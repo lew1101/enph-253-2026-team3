@@ -1,0 +1,20 @@
+CompileFlags:
+  Add:
+    - "-D__xtensa__"
+    - "-DESP32"
+    - "-DESP_PLATFORM"
+  Remove:
+    - "-mlongcalls"
+    - "-fno-shrink-wrap"
+    - "-fstrict-volatile-bitfields"
+    - "-fno-tree-switch-conversion"
+
+Diagnostics:
+  Suppress:
+    - "drv_unknown_argument*"
+
+InlayHints:
+  Enabled: false
+
+Hover:
+  ShowAKA: true
