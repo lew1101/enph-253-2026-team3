@@ -6,6 +6,7 @@
 
 #include <cstdint>
 
+namespace driver {
 class ServoDriver {
   public:
     struct Config {
@@ -49,6 +50,7 @@ class ServoDriver {
 
     uint32_t deg_to_us(float deg) const;
     uint32_t us_to_duty(uint32_t us) const;
-    uint32_t duty_levels() const;
-    uint32_t max_duty() const;
+    inline uint32_t duty_levels() const { return 1UL << _config.duty_res; }
+    inline uint32_t max_duty() const { return duty_levels() - 1; }
 };
+} // namespace driver

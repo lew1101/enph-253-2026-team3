@@ -10,10 +10,22 @@ ColumnLimit: 100
 PointerAlignment: Right
 DerivePointerAlignment: false
 
-AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: Empty
-AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: false
+
+AlwaysBreakTemplateDeclarations: Yes
+
+BinPackArguments: false
+BinPackParameters: false
+
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
 
 SortIncludes: false
 IncludeBlocks: Preserve
