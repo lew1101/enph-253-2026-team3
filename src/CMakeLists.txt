@@ -1,7 +1,7 @@
 idf_component_register(
     SRC_DIRS
         "."
-        "drivers"
+        "app_driver"
         "control"
         "comms"
         "tasks"
