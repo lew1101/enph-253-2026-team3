@@ -6,3 +6,7 @@
 
 #include "driver/gpio.h"
 #include "driver/mcpwm_prelude.h"
+
+namespace driver{
+
+} // namespace driver

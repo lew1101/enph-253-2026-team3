@@ -1,0 +1,46 @@
+#pragma once
+
+#include <cstdint>
+#include <type_traits>
+
+namespace telemetry {
+struct __attribute__((packed)) TlvPacketHeader {
+    uint16_t magic; //
+    uint8_t version;
+    uint8_t packet_type; // Telemetry type (e.g., 0 for sensor data, 1 for status update, etc.)
+    uint16_t packet_len; // length of the total packet (including header) in bytes
+    uint16_t packet_seq;
+    uint32_t tick; // system tick at the time of packet creation
+};
+
+template <typename T>
+struct IsTlvValue : std::false_type {};
+
+template <>
+struct IsTlvValue<bool> : std::true_type {};
+
+template <>
+struct IsTlvValue<uint8_t> : std::true_type {};
+
+template <>
+struct IsTlvValue<uint16_t> : std::true_type {};
+
+template <>
+struct IsTlvValue<uint32_t> : std::true_type {};
+
+template <>
+struct IsTlvValue<int32_t> : std::true_type {};
+
+template <>
+struct IsTlvValue<float> : std::true_type {};
+
+template <uint8_t TlvType, typename T>
+struct TlvField {
+    static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
+
+    static constexpr uint8_t type = TlvType;
+    static constexpr uint16_t payload_len = sizeof(T);
+
+    T payload;
+};
+} // namespace telemetry
