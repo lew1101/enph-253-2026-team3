@@ -1,11 +1,8 @@
 #pragma once
 
+#include <Arduino.h>
+
 #include "comms/tlv_fields.hpp"
-
-#include "esp_err.h"
-
-#include <cstdint>
-#include <cstring>
 
 namespace telemetry {
 class TlvPacketParser {
@@ -81,12 +78,37 @@ class TlvPacketParser {
         return result;
     }
 
+    template <uint8_t TlvType>
+    esp_err_t read_string(char* out, size_t buf_capacity)
+    {
+        if (!_ok) return ESP_ERR_INVALID_STATE;
+        if (out == nullptr) return ESP_ERR_INVALID_ARG;
+
+        TlvType_t type;
+        TlvPayloadLen_t payload_len;
+
+        if (!read_raw(&type, sizeof(type)) || !read_raw(&payload_len, sizeof(payload_len))) {
+            _ok = false;
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        if (type != TlvType) return ESP_ERR_INVALID_RESPONSE;
+        if (payload_len > buf_capacity) return ESP_ERR_INVALID_SIZE;
+
+        if (!read_raw(out, payload_len)) {
+            _ok = false;
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        return ESP_OK;
+    }
+
     esp_err_t skip()
     {
         if (!_ok) return ESP_ERR_INVALID_STATE;
 
-        uint8_t type;
-        uint16_t payload_len;
+        TlvType_t type;
+        TlvPayloadLen_t payload_len;
 
         if (!read_raw(&type, sizeof(type)) || !read_raw(&payload_len, sizeof(payload_len))) {
             _ok = false;
@@ -112,7 +134,7 @@ class TlvPacketParser {
     inline size_t remaining() const { return _end - _it; }
     inline bool has_next() const { return _ok && remaining() > 0; }
 
-    inline const TlvPacketHeader &parse_header() const { return *_header; }
+    inline const TlvPacketHeader &header() const { return *_header; }
 
     inline const uint8_t *begin() const { return _begin; }
     inline const uint8_t *end() const { return _end; }
@@ -122,7 +144,7 @@ class TlvPacketParser {
     bool read_raw(void *out, size_t n)
     {
         if (!_ok || out == nullptr || remaining() < n) return false;
-        std::memcpy(out, _it, n);
+        memcpy(out, _it, n);
         _it += n;
         return true;
     }

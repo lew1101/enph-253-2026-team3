@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #include "esp_log.h"
 
 #include "freertos/FreeRTOS.h"
@@ -5,7 +7,11 @@
 
 static constexpr char TAG[] = "main";
 
-extern "C" void app_main(void)
+void setUp() {
+    Serial.begin(SERIAL_BAUD);
+}
+
+void loop()
 {
     ESP_LOGI(TAG, "Robot starting");
 

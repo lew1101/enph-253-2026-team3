@@ -1,12 +1,8 @@
 #pragma once
 
-#include "esp_err.h"
+#include <Arduino.h>
 
 #include "comms/tlv_fields.hpp"
-
-#include <cstdint>
-#include <cstring>
-
 namespace telemetry {
 class TlvPacketWriter {
   public:
@@ -67,11 +63,11 @@ class TlvPacketWriter {
     }
 
     template <uint8_t TlvType, typename T>
-    TlvPacketWriter &add(const TlvField<TlvType, T> &field)
+    TlvPacketWriter &add_field(const TlvField<TlvType, T> &field)
     {
         if (_ok) {
-            constexpr uint8_t type = field.type;
-            constexpr uint16_t length = field.payload_len;
+            constexpr TlvType_t type = field.type;
+            constexpr TlvPayloadLen_t length = field.payload_len;
 
             write_raw(&type, sizeof(type));
             write_raw(&length, sizeof(length));
@@ -81,10 +77,42 @@ class TlvPacketWriter {
         return *this;
     }
 
+    template <TlvType_t TlvType>
+    TlvPacketWriter &add_string_field(const TlvStringField<TlvType> &field)
+    {
+        if (_ok) {
+            constexpr TlvType_t type = field.type;
+            const TlvPayloadLen_t length = field.payload_len;
+
+            if (field.payload == nullptr && length != 0) {
+                _ok = false;
+                return *this;
+            }
+
+            write_raw(&type, sizeof(type));
+            write_raw(&length, sizeof(length));
+
+            if (length > 0) {
+                write_raw(field.payload, length);
+            }
+        }
+
+        return *this;
+    }
+
     template <uint8_t TlvType, typename T>
     inline TlvPacketWriter &add(const T &value)
     {
-        return add(TlvField<TlvType, T>{value});
+        return add_field(TlvField<TlvType, T>{value});
+    }
+
+    template <uint8_t TlvType>
+    inline TlvPacketWriter &add(const char *value, size_t n)
+    {
+        return add_field(TlvStringField<TlvType>{
+            .payload = value, //
+            .payload_len = n  //
+        });
     }
 
     inline bool ok() const { return _ok; }
@@ -108,7 +136,7 @@ class TlvPacketWriter {
             return false;
         }
 
-        std::memcpy(_it, data, n);
+        memcpy(_it, data, n);
         _it += n;
 
         return true;

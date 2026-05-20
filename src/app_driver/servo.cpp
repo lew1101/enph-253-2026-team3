@@ -1,11 +1,12 @@
+#include <Arduino.h>
+
 #include "app_driver/servo.hpp"
 
 #include <algorithm>
-#include <cstdint>
+
 
 namespace driver {
 using std::clamp;
-
 // --- Constructor ---
 
 ServoDriver::ServoDriver(const Config &config)

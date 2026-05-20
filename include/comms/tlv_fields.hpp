@@ -17,9 +17,6 @@ template <typename T>
 struct IsTlvValue : std::false_type {};
 
 template <>
-struct IsTlvValue<bool> : std::true_type {};
-
-template <>
 struct IsTlvValue<uint8_t> : std::true_type {};
 
 template <>
@@ -34,13 +31,24 @@ struct IsTlvValue<int32_t> : std::true_type {};
 template <>
 struct IsTlvValue<float> : std::true_type {};
 
+using TlvType_t = uint8_t;
+using TlvPayloadLen_t = uint16_t;
+
 template <uint8_t TlvType, typename T>
 struct TlvField {
     static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
 
-    static constexpr uint8_t type = TlvType;
-    static constexpr uint16_t payload_len = sizeof(T);
+    static constexpr TlvType_t type = TlvType;
+    static constexpr TlvPayloadLen_t payload_len = sizeof(T);
 
-    T payload;
+    T payload{};
+};
+
+template <uint8_t TlvType>
+struct TlvStringField {
+    static constexpr TlvType_t type = TlvType;
+
+    const uint16_t payload_len{};
+    const char *payload{};
 };
 } // namespace telemetry
