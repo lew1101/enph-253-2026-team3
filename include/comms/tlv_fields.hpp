@@ -48,7 +48,7 @@ template <uint8_t TlvType>
 struct TlvStringField {
     static constexpr TlvType_t type = TlvType;
 
-    const uint16_t payload_len{};
+    const TlvPayloadLen_t payload_len{};
     const char *payload{};
 };
 } // namespace telemetry

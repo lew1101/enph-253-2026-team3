@@ -4,7 +4,6 @@
 
 #include <algorithm>
 
-
 namespace driver {
 using std::clamp;
 // --- Constructor ---
@@ -16,91 +15,63 @@ ServoDriver::ServoDriver(const Config &config)
 
 // --- Public API ---
 
-esp_err_t ServoDriver::init()
+bool ServoDriver::init()
 {
-    if (_initialized) return ESP_ERR_INVALID_STATE; // user error
-    if (_config.gpio == GPIO_NUM_NC) return ESP_ERR_INVALID_ARG;
-    if (_config.min_pulse_us >= _config.max_pulse_us) return ESP_ERR_INVALID_ARG;
-    if (_config.freq_hz == 0) return ESP_ERR_INVALID_ARG;
-    if (_config.min_pulse_deg >= _config.max_pulse_deg) return ESP_ERR_INVALID_ARG;
-    if (_config.min_clamp_deg >= _config.max_clamp_deg) return ESP_ERR_INVALID_ARG;
+    if (_initialized) return false; // user error
+    if (_config.gpio == GPIO_NUM_NC) return false;
+    if (_config.min_pulse_us >= _config.max_pulse_us) return false;
+    if (_config.freq_hz == 0) return false;
+    if (_config.min_pulse_deg >= _config.max_pulse_deg) return false;
+    if (_config.min_clamp_deg >= _config.max_clamp_deg) return false;
 
     if (_config.min_clamp_deg < _config.min_pulse_deg ||
         _config.max_clamp_deg > _config.max_pulse_deg)
-        return ESP_ERR_INVALID_ARG;
+        return false;
 
-    if (_config.max_pulse_us > (1000000UL / _config.freq_hz)) return ESP_ERR_INVALID_ARG;
+    if (_config.max_pulse_us > (1000000UL / _config.freq_hz)) return false;
 
-    esp_err_t err;
+    const double actual_freq = ledcSetup(_config.channel, _config.freq_hz, _config.duty_res_bits);
 
-    if (_config.configure_timer) {
-        // configure ledc timer
-        ledc_timer_config_t timer_config = {};
-        timer_config.speed_mode = _config.speed_mode;
-        timer_config.duty_resolution = _config.duty_res;
-        timer_config.timer_num = _config.timer;
-        timer_config.freq_hz = _config.freq_hz;
-        timer_config.clk_cfg = LEDC_AUTO_CLK;
+    if (actual_freq == 0.0) return false;
 
-        err = ledc_timer_config(&timer_config);
-        if (err != ESP_OK) return err;
-    }
-
-    // now configure ledc channel
-    ledc_channel_config_t channel_config = {};
-    channel_config.gpio_num = _config.gpio;
-    channel_config.speed_mode = _config.speed_mode;
-    channel_config.channel = _config.channel;
-    channel_config.timer_sel = _config.timer;
-    channel_config.duty = 0; // off
-    channel_config.hpoint = 0;
-
-    err = ledc_channel_config(&channel_config);
-    if (err != ESP_OK) return err;
+    ledcAttachPin(_config.gpio, _config.channel);
 
     _initialized = true;
 
     // set to center position
-    err = center();
-    if (err != ESP_OK) _initialized = false;
+    if (!center()) {
+        _initialized = false;
+        return false;
+    }
 
-    return err;
+    return true;
 }
 
-esp_err_t ServoDriver::set_deg(float deg)
+bool ServoDriver::set_deg(float deg)
 {
-    if (!_initialized) return ESP_ERR_INVALID_STATE;
+    if (!_initialized) return false;
 
     const uint32_t us = deg_to_us(deg);
     return set_us(us);
 }
 
-esp_err_t ServoDriver::set_us(uint32_t us)
+bool ServoDriver::set_us(uint32_t us)
 {
-    if (!_initialized) return ESP_ERR_INVALID_STATE;
+    if (!_initialized) return false;
 
     us = clamp(us, _config.min_pulse_us, _config.max_pulse_us);
     const uint32_t duty = us_to_duty(us);
 
-    esp_err_t err = ledc_set_duty(_config.speed_mode, _config.channel, duty);
-    if (err != ESP_OK) return err;
-
-    return ledc_update_duty(_config.speed_mode, _config.channel);
+    ledcWrite(_config.channel, duty);
+    return true;
 }
 
-esp_err_t ServoDriver::center()
+bool ServoDriver::center()
 {
-    if (!_initialized) return ESP_ERR_INVALID_STATE;
+    if (!_initialized) return false;
 
     const float center_deg = 0.5f * (_config.min_clamp_deg + _config.max_clamp_deg);
     return set_deg(center_deg);
-}
-
-esp_err_t ServoDriver::stop()
-{
-    if (!_initialized) return ESP_ERR_INVALID_STATE;
-
-    return ledc_stop(_config.speed_mode, _config.channel, 0);
 }
 
 // --- Private helper methods ---

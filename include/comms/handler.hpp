@@ -1,6 +1,8 @@
 #pragma once
 
 #include "comms/tlv_parser.hpp"
+#include "comms/tlv_fields.hpp"
+
 #include <Arduino.h>
 
 namespace telemetry {
