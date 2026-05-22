@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 
-#include "esp_err.h"
-
 #include <cstdint>
 
 namespace driver {

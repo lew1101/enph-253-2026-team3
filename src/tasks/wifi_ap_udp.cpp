@@ -17,13 +17,11 @@ static constexpr uint16_t LOCAL_UDP_PORT = 4210;
 static constexpr size_t TX_BUFFER_SIZE = 256;
 static constexpr size_t RX_BUFFER_SIZE = 256;
 
-using telemetry::PacketError;
-using telemetry::PacketHandler;
-using telemetry::PacketHandlerResult;
-using telemetry::ResponseType;
-
 static void wifi_udp_task(void *arg)
 {
+    using telemetry::PacketHandler;
+    using telemetry::PacketHandlerResult;
+
     const auto *context = reinterpret_cast<const WifiUdpContext *>(arg);
 
     const WifiUdpConfig config = context->config;

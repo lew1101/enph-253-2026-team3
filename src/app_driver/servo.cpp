@@ -30,12 +30,10 @@ bool ServoDriver::init()
 
     if (_config.max_pulse_us > (1000000UL / _config.freq_hz)) return false;
 
-    const double actual_freq = ledcSetup(_config.channel, _config.freq_hz, _config.duty_res_bits);
+    const bool attached =
+        ledcAttachChannel(_config.gpio, _config.freq_hz, _config.duty_res_bits, _config.channel);
 
-    if (actual_freq == 0.0) return false;
-
-    ledcAttachPin(_config.gpio, _config.channel);
-
+    if (!attached) return false;
     _initialized = true;
 
     // set to center position
@@ -62,7 +60,7 @@ bool ServoDriver::set_us(uint32_t us)
     us = clamp(us, _config.min_pulse_us, _config.max_pulse_us);
     const uint32_t duty = us_to_duty(us);
 
-    ledcWrite(_config.channel, duty);
+    ledcWriteChannel(_config.channel, duty);
     return true;
 }
 
@@ -90,12 +88,19 @@ uint32_t ServoDriver::deg_to_us(float deg) const
 
 uint32_t ServoDriver::us_to_duty(uint32_t us) const
 {
-    const float period_us = 1000000.0f / static_cast<float>(_config.freq_hz);
-    const float duty_f = static_cast<float>(us) / period_us;
+    // const float period_us = 1000000.0f / static_cast<float>(_config.freq_hz);
+    // const float duty_f = static_cast<float>(us) / period_us;
 
-    uint32_t ticks_high =
-        static_cast<uint32_t>(duty_f * duty_levels() + 0.5f); // round to nearest tick
+    // uint32_t ticks_high =
+    //     static_cast<uint32_t>(duty_f * duty_levels() + 0.5f); // round to nearest tick
 
-    return clamp<uint32_t>(ticks_high, 0UL, max_duty());
+    // return clamp<uint32_t>(ticks_high, 0UL, max_duty());
+
+    // better implementation
+    const uint64_t numerator = static_cast<uint64_t>(us) * max_duty();
+    const uint64_t denominator = 1000000UL / _config.freq_hz;
+
+    // divide towards nearest whole integer
+    return static_cast<uint32_t>((numerator + denominator / 2UL) / denominator);
 }
 } // namespace driver

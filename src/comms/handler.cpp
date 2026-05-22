@@ -9,7 +9,6 @@
 
 #include "esp_err.h"
 
-#include "freertos/portmacro.h"
 #include "freertos/task.h"
 
 #include <cstdint>
@@ -186,11 +185,13 @@ PacketHandlerResult PacketHandler::handle_command(TlvPacketParser &parser)
 PacketHandlerResult PacketHandler::handle_ping(TlvPacketParser &parser, uint16_t sequence)
 {
     if (!parser.ok()) return PacketHandlerResult{.error = PacketError::ParseFail};
-    if (_robot_cbs.read_telemetry == nullptr) return PacketHandlerResult{.error = PacketError::InternalError};
+    if (_robot_cbs.read_telemetry == nullptr)
+        return PacketHandlerResult{.error = PacketError::InternalError};
 
     TlvPacketHeader header = parser.header();
     // check if header type is correct.
-    if (header.packet_type != PacketType::PING) return PacketHandlerResult{.error = PacketError::InvalidPacket};
+    if (header.packet_type != PacketType::PING)
+        return PacketHandlerResult{.error = PacketError::InvalidPacket};
     return build_pong_packet(sequence);
 }
 
