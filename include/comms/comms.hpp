@@ -177,7 +177,7 @@ class PacketHandler {
     }
 
     PacketHandlerResult handle_received_packet(size_t rx_len);
-    PacketHandlerResult build_telemetry_packet(uint16_t &sequence);
+    PacketHandlerResult build_telemetry_packet(uint16_t sequence);
     PacketHandlerResult build_pong_packet(uint16_t ping_seq);
 
   private:

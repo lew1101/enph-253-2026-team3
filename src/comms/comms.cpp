@@ -56,7 +56,7 @@ PacketHandlerResult PacketHandler::handle_received_packet(size_t rx_len)
     return resp;
 }
 
-PacketHandlerResult PacketHandler::build_telemetry_packet(uint16_t &sequence)
+PacketHandlerResult PacketHandler::build_telemetry_packet(uint16_t sequence)
 {
     if (_robot_cbs.read_telemetry == nullptr) {
         return PacketHandlerResult{
@@ -84,8 +84,6 @@ PacketHandlerResult PacketHandler::build_telemetry_packet(uint16_t &sequence)
         ESP_LOGW(TAG, "Unable to construct telemetry packet");
         return PacketHandlerResult{.error = PacketError::InternalError};
     }
-
-    sequence++; // increment only if everything ok
 
     return PacketHandlerResult{
         .error = PacketError::None,
