@@ -1,9 +1,10 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>
+
 #include <type_traits>
 
-namespace telemetry {
+namespace comms {
 struct __attribute__((packed)) TlvPacketHeader {
     uint16_t magic; //
     uint8_t version;
@@ -51,4 +52,4 @@ struct TlvStringField {
     const TlvPayloadLen_t payload_len{};
     const char *payload{};
 };
-} // namespace telemetry
+} // namespace comms

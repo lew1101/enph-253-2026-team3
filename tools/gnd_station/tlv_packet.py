@@ -100,6 +100,24 @@ class TlvField:
     def payload_len(self) -> int:
         return len(self.payload)
 
+    @staticmethod
+    def pack_float(field_type: TlvType, value: float) -> "TlvField":
+        return TlvField(field_type, struct.pack("<f", float(value)))
+
+    @staticmethod
+    def pack_u8(field_type: TlvType, value: int) -> "TlvField":
+        if not 0 <= value <= 0xFF:
+            raise ValueError("u8 out of range")
+        return TlvField(field_type, struct.pack("<B", value))
+
+    @staticmethod
+    def pack_i32(field_type: TlvType, value: int) -> "TlvField":
+        return TlvField(field_type, struct.pack("<i", value))
+
+    @staticmethod
+    def pack_string(field_type: TlvType, value: str) -> "TlvField":
+        return TlvField(field_type, value.encode("utf-8"))
+
     def pack(self) -> bytes:
         if self.payload_len > 0xFFFF:
             raise ValueError("TLV payload too large")
@@ -160,24 +178,6 @@ class Packet:
         if field is None:
             return default
         return field.payload.decode("utf-8", errors="replace")
-
-
-def pack_float(field_type: TlvType, value: float) -> TlvField:
-    return TlvField(field_type, struct.pack("<f", float(value)))
-
-
-def pack_u8(field_type: TlvType, value: int) -> TlvField:
-    if not 0 <= value <= 0xFF:
-        raise ValueError("u8 out of range")
-    return TlvField(field_type, struct.pack("<B", value))
-
-
-def pack_i32(field_type: TlvType, value: int) -> TlvField:
-    return TlvField(field_type, struct.pack("<i", value))
-
-
-def pack_string(field_type: TlvType, value: str) -> TlvField:
-    return TlvField(field_type, value.encode("utf-8"))
 
 
 def build_packet(

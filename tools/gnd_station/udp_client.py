@@ -15,7 +15,7 @@ class RobotTelemetry:
     tick: int = 0
 
     @staticmethod
-    def telemetry_from_packet(packet: Packet) -> "RobotTelemetry":
+    def from_packet(packet: Packet) -> "RobotTelemetry":
         if packet.header.packet_type != PacketType.TELEMETRY:
             raise TlvFormatError(
                 f"expected TELEMETRY, got {packet.header.packet_type.name}"
@@ -46,9 +46,9 @@ def build_command_packet(command: RobotCommand) -> bytes:
         sequence=command.sequence,
         tick=command.tick,
         fields=(
-            pack_float(TlvType.CMD_DRIVETRAIN_L, command.drivetrain_l),
-            pack_float(TlvType.CMD_DRIVETRAIN_R, command.drivetrain_r),
-            pack_u8(TlvType.CMD_ESTOP, command.estop),
+            TlvField.pack_float(TlvType.CMD_DRIVETRAIN_L, command.drivetrain_l),
+            TlvField.pack_float(TlvType.CMD_DRIVETRAIN_R, command.drivetrain_r),
+            TlvField.pack_u8(TlvType.CMD_ESTOP, command.estop),
         ),
     )
 
@@ -117,4 +117,4 @@ class RobotUdpClient:
 
     def receive_telemetry(self, max_bytes: int = 2048) -> RobotTelemetry:
         packet, _ = self.receive_packet(max_bytes)
-        return RobotTelemetry.telemetry_from_packet(packet)
+        return RobotTelemetry.from_packet(packet)

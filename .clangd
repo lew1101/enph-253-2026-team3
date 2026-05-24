@@ -9,6 +9,7 @@ CompileFlags:
     - "-fstrict-volatile-bitfields"
     - "-fno-tree-switch-conversion"
     - "-mdisable-hardware-atomics"
+    - "-fstrict-volataile-bitfields"
     - "-mfix-esp32-psram-cache-issue"
     - "-mfix-esp32-psram-cache-strategy=memw"
 

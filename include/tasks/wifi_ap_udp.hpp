@@ -2,24 +2,20 @@
 
 #include <Arduino.h>
 
-#include "comms/handler.hpp"
+#include "comms/comms.hpp"
 
-using telemetry::RobotCallbacks;
-
-static constexpr uint32_t PERIOD_MS = 50;
-static constexpr uint32_t TASK_STACK_SIZE = 4096;
-static constexpr uint32_t TASK_PRIORITY = 5;
+using comms::RobotCallbacks;
 
 struct WifiUdpConfig {
-    uint32_t stack_depth;
-    UBaseType_t priority;
-    BaseType_t core_id;
-    uint32_t period_ms;
+    uint32_t stack_depth = 4096;
+    UBaseType_t priority = 2;
+    BaseType_t core_id = 1;
+    uint32_t period_ms = 50;
 };
 
 struct WifiUdpContext {
-    WifiUdpConfig config;
-    RobotCallbacks robot_cbs;
+    WifiUdpConfig config {};
+    RobotCallbacks callbacks {};
 };
 
-void start_wifi_udp_task(const WifiUdpContext &context);
+esp_err_t start_wifi_udp_task(WifiUdpContext &context, TaskHandle_t *out_handle);

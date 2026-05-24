@@ -3,7 +3,8 @@
 #include <Arduino.h>
 
 #include "comms/tlv_fields.hpp"
-namespace telemetry {
+#include "esp_err.h"
+namespace comms {
 class TlvPacketWriter {
   public:
     static constexpr uint16_t MAGIC_NUMBER = 0xABCD;
@@ -18,6 +19,7 @@ class TlvPacketWriter {
     TlvPacketHeader *_header;
     uint8_t *_payload;
     bool _ok;
+    bool _initialized = false;
 
   public:
     explicit TlvPacketWriter(uint8_t *buffer, size_t capacity)
@@ -38,7 +40,7 @@ class TlvPacketWriter {
 
     esp_err_t begin(uint8_t packet_type, uint16_t packet_seq, uint32_t tick)
     {
-        if (!_ok) return ESP_ERR_INVALID_ARG;
+        if (!_ok || _initialized) return ESP_ERR_INVALID_STATE;
 
         _header->magic = MAGIC_NUMBER;
         _header->version = VERSION;
@@ -47,12 +49,14 @@ class TlvPacketWriter {
         _header->packet_seq = packet_seq;
         _header->tick = tick;
 
+        _initialized = true;
+
         return ESP_OK;
     }
 
     esp_err_t finish()
     {
-        if (!_ok) return ESP_ERR_INVALID_ARG;
+        if (!_ok || !_initialized) return ESP_ERR_INVALID_ARG;
         if (_it > _end) {
             _ok = false;
             return ESP_ERR_INVALID_STATE;
@@ -110,8 +114,8 @@ class TlvPacketWriter {
     inline TlvPacketWriter &add(const char *value, size_t n)
     {
         return add_field(TlvStringField<TlvType>{
-            .payload = value, //
-            .payload_len = n  //
+            .payload_len = n,  //
+            .payload = value //
         });
     }
 
@@ -142,4 +146,4 @@ class TlvPacketWriter {
         return true;
     }
 };
-} // namespace telemetry
+} // namespace comms

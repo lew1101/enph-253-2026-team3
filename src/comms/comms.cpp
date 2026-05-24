@@ -2,12 +2,11 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-#include "comms/handler.hpp"
+#include "esp_err.h"
 
+#include "comms/comms.hpp"
 #include "comms/tlv_writer.hpp"
 #include "comms/tlv_parser.hpp"
-
-#include "esp_err.h"
 
 #include "freertos/task.h"
 
@@ -17,7 +16,7 @@ static constexpr const char TAG[] = "udp_comms_task";
 
 static constexpr inline auto get_current_tick = xTaskGetTickCount;
 
-namespace telemetry {
+namespace comms {
 PacketHandlerResult PacketHandler::handle_received_packet(size_t rx_len)
 {
     TlvPacketParser parser(_rx_buf, rx_len);
@@ -59,32 +58,28 @@ PacketHandlerResult PacketHandler::handle_received_packet(size_t rx_len)
 
 PacketHandlerResult PacketHandler::build_telemetry_packet(uint16_t &sequence)
 {
-    size_t tx_len = 0;
-
-    if (_robot_cbs.read_telemetry == nullptr)
-        return PacketHandlerResult{.error = PacketError::InternalError};
+    if (_robot_cbs.read_telemetry == nullptr) {
+        return PacketHandlerResult{
+            .error = PacketError::None,
+            .response_type = ResponseType::None //
+        };
+    }
 
     RobotTelemetry telemetry{};
     esp_err_t err;
 
-    err = _robot_cbs.read_telemetry(telemetry, _robot_cbs.param);
+    if (_robot_cbs.handle_command != nullptr) {
+        err = _robot_cbs.read_telemetry(telemetry, _robot_cbs.param);
 
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Unable to read telemetry from callback");
-        return PacketHandlerResult{.error = PacketError::InternalError};
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Unable to read telemetry from callback");
+            return PacketHandlerResult{.error = PacketError::InternalError};
+        }
     }
 
     TlvPacketWriter writer(_tx_buf, _tx_cap);
 
-    err = writer.begin(PacketType::TELEMETRY, sequence, telemetry.tick);
-    if (err != ESP_OK) return PacketHandlerResult{.error = PacketError::InternalError};
-
-    writer.add<TlvType::BATT_V>(telemetry.battery_v)
-        .add<TlvType::DRIVETRAIN_L>(telemetry.drivetrain_l)
-        .add<TlvType::DRIVETRAIN_R>(telemetry.drivetrain_r)
-        .add<TlvType::ERR>(telemetry.err);
-
-    err = writer.finish();
+    err = telemetry.to_tlv(writer, sequence);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Unable to construct telemetry packet");
         return PacketHandlerResult{.error = PacketError::InternalError};
@@ -107,6 +102,8 @@ PacketHandlerResult PacketHandler::build_pong_packet(uint16_t ping_seq)
 
     uint16_t tick = get_current_tick();
     esp_err_t err = writer.begin(PacketType::PONG, ping_seq, tick);
+
+    ESP_LOGI(TAG, "building pong packet");
 
     if (err != ESP_OK) return PacketHandlerResult{.error = PacketError::InternalError};
     err = writer.finish();
@@ -135,37 +132,12 @@ PacketHandlerResult PacketHandler::handle_command(TlvPacketParser &parser)
     if (header.packet_type != PacketType::COMMAND)
         return PacketHandlerResult{.error = PacketError::InvalidPacket};
 
-    RobotCommand command = {};
-    esp_err_t err;
+    RobotCommand command{};
+    esp_err_t err = command.from_tlv(parser);
 
-    while (parser.has_next()) {
-        switch (parser.peek_type()) {
-            case TlvType::CMD_DRIVETRAIN_L:
-                err = parser.read<TlvType::CMD_DRIVETRAIN_L>(command.drivetrain_l);
-                break;
-
-            case TlvType::CMD_DRIVETRAIN_R:
-                err = parser.read<TlvType::CMD_DRIVETRAIN_R>(command.drivetrain_r);
-                break;
-
-            case TlvType::CMD_ESTOP:
-                err = parser.read<TlvType::CMD_ESTOP>(command.estop);
-                break;
-
-            default:
-                err = parser.skip();
-                break;
-        }
-
-        if (err != ESP_OK) {
-            command.valid = false;
-            return PacketHandlerResult{.error = PacketError::ParseFail};
-        }
+    if (err != ESP_OK) {
+        return PacketHandlerResult{.error = PacketError::ParseFail};
     }
-
-    command.sequence = header.packet_seq;
-    command.tick = header.tick;
-    command.valid = true;
 
     if (_robot_cbs.handle_command != nullptr) {
         err = _robot_cbs.handle_command(command, _robot_cbs.param);
@@ -185,8 +157,8 @@ PacketHandlerResult PacketHandler::handle_command(TlvPacketParser &parser)
 PacketHandlerResult PacketHandler::handle_ping(TlvPacketParser &parser, uint16_t sequence)
 {
     if (!parser.ok()) return PacketHandlerResult{.error = PacketError::ParseFail};
-    if (_robot_cbs.read_telemetry == nullptr)
-        return PacketHandlerResult{.error = PacketError::InternalError};
+
+    // ESP_LOGI(TAG, "PING");
 
     TlvPacketHeader header = parser.header();
     // check if header type is correct.
@@ -195,4 +167,4 @@ PacketHandlerResult PacketHandler::handle_ping(TlvPacketParser &parser, uint16_t
     return build_pong_packet(sequence);
 }
 
-} // namespace telemetry
+} // namespace comms

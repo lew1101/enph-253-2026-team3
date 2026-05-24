@@ -4,7 +4,7 @@
 
 #include "comms/tlv_fields.hpp"
 
-namespace telemetry {
+namespace comms {
 class TlvPacketParser {
   public:
     static constexpr uint16_t MAGIC_NUMBER = 0xABCD;
@@ -39,43 +39,28 @@ class TlvPacketParser {
     }
 
     template <uint8_t TlvType, typename T>
-    esp_err_t read(TlvField<TlvType, T> &out)
+    inline esp_err_t read(T &out)
     {
         if (!_ok) return ESP_ERR_INVALID_STATE;
 
-        if (out == nullptr) return ESP_ERR_INVALID_ARG;
-        out = {};
+        TlvType_t type;
+        TlvPayloadLen_t len;
 
-        if (!read_raw(&out.type, sizeof(out.type)) ||
-            !read_raw(&out.payload_len, sizeof(out.payload_len))) {
+        if (!read_raw(&type, sizeof(type)) ||
+            !read_raw(&len, sizeof(len))) {
             _ok = false;
             return ESP_ERR_INVALID_SIZE;
         }
 
-        if (out.type != TlvType) return ESP_ERR_INVALID_RESPONSE;
-        if (out.payload_len != sizeof(T)) return ESP_ERR_INVALID_SIZE;
+        if (type != TlvType) return ESP_ERR_INVALID_RESPONSE;
+        if (len != sizeof(T)) return ESP_ERR_INVALID_SIZE;
 
-        if (!read_raw(&out.payload, sizeof(out.payload))) {
+        if (!read_raw(&out, sizeof(out))) {
             _ok = false;
             return ESP_ERR_INVALID_SIZE;
         }
 
         return ESP_OK;
-    }
-
-    template <uint8_t TlvType, typename T>
-    inline esp_err_t read(T &out)
-    {
-        if (!_ok) return ESP_ERR_INVALID_STATE;
-        if (out == nullptr) return ESP_ERR_INVALID_ARG;
-
-        TlvField<TlvType, T> field;
-        esp_err_t result = read(&field);
-
-        if (result == ESP_OK) {
-            *out = field.payload;
-        }
-        return result;
     }
 
     template <uint8_t TlvType>
@@ -149,4 +134,4 @@ class TlvPacketParser {
         return true;
     }
 };
-} // namespace telemetry
+} // namespace comms
