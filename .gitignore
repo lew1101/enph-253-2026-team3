@@ -5,7 +5,8 @@
 .pioenvs
 .piolibdeps
 
-.vscode/*
+.vscode
+.idea
 
 compile_commands.json
 

@@ -41,6 +41,8 @@ class TlvPacketParser {
     template <typename T>
     inline esp_err_t read(const TlvType_t tlv_type, T &out)
     {
+        static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
+
         if (!_ok) return ESP_ERR_INVALID_STATE;
 
         TlvType_t type;

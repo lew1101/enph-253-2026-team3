@@ -48,6 +48,6 @@ struct TlvField {
 struct TlvStringField {
     TlvType_t type;
     const TlvPayloadLen_t payload_len;
-    const char *payload;
+    const char *payload_buf;
 };
 } // namespace comms

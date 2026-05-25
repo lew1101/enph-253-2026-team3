@@ -69,12 +69,11 @@ class TlvPacketWriter {
     template <typename T>
     TlvPacketWriter &add_field(const TlvField<T> &field)
     {
-        if (_ok) {
-            const TlvType_t type = field.type;
-            constexpr TlvPayloadLen_t length = field.payload_len;
+        static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
 
-            write_raw(&type, sizeof(type));
-            write_raw(&length, sizeof(length));
+        if (_ok) {
+            write_raw(&field.type, sizeof(field.type));
+            write_raw(&field.payload_len, sizeof(field.payload_len));
             write_raw(&field.payload, sizeof(field.payload));
         }
 
@@ -84,19 +83,15 @@ class TlvPacketWriter {
     TlvPacketWriter &add_string_field(const TlvStringField &field)
     {
         if (_ok) {
-            const TlvType_t tlv_type = field.type;
-            const TlvPayloadLen_t length = field.payload_len;
-
-            if (field.payload == nullptr && length != 0) {
+            if (field.payload_buf == nullptr && field.payload_len != 0) {
                 _ok = false;
                 return *this;
             }
 
-            write_raw(&tlv_type, sizeof(tlv_type));
-            write_raw(&length, sizeof(length));
-
-            if (length > 0) {
-                write_raw(field.payload, length);
+            if (field.payload_len > 0) {
+                write_raw(&field.type, sizeof(field.type));
+                write_raw(&field.payload_len, sizeof(field.payload_len));
+                write_raw(field.payload_buf, field.payload_len);
             }
         }
 
@@ -106,16 +101,18 @@ class TlvPacketWriter {
     template <typename T>
     inline TlvPacketWriter &add(const TlvType_t tlv_type, const T &payload)
     {
+        static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
         return add_field(TlvField<T>{.type = tlv_type, .payload = payload});
     }
 
-    template <uint8_t TlvType>
-    inline TlvPacketWriter &add(const TlvType_t tlv_type, const char *value, TlvPayloadLen_t n)
+    inline TlvPacketWriter &add_string(const TlvType_t tlv_type,
+                                       const char *buf,
+                                       const TlvPayloadLen_t n)
     {
         return add_string_field(TlvStringField{
             .type = tlv_type,
-            .payload_len = n,  //
-            .payload = value //
+            .payload_len = n, //
+            .payload_buf = buf  //
         });
     }
 
