@@ -49,10 +49,10 @@ struct RobotTelemetry {
                             "failed to write telemetry header" //
         );
 
-        writer.add<TlvType::BATT_V>(battery_v)
-            .add<TlvType::DRIVETRAIN_L>(drivetrain_l)
-            .add<TlvType::DRIVETRAIN_R>(drivetrain_r)
-            .add<TlvType::ERR>(err);
+        writer.add(TlvType::BATT_V, battery_v)
+            .add(TlvType::DRIVETRAIN_L, drivetrain_l)
+            .add(TlvType::DRIVETRAIN_R, drivetrain_r)
+            .add(TlvType::ERR, err);
 
         ESP_RETURN_ON_ERROR(writer.finish(), TAG, "failed to construct telemetry packet");
 
@@ -88,19 +88,19 @@ struct RobotCommand {
         while (parser.has_next()) {
             switch (parser.peek_type()) {
                 case TlvType::CMD_DRIVETRAIN_L:
-                    ESP_RETURN_ON_ERROR(parser.read<TlvType::CMD_DRIVETRAIN_L>(drivetrain_l),
+                    ESP_RETURN_ON_ERROR(parser.read(TlvType::CMD_DRIVETRAIN_L, drivetrain_l),
                                         TAG,
                                         "failed to parse drivetrain_l, command packet ignored");
                     break;
 
                 case TlvType::CMD_DRIVETRAIN_R:
-                    ESP_RETURN_ON_ERROR(parser.read<TlvType::CMD_DRIVETRAIN_R>(drivetrain_r),
+                    ESP_RETURN_ON_ERROR(parser.read(TlvType::CMD_DRIVETRAIN_R, drivetrain_r),
                                         TAG,
                                         "failed to parse drivetrain_r, command packet ignored");
                     break;
 
                 case TlvType::CMD_ESTOP:
-                    ESP_RETURN_ON_ERROR(parser.read<TlvType::CMD_ESTOP>(estop),
+                    ESP_RETURN_ON_ERROR(parser.read(TlvType::CMD_ESTOP, estop),
                                         TAG,
                                         "failed to parse estop, command packet ignored");
                     break;

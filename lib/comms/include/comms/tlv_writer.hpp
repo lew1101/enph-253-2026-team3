@@ -66,11 +66,11 @@ class TlvPacketWriter {
         return ESP_OK;
     }
 
-    template <uint8_t TlvType, typename T>
-    TlvPacketWriter &add_field(const TlvField<TlvType, T> &field)
+    template <typename T>
+    TlvPacketWriter &add_field(const TlvField<T> &field)
     {
         if (_ok) {
-            constexpr TlvType_t type = field.type;
+            const TlvType_t type = field.type;
             constexpr TlvPayloadLen_t length = field.payload_len;
 
             write_raw(&type, sizeof(type));
@@ -81,11 +81,10 @@ class TlvPacketWriter {
         return *this;
     }
 
-    template <TlvType_t TlvType>
-    TlvPacketWriter &add_string_field(const TlvStringField<TlvType> &field)
+    TlvPacketWriter &add_string_field(const TlvStringField &field)
     {
         if (_ok) {
-            constexpr TlvType_t type = field.type;
+            const TlvType_t tlv_type = field.type;
             const TlvPayloadLen_t length = field.payload_len;
 
             if (field.payload == nullptr && length != 0) {
@@ -93,7 +92,7 @@ class TlvPacketWriter {
                 return *this;
             }
 
-            write_raw(&type, sizeof(type));
+            write_raw(&tlv_type, sizeof(tlv_type));
             write_raw(&length, sizeof(length));
 
             if (length > 0) {
@@ -104,16 +103,17 @@ class TlvPacketWriter {
         return *this;
     }
 
-    template <uint8_t TlvType, typename T>
-    inline TlvPacketWriter &add(const T &value)
+    template <typename T>
+    inline TlvPacketWriter &add(const TlvType_t tlv_type, const T &payload)
     {
-        return add_field(TlvField<TlvType, T>{value});
+        return add_field(TlvField<T>{.type = tlv_type, .payload = payload});
     }
 
     template <uint8_t TlvType>
-    inline TlvPacketWriter &add(const char *value, size_t n)
+    inline TlvPacketWriter &add(const TlvType_t tlv_type, const char *value, TlvPayloadLen_t n)
     {
-        return add_field(TlvStringField<TlvType>{
+        return add_string_field(TlvStringField{
+            .type = tlv_type,
             .payload_len = n,  //
             .payload = value //
         });

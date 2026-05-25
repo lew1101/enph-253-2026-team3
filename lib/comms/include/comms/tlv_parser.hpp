@@ -38,8 +38,8 @@ class TlvPacketParser {
         }
     }
 
-    template <uint8_t TlvType, typename T>
-    inline esp_err_t read(T &out)
+    template <typename T>
+    inline esp_err_t read(const TlvType_t tlv_type, T &out)
     {
         if (!_ok) return ESP_ERR_INVALID_STATE;
 
@@ -52,7 +52,7 @@ class TlvPacketParser {
             return ESP_ERR_INVALID_SIZE;
         }
 
-        if (type != TlvType) return ESP_ERR_INVALID_RESPONSE;
+        if (type != tlv_type) return ESP_ERR_INVALID_RESPONSE;
         if (len != sizeof(T)) return ESP_ERR_INVALID_SIZE;
 
         if (!read_raw(&out, sizeof(out))) {
@@ -63,8 +63,7 @@ class TlvPacketParser {
         return ESP_OK;
     }
 
-    template <uint8_t TlvType>
-    esp_err_t read_string(char* out, size_t buf_capacity)
+    esp_err_t read_string(const TlvType_t tlv_type, char* out, size_t buf_capacity)
     {
         if (!_ok) return ESP_ERR_INVALID_STATE;
         if (out == nullptr) return ESP_ERR_INVALID_ARG;
@@ -77,7 +76,7 @@ class TlvPacketParser {
             return ESP_ERR_INVALID_SIZE;
         }
 
-        if (type != TlvType) return ESP_ERR_INVALID_RESPONSE;
+        if (type != tlv_type) return ESP_ERR_INVALID_RESPONSE;
         if (payload_len > buf_capacity) return ESP_ERR_INVALID_SIZE;
 
         if (!read_raw(out, payload_len)) {

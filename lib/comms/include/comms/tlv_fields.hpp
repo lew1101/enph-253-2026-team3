@@ -35,21 +35,19 @@ struct IsTlvValue<float> : std::true_type {};
 using TlvType_t = uint8_t;
 using TlvPayloadLen_t = uint16_t;
 
-template <uint8_t TlvType, typename T>
+template <typename T>
 struct TlvField {
     static_assert(IsTlvValue<T>::value, "Unsupported TLV value type");
 
-    static constexpr TlvType_t type = TlvType;
     static constexpr TlvPayloadLen_t payload_len = sizeof(T);
 
-    T payload{};
+    TlvType_t type;
+    T payload;
 };
 
-template <uint8_t TlvType>
 struct TlvStringField {
-    static constexpr TlvType_t type = TlvType;
-
-    const TlvPayloadLen_t payload_len{};
-    const char *payload{};
+    TlvType_t type;
+    const TlvPayloadLen_t payload_len;
+    const char *payload;
 };
 } // namespace comms
