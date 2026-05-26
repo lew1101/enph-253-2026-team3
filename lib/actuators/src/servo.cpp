@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#include "app_driver/servo.hpp"
+#include "actuators/servo.hpp"
 
 #include <algorithm>
 

@@ -1,5 +1,6 @@
-.DS_Store
-.cache
+compile_commands.json
+
+build/*
 
 .pio
 .pioenvs
@@ -8,9 +9,8 @@
 .vscode
 .idea
 
-compile_commands.json
-
-build/*
+.DS_Store
+.cache
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

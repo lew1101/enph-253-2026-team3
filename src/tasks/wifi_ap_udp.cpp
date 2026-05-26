@@ -2,17 +2,17 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-#include "comms/comms.hpp"
-#include "tasks/wifi_ap_udp.hpp"
-
 #include "esp_err.h"
+
+#include "comms/comms.hpp"
+
+#include "tasks/wifi_ap_udp.hpp"
 
 static constexpr char TAG[] = "wifi_ap_udp";
 
-static constexpr char AP_SSID[] = "ESP32-Robot";
-static constexpr char AP_PASS[] = "robot1234";
-
-static constexpr uint16_t LOCAL_UDP_PORT = 4210;
+static constexpr char WIFI_AP_SSID[] = "enph-robot-team3";
+static constexpr char WIFI_AP_PASSWORD[] = "robot1234";
+static constexpr uint16_t UDP_PORT = 4210;
 
 static constexpr size_t TX_BUFFER_SIZE = 256;
 static constexpr size_t RX_BUFFER_SIZE = 256;
@@ -63,7 +63,7 @@ static void wifi_udp_task(void *arg)
 
     WiFi.mode(WIFI_AP);
 
-    if (!WiFi.softAP(AP_SSID, AP_PASS)) {
+    if (!WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD)) {
         ESP_LOGE(TAG, "Failed to start Wi-Fi AP");
         vTaskDelete(nullptr);
         return;
@@ -73,7 +73,7 @@ static void wifi_udp_task(void *arg)
 
     ESP_LOGI(TAG, "ESP Wi-Fi AP IP: %s", ap_ip.toString().c_str());
 
-    if (!udp.begin(LOCAL_UDP_PORT)) {
+    if (!udp.begin(UDP_PORT)) {
         ESP_LOGE(TAG, "Failed to begin UDP socket");
         vTaskDelete(nullptr);
         return;

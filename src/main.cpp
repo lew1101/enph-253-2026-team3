@@ -5,6 +5,9 @@
 // #include "freertos/FreeRTOS.h"
 // #include "freertos/task.h"
 
+#include "actuators/servo.hpp"
+#include "control/pid.hpp"
+
 #include "tasks/wifi_ap_udp.hpp"
 
 static constexpr char TAG[] = "main";
