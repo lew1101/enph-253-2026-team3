@@ -36,6 +36,7 @@ class PID {
     float _max_output = FLT_MAX;
 
     float _integral = 0.0f;
-    float _previous_error = 0.0f;
+    float _prev_err = 0.0f;
+    bool _initialized = false;
 };
 } // namespace control
