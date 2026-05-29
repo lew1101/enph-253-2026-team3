@@ -12,7 +12,7 @@ static constexpr char TAG[] = "wifi_ap_udp";
 
 static constexpr char WIFI_AP_SSID[] = "enph-robot-team3";
 static constexpr char WIFI_AP_PASSWORD[] = "robot1234";
-static constexpr uint16_t UDP_PORT = 4210;
+static constexpr uint16_t LOCAL_UDP_PORT = 4210;
 
 static constexpr size_t TX_BUFFER_SIZE = 256;
 static constexpr size_t RX_BUFFER_SIZE = 256;
@@ -73,7 +73,7 @@ static void wifi_udp_task(void *arg)
 
     ESP_LOGI(TAG, "ESP Wi-Fi AP IP: %s", ap_ip.toString().c_str());
 
-    if (!udp.begin(UDP_PORT)) {
+    if (!udp.begin(LOCAL_UDP_PORT)) {
         ESP_LOGE(TAG, "Failed to begin UDP socket");
         vTaskDelete(nullptr);
         return;
