@@ -15,10 +15,10 @@ class DCDriver {
             gpio_num_t c_clockwise_pwm_output = GPIO_NUM_NC;
 
             // MCPWM Setup
-            uint32_t freq_hz = 50;
-            uint8_t duty_res_bits = 16;
             int group_id = 0;
-            mcpwm_timer_handle_t timer;
+            mcpwm_timer_handle_t timer = nullptr;
+            uint32_t period_ticks = 0;
+            float clamp_percentage = 100.0f;
         };
 
         explicit DCDriver(const Config &config); 
