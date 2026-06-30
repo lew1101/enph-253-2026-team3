@@ -59,24 +59,47 @@ bool DCDriver::init()
 
 bool DCDriver::set_speed(float percentage) // 0% to 100%
 {
-    // Implementation for setting speed
-    return true;
+    percentage = clamp(percentage, 0.0f, 100.0f);
+    uint32_t compare_value = percentage / 100.0f * _config.period_ticks;
+
+    return (mcpwm_comparator_set_compare_value(motor_comparator, compare_value) == ESP_OK);
 }
 
 bool DCDriver::turn_clockwise()
 {
-    // Implementation for turning clockwise
+    if (_clockwise) return true; // already turning clockwise
+
+    else if (_clockwise == false) {
+        // If currently turning counterclockwise, stop first and wait for motor momentum to dissipate
+        stop();
+    }
+    vTaskDelay(pdMS_TO_TICKS(100)); // wait for 100ms
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_a, -1, true)); // -1 means no forcing
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_b, 0, true));
+    _clockwise = true;
     return true;
 }
 
 bool DCDriver::turn_c_clockwise()
 {
-    // Implementation for turning counterclockwise
+    if (!_clockwise) return true; // already turning counterclockwise
+
+    else if (_clockwise == true) {
+        // If currently turning clockwise, stop first and wait for motor momentum to dissipate
+        stop();
+    }
+    vTaskDelay(pdMS_TO_TICKS(100)); // wait for 100ms
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_a, 0, true));
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_b, -1, true));
+    _clockwise = false;
     return true;
 }
 
 bool DCDriver::stop()
 {
     // Implementation for stopping
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_a, 0, true));
+    ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_b, 0, true));
     return true;
+}
 }

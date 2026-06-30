@@ -34,6 +34,7 @@ class DCDriver {
     private:
         Config _config;
 
+        bool _clockwise = false;
         mcpwm_oper_handle_t motor_operator = nullptr;
         mcpwm_cmpr_handle_t motor_comparator = nullptr;
         mcpwm_gen_handle_t motor_generator_a = nullptr;
