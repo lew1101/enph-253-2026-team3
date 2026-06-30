@@ -24,9 +24,9 @@ bool ServoDriver::init()
     if (_config.min_pulse_deg >= _config.max_pulse_deg) return false;
     if (_config.min_clamp_deg >= _config.max_clamp_deg) return false;
 
-    if (_config.min_clamp_deg < _config.min_pulse_deg ||
-        _config.max_clamp_deg > _config.max_pulse_deg)
-        return false;
+    // if (_config.min_clamp_deg < _config.min_pulse_deg ||
+    //     _config.max_clamp_deg > _config.max_pulse_deg)
+    //     return false;
 
     if (_config.max_pulse_us > (1000000UL / _config.freq_hz)) return false;
 

@@ -79,7 +79,7 @@ static void wifi_udp_task(void *arg)
         return;
     }
 
-    ESP_LOGI(TAG, "UDP listening on port %u", static_cast<unsigned>(LOCAL_UDP_PORT));
+    ESP_LOGI(TAG, "UDP listening on port %u", static_cast<unsigned>(UDP_PORT));
 
     uint8_t rx_buffer[RX_BUFFER_SIZE];
     uint8_t tx_buffer[TX_BUFFER_SIZE];
