@@ -7,6 +7,12 @@
 #include "driver/gpio.h"
 #include "driver/mcpwm_prelude.h"
 
+enum State{
+    MOTOR_STOPPED,
+    MOTOR_CLOCKWISE,
+    MOTOR_COUNTER_CLOCKWISE
+};
+
 namespace driver{
 class DCDriver {
     public:
@@ -21,6 +27,8 @@ class DCDriver {
             float clamp_percentage = 100.0f;
         };
 
+        DCDriver() = default;
+
         explicit DCDriver(const Config &config); 
 
         bool init();
@@ -34,7 +42,7 @@ class DCDriver {
     private:
         Config _config;
 
-        bool _clockwise = false;
+        State motor_state = MOTOR_STOPPED;
         mcpwm_oper_handle_t motor_operator = nullptr;
         mcpwm_cmpr_handle_t motor_comparator = nullptr;
         mcpwm_gen_handle_t motor_generator_a = nullptr;
