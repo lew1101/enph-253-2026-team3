@@ -39,6 +39,7 @@ bool control::Drivetrain::forward(float speed_percentage)
         back_left_motor.turn_c_clockwise();
     }
 
+    speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
     back_right_motor.set_speed(speed_percentage);
     front_left_motor.set_speed(speed_percentage);
@@ -63,6 +64,7 @@ bool control::Drivetrain::strafe(float speed_percentage) // right is positive, l
         back_left_motor.turn_c_clockwise();
     }
 
+    speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
     back_right_motor.set_speed(speed_percentage);
     front_left_motor.set_speed(speed_percentage);
@@ -84,19 +86,20 @@ bool control::Drivetrain::stop()
 bool control::Drivetrain::turn(float speed_percentage)
 {
     if (speed_percentage > 0.0) {
-        front_right_motor.turn_clockwise();
-        back_right_motor.turn_clockwise();
+        front_right_motor.turn_c_clockwise();
+        back_right_motor.turn_c_clockwise();
         front_left_motor.turn_clockwise();
         back_left_motor.turn_clockwise();
     }
 
     else {
-        front_right_motor.turn_c_clockwise();
-        back_right_motor.turn_c_clockwise();
+        front_right_motor.turn_clockwise();
+        back_right_motor.turn_clockwise();
         front_left_motor.turn_c_clockwise();
         back_left_motor.turn_c_clockwise();
     }
 
+    speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
     back_right_motor.set_speed(speed_percentage);
     front_left_motor.set_speed(speed_percentage);
