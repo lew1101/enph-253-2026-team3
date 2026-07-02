@@ -66,7 +66,6 @@ bool DCDriver::set_speed(float percentage) // 0% to 100%
 {
     uint32_t compare_value = ((percentage * (_config.clamp_percentage / 100.0f) * _config.period_ticks) / 100.0f) / 2; // divide by 2 because we're using symmetry mode
 
-    Serial.println(compare_value);
     return (mcpwm_comparator_set_compare_value(motor_comparator, compare_value) == ESP_OK);
 }
 
@@ -104,6 +103,7 @@ bool DCDriver::turn_c_clockwise()
 bool DCDriver::stop()
 {
     // Implementation for stopping
+    set_speed(0.0f);
     ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_a, 0, true));
     ESP_ERROR_CHECK(mcpwm_generator_set_force_level(motor_generator_b, 0, true));
     motor_state = MOTOR_STOPPED;
