@@ -8,6 +8,9 @@
 #include "actuators/servo.hpp"
 #include "control/pid.hpp"
 
+#include "ring_buffer/ring_buffer.hpp"
+#include "filters/goertzel.hpp"
+
 #include "tasks/wifi_ap_udp.hpp"
 
 static constexpr char TAG[] = "main";
