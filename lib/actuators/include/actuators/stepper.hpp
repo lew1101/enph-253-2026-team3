@@ -6,19 +6,14 @@
 
 #include "driver/gpio.h"
 #include "driver/mcpwm_prelude.h"
+#include "AccelStepper.h"
 
 namespace driver{
 class StepperDriver {
     public:
         struct Config{
-            gpio_num_t clockwise_pwm_output = GPIO_NUM_NC;
-            gpio_num_t c_clockwise_pwm_output = GPIO_NUM_NC;
-
-            // MCPWM Setup
-            int group_id = 0;
-            mcpwm_timer_handle_t timer = nullptr;
-            uint32_t period_ticks = 0;
-            float clamp_percentage = 100.0f;
+            gpio_num_t dir_1 = GPIO_NUM_NC;
+            gpio_num_t dir_2 = GPIO_NUM_NC;
         };
 
         StepperDriver() = default;
@@ -36,9 +31,6 @@ class StepperDriver {
     private:
         Config _config;
 
-        mcpwm_oper_handle_t motor_operator = nullptr;
-        mcpwm_cmpr_handle_t motor_comparator = nullptr;
-        mcpwm_gen_handle_t motor_generator_a = nullptr;
-        mcpwm_gen_handle_t motor_generator_b = nullptr;
+        int motor_interface_type = 1; // 1 for DRIVER, 4 for FULL4WIRE, 8 for HALF4WIRE
     };
 }

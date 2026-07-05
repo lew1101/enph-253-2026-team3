@@ -4,19 +4,19 @@
 
 #include <algorithm>
 
-namespace driver {
-using std::clamp;
-// --- Constructor ---
+// namespace driver {
+// using std::clamp;
+// // --- Constructor ---
 
-DCDriver::DCDriver(const Config &config)
-    : _config(config)
-{
-}
+// StepperDriver::DCDriver(const Config &config)
+//     : _config(config)
+// {
+// }
 
-// --- Public API ---
+// // --- Public API ---
 
-bool DCDriver::init()
-{
-    return true;
-}
-}
+// bool DCDriver::init()
+// {
+//     return true;
+// }
+// }
