@@ -2,10 +2,11 @@
 
 #include "actuators/dc_driver.hpp"
 
-#include <algorithm>
+#include <esp32-hal-log.h>
+
+static constexpr char TAG[] = "dc_driver";
 
 namespace driver {
-using std::clamp;
 // --- Constructor ---
 
 DCDriver::DCDriver(const Config &config)
@@ -15,25 +16,25 @@ DCDriver::DCDriver(const Config &config)
 
 // --- Public API ---
 
-bool DCDriver::init()
+esp_err_t DCDriver::init()
 {
     if (_config.clockwise_pwm_output == GPIO_NUM_NC || _config.c_clockwise_pwm_output == GPIO_NUM_NC) return false;
     if (_config.timer == nullptr) return false;
 
     // Set up MCPWM
-    Serial.println("Set up Operator");
+    ESP_LOGD(TAG, "Set up MCPWM Operator");
     mcpwm_operator_config_t operator_config = {};
     operator_config.group_id = _config.group_id;
     ESP_ERROR_CHECK(mcpwm_new_operator(&operator_config, &motor_operator));
     ESP_ERROR_CHECK(mcpwm_operator_connect_timer(motor_operator, _config.timer));
 
-    Serial.println("Set up Comparator");
+    ESP_LOGD(TAG, "Set up MCPWM Comparator");
     mcpwm_comparator_config_t comparator_config = {};
     comparator_config.flags.update_cmp_on_tez = true;
     ESP_ERROR_CHECK(mcpwm_new_comparator(motor_operator, &comparator_config, &motor_comparator));
     ESP_ERROR_CHECK(mcpwm_comparator_set_compare_value(motor_comparator, 0));
 
-    Serial.println("Set up Generators");
+    ESP_LOGD(TAG,"Set up MCPWM Generators");
     mcpwm_generator_config_t generator_a_config = {};
     generator_a_config.gen_gpio_num = _config.clockwise_pwm_output;
     ESP_ERROR_CHECK(mcpwm_new_generator(motor_operator, &generator_a_config, &motor_generator_a));
@@ -41,25 +42,27 @@ bool DCDriver::init()
     generator_b_config.gen_gpio_num = _config.c_clockwise_pwm_output;
     ESP_ERROR_CHECK(mcpwm_new_generator(motor_operator, &generator_b_config, &motor_generator_b));
 
-    Serial.println("Set up Event Timer");
+    ESP_LOGD(TAG,"Set up MCPWM Event Timer");
     ESP_ERROR_CHECK(mcpwm_generator_set_actions_on_timer_event(motor_generator_a,
-    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH), 
+    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH),
     MCPWM_GEN_TIMER_EVENT_ACTION_END())); // when timer count up and reset to 0, generate high, end action
+
     ESP_ERROR_CHECK(mcpwm_generator_set_actions_on_compare_event(motor_generator_a,
     MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, motor_comparator, MCPWM_GEN_ACTION_LOW),
-    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_DOWN, motor_comparator, MCPWM_GEN_ACTION_HIGH), 
+    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_DOWN, motor_comparator, MCPWM_GEN_ACTION_HIGH),
     MCPWM_GEN_COMPARE_EVENT_ACTION_END())); // when timer count up, match comparator, generate low, end action
 
     ESP_ERROR_CHECK(mcpwm_generator_set_actions_on_timer_event(motor_generator_b,
-    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH), 
+    MCPWM_GEN_TIMER_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, MCPWM_TIMER_EVENT_EMPTY, MCPWM_GEN_ACTION_HIGH),
     MCPWM_GEN_TIMER_EVENT_ACTION_END())); // when timer count up and reset to 0, generate high, end action
+
     ESP_ERROR_CHECK(mcpwm_generator_set_actions_on_compare_event(motor_generator_b,
     MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_UP, motor_comparator, MCPWM_GEN_ACTION_LOW),
-    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_DOWN, motor_comparator, MCPWM_GEN_ACTION_HIGH), 
+    MCPWM_GEN_COMPARE_EVENT_ACTION(MCPWM_TIMER_DIRECTION_DOWN, motor_comparator, MCPWM_GEN_ACTION_HIGH),
     MCPWM_GEN_COMPARE_EVENT_ACTION_END())); // when timer count up, match comparator, generate low, end action
 
     stop();
-    return true;
+    return ESP_OK;
 }
 
 bool DCDriver::set_speed(float percentage) // 0% to 100%
