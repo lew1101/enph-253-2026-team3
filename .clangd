@@ -18,7 +18,7 @@ Diagnostics:
     - "drv_unknown_argument*"
 
 InlayHints:
-  Enabled: false
+  Enabled: true
 
 Hover:
   ShowAKA: true
