@@ -4,11 +4,6 @@
 #include "driver/gpio.h"
 
 namespace metal_detector {
-enum class MetalPhase : uint8_t {
-    PHASE_START_PULSE,
-    PHASE_END_PULSE,
-    PHASE_SAMPLE
-};
 
 enum class MetalState : uint8_t {
     METAL_CALIBRATION,
@@ -45,14 +40,12 @@ struct MetalTaskConfig {
     BaseType_t core_id = 1;
 };
 
-
 struct MetalSnapshot {
     int raw = 0;
     float sensor = 0.0f;
     float baseline = 0.0f;
     bool baseline_ready = false;
     MetalState state = MetalState::METAL_NONE;
-    MetalPhase phase = MetalPhase::PHASE_START_PULSE;
 };
 
 esp_err_t start_metal_detector_task(const MetalTaskConfig &task_cfg,
@@ -60,4 +53,6 @@ esp_err_t start_metal_detector_task(const MetalTaskConfig &task_cfg,
                                     TaskHandle_t *out_handle = nullptr);
 
 void get_snapshot(MetalSnapshot &out);
+void get_state(MetalState &out);
+
 } // namespace metal_detector
