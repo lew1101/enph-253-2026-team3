@@ -25,11 +25,14 @@ class Drivetrain {
         bool forward(float speed_percentage); // 0% to 100%
         bool strafe(float speed_percentage); // 0% to 100%
         bool stop();
-
         bool turn(float speed_percentage); // 0% to 100%, positive is clockwise, negative is counter-clockwise
 
+        bool update();
     private:
         Config _config;
+        bool stopped = true;
+        int delay_time_ms = 0;
+
         double wheel_radius = 0.05; // meters
         double wheel_base = 0.2; // ditance between front and rear (meters)
         double track_width = 0.2; // distance between left and right (meters)
@@ -42,5 +45,11 @@ class Drivetrain {
         driver::DCDriver front_left_motor;
         driver::DCDriver back_right_motor;
         driver::DCDriver back_left_motor;
+
+        // acceleration parameters
+        float target_speed[4] = {0.0, 0.0, 0.0, 0.0}; // front right, back right, front left, back left
+        float current_speed[4] = {0.0, 0.0, 0.0, 0.0};
+        float acceleration_rate = 0.2; // percentage per update
+        uint32_t previous_time = 0;
     };
 } // namespace control
