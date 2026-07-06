@@ -1,6 +1,5 @@
 #pragma once
 
-#include "freertos/idf_additions.h"
 #include <cstdint>
 
 #define ROBOT_MODE_LIST(X)                                                                         \
@@ -13,7 +12,7 @@
     X(ROBOT_ERROR)
 
 #define ROBOT_FLAG_LIST(X)                                                                         \
-    X(ROBOT_FLAG_NONE, 0)                                                                        \
+    X(ROBOT_FLAG_NONE, 0)                                                                          \
     X(ROBOT_FLAG_FAULT_ACTIVE, 1)                                                                  \
     X(ROBOT_FLAG_DRIVE_ENABLED, 2)                                                                 \
     X(ROBOT_FLAG_METAL_RUNNING, 3)                                                                 \
@@ -23,7 +22,7 @@
 
 #define ROBOT_EVENT_LIST(X)                                                                        \
     X(START)                                                                                       \
-    X(STOP)                                                                                      \
+    X(STOP)                                                                                        \
     X(METAL_CALIBRATE_START)                                                                       \
     X(METAL_CALIBRATE_DONE)                                                                        \
     X(TAPE_SEEN)                                                                                   \
@@ -94,6 +93,10 @@ struct RobotState {
     RobotMode mode = RobotMode::ROBOT_IDLE;
     uint32_t flags = 0;
     uint32_t sequence = 0;
+};
+
+struct RobotEvent {
+    RobotEventType event_type;
 };
 
 constexpr inline bool has_flag(uint32_t flags, RobotFlag f) { return (flags & f) != 0; }
