@@ -44,7 +44,10 @@ class Drivetrain {
         driver::DCDriver back_right_motor;
         driver::DCDriver back_left_motor;
 
-        bool run_pid();
-        bool apply_slew_rate();
+        // acceleration parameters
+        float target_speed[4] = {0.0, 0.0, 0.0, 0.0}; // front right, back right, front left, back left
+        float current_speed[4] = {0.0, 0.0, 0.0, 0.0};
+        float acceleration_rate = 0.2; // percentage per update
+        uint32_t previous_time = 0;
     };
 } // namespace control

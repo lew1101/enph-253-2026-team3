@@ -76,134 +76,100 @@ bool control::Drivetrain::init()
 
 bool control::Drivetrain::forward(float speed_percentage)
 {
-    if (speed_percentage > 0.0) {
-        front_right_motor.turn_c_clockwise();
-        back_right_motor.turn_c_clockwise();
-        front_left_motor.turn_clockwise();
-        back_left_motor.turn_clockwise();
-    }
-
-    else {
-        front_right_motor.turn_clockwise();
-        back_right_motor.turn_clockwise();
-        front_left_motor.turn_c_clockwise();
-        back_left_motor.turn_c_clockwise();
-    }
-
-    if (stopped) {
-        delay_time_ms = 10;
-        stopped = false;
-    }
-
-    speed_percentage = std::abs(speed_percentage);
-    front_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    front_left_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_left_motor.set_speed(speed_percentage);
-
-    delay_time_ms = 0; // no need for delay if robot is already moving
+    target_speed[0] = speed_percentage;
+    target_speed[1] = speed_percentage;
+    target_speed[2] = -speed_percentage;
+    target_speed[3] = -speed_percentage;
 
     return true;
 }
 
 bool control::Drivetrain::strafe(float speed_percentage) // right is positive, left is negative
 {
-    if (speed_percentage > 0.0) {
-        front_right_motor.turn_c_clockwise();
-        back_right_motor.turn_clockwise();
-        front_left_motor.turn_c_clockwise();
-        back_left_motor.turn_clockwise();
-    }
+    target_speed[0] = speed_percentage;
+    target_speed[1] = -speed_percentage;
+    target_speed[2] = speed_percentage;
+    target_speed[3] = -speed_percentage;
 
-    else {
-        front_right_motor.turn_clockwise();
-        back_right_motor.turn_c_clockwise();
-        front_left_motor.turn_clockwise();
-        back_left_motor.turn_c_clockwise();
-    }
+    return true;
+}
 
-    if (stopped) {
-        delay_time_ms = 10;
-        stopped = false;
-    }
-
-    speed_percentage = std::abs(speed_percentage);
-    front_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    front_left_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_left_motor.set_speed(speed_percentage);
-
-    delay_time_ms = 0;
+bool control::Drivetrain::turn(float speed_percentage) // positive is clockwise, negative is counter-clockwise
+{
+    target_speed[0] = -speed_percentage;
+    target_speed[1] = -speed_percentage;
+    target_speed[2] = -speed_percentage;
+    target_speed[3] = -speed_percentage;
 
     return true;
 }
 
 bool control::Drivetrain::stop()
 {
-    if (!front_right_motor.stop()) return false;
-    if (!front_left_motor.stop()) return false;
-    if (!back_right_motor.stop()) return false;
-    if (!back_left_motor.stop()) return false;
+    target_speed[0] = 0.0;
+    target_speed[1] = 0.0;
+    target_speed[2] = 0.0;
+    target_speed[3] = 0.0;
 
     stopped = true;
     return true;
 }
 
-bool control::Drivetrain::turn(float speed_percentage)
-{
-    if (speed_percentage > 0.0) {
-        front_right_motor.turn_c_clockwise();
-        back_right_motor.turn_c_clockwise();
-        front_left_motor.turn_clockwise();
-        back_left_motor.turn_clockwise();
-    }
-
-    else {
-        front_right_motor.turn_clockwise();
-        back_right_motor.turn_clockwise();
-        front_left_motor.turn_c_clockwise();
-        back_left_motor.turn_c_clockwise();
-    }
-
-     if (stopped) {
-        delay_time_ms = 10;
-        stopped = false;
-    }
-
-    speed_percentage = std::abs(speed_percentage);
-    front_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_right_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    front_left_motor.set_speed(speed_percentage);
-    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
-    back_left_motor.set_speed(speed_percentage);
-
-    delay_time_ms = 0;
-
-    return true;
-}
-
 bool control::Drivetrain::update()
 {
-    run_pid();
-    apply_slew_rate();
+    uint32_t current_time = millis();
+    float time_elapsed = current_time - previous_time;
+    previous_time = current_time;
 
-    return true;
-}
+    for (int i = 0; i < 4; i++) {
+        if (current_speed[i] < target_speed[i]) {
+            current_speed[i] += acceleration_rate * time_elapsed;
+            if (current_speed[i] > target_speed[i]) {
+                current_speed[i] = target_speed[i];
+            }
+        } else if (current_speed[i] > target_speed[i]) {
+            current_speed[i] -= acceleration_rate * time_elapsed;
+            if (current_speed[i] < target_speed[i]) {
+                current_speed[i] = target_speed[i];
+            }
+        }
+    }
 
-// Private Functions
+    if (current_speed[0] > 0.0) {
+        front_right_motor.turn_clockwise();
+    } else if (current_speed[0] < 0.0) {
+        front_right_motor.turn_c_clockwise();
+    } else {
+        front_right_motor.stop();
+    }
+    front_right_motor.set_speed(std::abs(current_speed[0]));
 
-bool control::Drivetrain::run_pid(){
-    return true;
-}
+    if (current_speed[1] > 0.0) {
+        back_right_motor.turn_clockwise();
+    } else if (current_speed[1] < 0.0) {
+        back_right_motor.turn_c_clockwise();
+    } else {
+        back_right_motor.stop();
+    }
+    back_right_motor.set_speed(std::abs(current_speed[1]));
 
-bool control::Drivetrain::apply_slew_rate(){
+    if (current_speed[2] > 0.0) {
+        front_left_motor.turn_clockwise();
+    } else if (current_speed[2] < 0.0) {
+        front_left_motor.turn_c_clockwise();
+    } else {
+        front_left_motor.stop();
+    }
+    front_left_motor.set_speed(std::abs(current_speed[2]));
+
+    if (current_speed[3] > 0.0) {
+        back_left_motor.turn_clockwise();
+    } else if (current_speed[3] < 0.0) {
+        back_left_motor.turn_c_clockwise();
+    } else {
+        back_left_motor.stop();
+    }
+    back_left_motor.set_speed(std::abs(current_speed[3]));
+    
     return true;
 }
