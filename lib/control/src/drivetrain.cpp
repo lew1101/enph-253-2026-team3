@@ -90,11 +90,21 @@ bool control::Drivetrain::forward(float speed_percentage)
         back_left_motor.turn_c_clockwise();
     }
 
+    if (stopped) {
+        delay_time_ms = 10;
+        stopped = false;
+    }
+
     speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     front_left_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_left_motor.set_speed(speed_percentage);
+
+    delay_time_ms = 0; // no need for delay if robot is already moving
 
     return true;
 }
@@ -115,11 +125,21 @@ bool control::Drivetrain::strafe(float speed_percentage) // right is positive, l
         back_left_motor.turn_c_clockwise();
     }
 
+    if (stopped) {
+        delay_time_ms = 10;
+        stopped = false;
+    }
+
     speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     front_left_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_left_motor.set_speed(speed_percentage);
+
+    delay_time_ms = 0;
 
     return true;
 }
@@ -131,6 +151,7 @@ bool control::Drivetrain::stop()
     if (!back_right_motor.stop()) return false;
     if (!back_left_motor.stop()) return false;
 
+    stopped = true;
     return true;
 }
 
@@ -150,11 +171,39 @@ bool control::Drivetrain::turn(float speed_percentage)
         back_left_motor.turn_c_clockwise();
     }
 
+     if (stopped) {
+        delay_time_ms = 10;
+        stopped = false;
+    }
+
     speed_percentage = std::abs(speed_percentage);
     front_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_right_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     front_left_motor.set_speed(speed_percentage);
+    vTaskDelay(pdMS_TO_TICKS(delay_time_ms));
     back_left_motor.set_speed(speed_percentage);
 
+    delay_time_ms = 0;
+
+    return true;
+}
+
+bool control::Drivetrain::update()
+{
+    run_pid();
+    apply_slew_rate();
+
+    return true;
+}
+
+// Private Functions
+
+bool control::Drivetrain::run_pid(){
+    return true;
+}
+
+bool control::Drivetrain::apply_slew_rate(){
     return true;
 }
