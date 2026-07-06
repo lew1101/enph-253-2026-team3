@@ -1,12 +1,15 @@
 #include <Arduino.h>
 #include "control/drivetrain.hpp"
+#include "esp_err.h"
+
+static constexpr char TAG[] = "drivetrain";
 
 control::Drivetrain::Drivetrain(const Config &config)
     : _config(config)
 {
 }
 
-bool control::Drivetrain::init()
+esp_err_t control::Drivetrain::init()
 {
     // Initialize timer 0 and timer 1
     mcpwm_timer_config_t timer_0_config = {};
@@ -15,26 +18,19 @@ bool control::Drivetrain::init()
     timer_0_config.resolution_hz = timer_resolution_hz;
     timer_0_config.period_ticks = period_tick;
     timer_0_config.count_mode = MCPWM_TIMER_COUNT_MODE_UP_DOWN;
-    if (mcpwm_new_timer(&timer_0_config, &_config.timer_0) == ESP_OK) {
-        Serial.println("Timer 0 initialized");
-    } else {
-        Serial.println("Failed to initialize Timer 0");
-        return false;
-    }
- 
+
+    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_0_config, &_config.timer_0));
+    ESP_LOGD(TAG, "Timer 0 initialized.");
+
     mcpwm_timer_config_t timer_1_config = {};
     timer_1_config.group_id = 1;
     timer_1_config.clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT;
     timer_1_config.resolution_hz = timer_resolution_hz;
     timer_1_config.period_ticks = period_tick;
     timer_1_config.count_mode = MCPWM_TIMER_COUNT_MODE_UP_DOWN;
-    timer_0_config.count_mode = MCPWM_TIMER_COUNT_MODE_UP_DOWN;
-    if (mcpwm_new_timer(&timer_1_config, &_config.timer_1) == ESP_OK) {
-        Serial.println("Timer 1 initialized");
-    } else {
-        Serial.println("Failed to initialize Timer 1");
-        return false;
-    }
+
+    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_1_config, &_config.timer_1));
+    ESP_LOGD(TAG, "Timer 1 initialized.");
 
     // Fleshing out the configs for the motors
     _config.front_right_motor_config.group_id = 0;
@@ -57,21 +53,27 @@ bool control::Drivetrain::init()
     back_right_motor = driver::DCDriver(_config.back_right_motor_config);
     back_left_motor = driver::DCDriver(_config.back_left_motor_config);
 
-    if (!front_right_motor.init()) return false;
-    Serial.println("Front right motor initialized");
-    if (!front_left_motor.init()) return false;
-    Serial.println("Front left motor initialized");
-    if (!back_right_motor.init()) return false;
-    Serial.println("Back right motor initialized");
-    if (!back_left_motor.init()) return false;
-    Serial.println("Back left motor initialized");
+    ESP_ERROR_CHECK(front_right_motor.init());
+    ESP_LOGI(TAG, "Front right motor initialized");
+
+    ESP_ERROR_CHECK(front_left_motor.init());
+    ESP_LOGI(TAG, "Front left motor initialized");
+
+    ESP_ERROR_CHECK(back_right_motor.init());
+    ESP_LOGI(TAG, "Back right motor initialized");
+
+    ESP_ERROR_CHECK(back_left_motor.init());
+    ESP_LOGI(TAG, "Back left motor initialized");
 
     ESP_ERROR_CHECK(mcpwm_timer_enable(_config.timer_0));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(_config.timer_0, MCPWM_TIMER_START_NO_STOP));
     ESP_ERROR_CHECK(mcpwm_timer_enable(_config.timer_1));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(_config.timer_1, MCPWM_TIMER_START_NO_STOP));
 
-    return true;
+
+    ESP_LOGI(TAG, "Drivetrain ok.");
+
+    return ESP_OK;
 }
 
 bool control::Drivetrain::forward(float speed_percentage)

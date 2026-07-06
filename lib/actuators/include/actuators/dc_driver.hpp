@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "esp_err.h" 
+#include "esp_err.h"
 
 #include "driver/gpio.h"
 #include "driver/mcpwm_prelude.h"
@@ -29,16 +29,16 @@ class DCDriver {
 
         DCDriver() = default;
 
-        explicit DCDriver(const Config &config); 
+        explicit DCDriver(const Config &config);
 
-        bool init();
-        
+        esp_err_t init();
+
         bool set_speed(float percentage); // 0% to 100%
         bool turn_clockwise();
         bool turn_c_clockwise();
         bool stop();
-        
-    
+
+
     private:
         Config _config;
 

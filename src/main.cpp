@@ -1,31 +1,15 @@
 #include <Arduino.h>
-
-#include "esp_log.h"
-
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"
-
-#include "actuators/servo.hpp"
-#include "control/pid.hpp"
-
-#include "ring_buffer/ring_buffer.hpp"
-#include "filters/goertzel.hpp"
-
-#include "tasks/wifi_ap_udp.hpp"
+#include "robot_state.hpp"
 
 static constexpr char TAG[] = "main";
 
-static WifiUdpContext udp_context{};
+std::atomic<RobotState> robot_state{RobotState::ROBOT_IDLE};
 
 void setup()
 {
-    Serial.begin(SERIAL_BAUD);
+    esp_log_level_set("metal_detector", ESP_LOG_VERBOSE);
 
-    start_wifi_udp_task(udp_context, nullptr);
+    vTaskDelete(nullptr); // delete the superloop task
 }
 
-void loop()
-{
-    ESP_LOGI(TAG, "Heartbeat");
-    vTaskDelay(pdMS_TO_TICKS(1000));
-}
+void loop() {}

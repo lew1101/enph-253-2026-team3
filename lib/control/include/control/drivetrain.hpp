@@ -1,8 +1,10 @@
 #include <Arduino.h>
+
 #include "actuators/dc_driver.hpp"
 
 namespace control {
 class Drivetrain {
+
     public:
         struct Config{
             mcpwm_timer_handle_t timer_0 = nullptr;
@@ -16,10 +18,10 @@ class Drivetrain {
 
         Drivetrain() = default;
 
-        explicit Drivetrain(const Config &config); 
+        explicit Drivetrain(const Config &config);
 
-        bool init();
-        
+        esp_err_t init();
+
         bool forward(float speed_percentage); // 0% to 100%
         bool strafe(float speed_percentage); // 0% to 100%
         bool stop();
@@ -37,7 +39,7 @@ class Drivetrain {
 
         int timer_resolution_hz = 1000000;
         int PWM_frequency_hz = 10000;
-        float period_tick = (timer_resolution_hz / (PWM_frequency_hz * 2));
+        float period_tick = (static_cast<float>(timer_resolution_hz) / (PWM_frequency_hz * 2));
 
         driver::DCDriver front_right_motor;
         driver::DCDriver front_left_motor;
