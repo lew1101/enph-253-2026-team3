@@ -1,18 +1,102 @@
 #pragma once
 
+#include "freertos/idf_additions.h"
 #include "portmacro.h"
-#include "state.hpp"
+
+#include <cstdint>
 
 namespace supervisor {
-struct SupervisorConfig {
-    uint32_t event_queue_len = 16;
+
+constexpr uint32_t EVENT_QUEUE_LEN = 32;
+
+extern EventGroupHandle_t g_robot_flags;
+
+#define ROBOT_STATE_LIST(X)                                                                        \
+    X(ROBOT_IDLE)                                                                                  \
+    X(ROBOT_CALIBRATE)                                                                             \
+    X(ROBOT_FOLLOW_TAPE)                                                                           \
+    X(ROBOT_DRIVE_TO_TARGET)                                                                       \
+    X(ROBOT_FIND_ROCK)                                                                             \
+    X(ROBOT_DETECT_METAL)                                                                          \
+    X(ROBOT_ESTOP)                                                                                 \
+    X(ROBOT_ERROR)
+
+#define ROBOT_EVENT_LIST(X)                                                                        \
+    X(START_REQUESTED)                                                                             \
+    X(STOP_REQUESTED)                                                                              \
+    X(RESET_REQUESTED)                                                                             \
+    X(TAPE_SEEN)                                                                                   \
+    X(TAPE_LOST)                                                                                   \
+    X(METAL_SEEN)                                                                                  \
+    X(METAL_LOST)                                                                                  \
+    X(ROCK_FOUND)                                                                                  \
+    X(ROCK_LOST)                                                                                   \
+    X(CALIBRATION_DONE)                                                                            \
+    X(LIFT_AT_TARGET)                                                                              \
+    X(DRIVE_TARGET_REACHED)                                                                        \
+    X(DRIVE_FAULT)                                                                                 \
+    X(SENSOR_FAULT)                                                                                \
+    X(TIMEOUT)
+
+#define ROBOT_FLAG_LIST(X)                                                                         \
+    X(ROBOT_FLAG_NONE, 0)                                                                          \
+    X(ROBOT_FLAG_FAULT_ACTIVE, 1)                                                                  \
+    X(ROBOT_FLAG_DRIVE_ENABLED, 2)                                                                 \
+    X(ROBOT_FLAG_METAL_ENABLED, 3)                                                                 \
+    X(ROBOT_FLAG_METAL_CALIBRATING, 4)                                                              \
+    X(ROBOT_FLAG_METAL_RUNNING, 5)                                                              \
+    X(ROBOT_FLAG_TAPE_ACTIVE, 6)                                                                   \
+    X(ROBOT_FLAG_METAL_SEEN, 7)                                                                    \
+    X(ROBOT_FLAG_TAPE_SEEN, 8)
+
+enum class RobotState : uint8_t {
+#define X(name) name,
+    ROBOT_STATE_LIST(X)
+#undef X
 };
 
-void init(SupervisorConfig &cfg, void (*event_handler)(const RobotEvent &));
+enum class RobotEvent : uint8_t {
+#define X(name) name,
+    ROBOT_EVENT_LIST(X)
+#undef X
+};
+
+enum RobotFlag : EventBits_t {
+#define X(name, bit) name = EventBits_t{1} << bit,
+    ROBOT_FLAG_LIST(X)
+#undef X
+};
+
+void init();
 void update();
+bool send_event(RobotEvent event, TickType_t timeout = 0);
+bool send_event_from_isr(RobotEvent event, BaseType_t *higher_priority_task_woken);
+bool get_state(RobotState &out, TickType_t timeout = 0);
 
-bool peek_state(RobotState &out, TickType_t timeout = 0);
-bool post_event(RobotEventType type, TickType_t timeout = 0);
-bool post_event_from_isr(RobotEventType type, BaseType_t *higher_priority_task_woken);
+inline constexpr const char *to_string(RobotState mode)
+{
+    switch (mode) {
+#define X(name)                                                                                    \
+    case RobotState::name:                                                                         \
+        return #name;
+        ROBOT_STATE_LIST(X)
+#undef X
+        default:
+            return "ROBOT_UNKNOWN";
+    }
+}
 
+inline constexpr const char *to_string(RobotFlag flag)
+{
+    switch (flag) {
+#define X(name, bit)                                                                               \
+    case name:                                                                                     \
+        return #name;
+        ROBOT_FLAG_LIST(X)
+#undef X
+
+        default:
+            return "ROBOT_FLAG_UNKNOWN";
+    }
+}
 } // namespace supervisor
