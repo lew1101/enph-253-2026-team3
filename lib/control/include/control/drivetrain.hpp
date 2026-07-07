@@ -1,55 +1,59 @@
 #include <Arduino.h>
+#include <array>
 
 #include "actuators/dc_driver.hpp"
 
 namespace control {
+
+using std::array;
+
 class Drivetrain {
+  public:
+    struct Config {
+        mcpwm_timer_handle_t timer_0 = nullptr;
+        mcpwm_timer_handle_t timer_1 = nullptr;
 
-    public:
-        struct Config{
-            mcpwm_timer_handle_t timer_0 = nullptr;
-            mcpwm_timer_handle_t timer_1 = nullptr;
+        driver::DCDriver::Config front_right_motor_config;
+        driver::DCDriver::Config back_right_motor_config;
+        driver::DCDriver::Config front_left_motor_config;
+        driver::DCDriver::Config back_left_motor_config;
 
-            driver::DCDriver::Config front_right_motor_config;
-            driver::DCDriver::Config back_right_motor_config;
-            driver::DCDriver::Config front_left_motor_config;
-            driver::DCDriver::Config back_left_motor_config;
-        };
-
-        Drivetrain() = default;
-
-        explicit Drivetrain(const Config &config);
-
-        esp_err_t init();
-
-        bool forward(float speed_percentage); // 0% to 100%
-        bool strafe(float speed_percentage); // 0% to 100%
-        bool stop();
-        bool turn(float speed_percentage); // 0% to 100%, positive is clockwise, negative is counter-clockwise
-
-        bool update();
-    private:
-        Config _config;
-        bool stopped = true;
-        int delay_time_ms = 0;
-
-        double wheel_radius = 0.05; // meters
-        double wheel_base = 0.2; // ditance between front and rear (meters)
-        double track_width = 0.2; // distance between left and right (meters)
-
-        int timer_resolution_hz = 1000000;
-        int PWM_frequency_hz = 10000;
-        float period_tick = (static_cast<float>(timer_resolution_hz) / (PWM_frequency_hz * 2));
-
-        driver::DCDriver front_right_motor;
-        driver::DCDriver front_left_motor;
-        driver::DCDriver back_right_motor;
-        driver::DCDriver back_left_motor;
-
-        // acceleration parameters
-        float target_speed[4] = {0.0, 0.0, 0.0, 0.0}; // front right, back right, front left, back left
-        float current_speed[4] = {0.0, 0.0, 0.0, 0.0};
-        float acceleration_rate = 0.2; // percentage per update
-        uint32_t previous_time = 0;
+        float rot_scalar = 1.0f;
+        float acceleration_rate = 0.2f; // percentage per update
     };
+
+    Drivetrain() = default;
+
+    explicit Drivetrain(const Config &config);
+
+    esp_err_t init();
+
+    bool forward(float speed_percentage); // -100 to 100
+    bool strafe(float speed_percentage);  // -100 to 100
+    bool turn(float speed_percentage); // -100 to 100, positive is clockwise, negative is counter-clockwise
+
+    bool move_vector(float vx, float vy, float omega);
+    bool stop();
+
+    bool update();
+
+  private:
+    Config _config;
+    bool stopped = true;
+
+    int timer_resolution_hz = 1'000'000;
+    int PWM_frequency_hz = 10'000;
+    float period_tick = (static_cast<float>(timer_resolution_hz) / (PWM_frequency_hz * 2));
+
+    driver::DCDriver front_right_motor;
+    driver::DCDriver front_left_motor;
+    driver::DCDriver back_right_motor;
+    driver::DCDriver back_left_motor;
+
+    // acceleration parameters
+    // front right, back right, front left, back left
+    array<float, 4> target_speed{0.0, 0.0, 0.0, 0.0};
+    array<float, 4> current_speed{0.0, 0.0, 0.0, 0.0};
+    uint32_t previous_time = 0;
+};
 } // namespace control

@@ -4,12 +4,14 @@
 
 static constexpr char TAG[] = "drivetrain";
 
-control::Drivetrain::Drivetrain(const Config &config)
+using control::Drivetrain;
+
+Drivetrain::Drivetrain(const Config &config)
     : _config(config)
 {
 }
 
-esp_err_t control::Drivetrain::init()
+esp_err_t Drivetrain::init()
 {
     // Initialize timer 0 and timer 1
     mcpwm_timer_config_t timer_0_config = {};
@@ -70,13 +72,12 @@ esp_err_t control::Drivetrain::init()
     ESP_ERROR_CHECK(mcpwm_timer_enable(_config.timer_1));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(_config.timer_1, MCPWM_TIMER_START_NO_STOP));
 
-
     ESP_LOGI(TAG, "Drivetrain ok.");
 
     return ESP_OK;
 }
 
-bool control::Drivetrain::forward(float speed_percentage)
+bool Drivetrain::forward(float speed_percentage)
 {
     target_speed[0] = speed_percentage;
     target_speed[1] = speed_percentage;
@@ -86,7 +87,7 @@ bool control::Drivetrain::forward(float speed_percentage)
     return true;
 }
 
-bool control::Drivetrain::strafe(float speed_percentage) // right is positive, left is negative
+bool Drivetrain::strafe(float speed_percentage) // right is positive, left is negative
 {
     target_speed[0] = speed_percentage;
     target_speed[1] = -speed_percentage;
@@ -96,17 +97,40 @@ bool control::Drivetrain::strafe(float speed_percentage) // right is positive, l
     return true;
 }
 
-bool control::Drivetrain::turn(float speed_percentage) // positive is clockwise, negative is counter-clockwise
+// positive is clockwise, negative is counter-clockwise
+bool Drivetrain::turn(float speed_percentage)
 {
-    target_speed[0] = -speed_percentage;
-    target_speed[1] = -speed_percentage;
-    target_speed[2] = -speed_percentage;
-    target_speed[3] = -speed_percentage;
+    target_speed[0] = -speed_percentage * _config.rot_scalar;
+    target_speed[1] = -speed_percentage * _config.rot_scalar;
+    target_speed[2] = -speed_percentage * _config.rot_scalar;
+    target_speed[3] = -speed_percentage * _config.rot_scalar;
 
     return true;
 }
 
-bool control::Drivetrain::stop()
+bool Drivetrain::move_vector(float vx, float vy, float omega)
+{
+    target_speed[0] = vy - vx + omega * _config.rot_scalar;
+    target_speed[1] = vy - vx + omega * _config.rot_scalar;
+    target_speed[2] = -(vy - vx + omega * _config.rot_scalar);
+    target_speed[3] = -(vy - vx + omega * _config.rot_scalar);
+
+    float max_mag = std::max({std::fabs(target_speed[0]),
+                              std::fabs(target_speed[1]),
+                              std::fabs(target_speed[2]),
+                              std::fabs(target_speed[3])});
+
+    if (max_mag > 1.0f) {
+        target_speed[0] /= max_mag;
+        target_speed[1] /= max_mag;
+        target_speed[2] /= max_mag;
+        target_speed[3] /= max_mag;
+    }
+
+    return true;
+}
+
+bool Drivetrain::stop()
 {
     target_speed[0] = 0.0;
     target_speed[1] = 0.0;
@@ -117,7 +141,7 @@ bool control::Drivetrain::stop()
     return true;
 }
 
-bool control::Drivetrain::update()
+bool Drivetrain::update()
 {
     uint32_t current_time = millis();
     float time_elapsed = current_time - previous_time;
@@ -125,12 +149,12 @@ bool control::Drivetrain::update()
 
     for (int i = 0; i < 4; i++) {
         if (current_speed[i] < target_speed[i]) {
-            current_speed[i] += acceleration_rate * time_elapsed;
+            current_speed[i] += _config.acceleration_rate * time_elapsed;
             if (current_speed[i] > target_speed[i]) {
                 current_speed[i] = target_speed[i];
             }
         } else if (current_speed[i] > target_speed[i]) {
-            current_speed[i] -= acceleration_rate * time_elapsed;
+            current_speed[i] -= _config.acceleration_rate * time_elapsed;
             if (current_speed[i] < target_speed[i]) {
                 current_speed[i] = target_speed[i];
             }
@@ -172,6 +196,6 @@ bool control::Drivetrain::update()
         back_left_motor.stop();
     }
     back_left_motor.set_speed(std::abs(current_speed[3]));
-    
+
     return true;
 }
