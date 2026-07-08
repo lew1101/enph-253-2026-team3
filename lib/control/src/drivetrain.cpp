@@ -89,10 +89,10 @@ bool Drivetrain::forward(float speed_percentage)
 
 bool Drivetrain::strafe(float speed_percentage) // right is positive, left is negative
 {
-    target_speed[0] = speed_percentage;
-    target_speed[1] = -speed_percentage;
-    target_speed[2] = speed_percentage;
-    target_speed[3] = -speed_percentage;
+    target_speed[0] = -speed_percentage;
+    target_speed[1] = speed_percentage;
+    target_speed[2] = -speed_percentage;
+    target_speed[3] = speed_percentage;
 
     return true;
 }
