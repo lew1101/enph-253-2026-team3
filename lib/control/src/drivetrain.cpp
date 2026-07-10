@@ -120,11 +120,11 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
                               std::fabs(target_speed[2]),
                               std::fabs(target_speed[3])});
 
-    if (max_mag > 1.0f) {
-        target_speed[0] /= max_mag;
-        target_speed[1] /= max_mag;
-        target_speed[2] /= max_mag;
-        target_speed[3] /= max_mag;
+    if (max_mag > 100.0f) {
+        target_speed[0] = (target_speed[0] / max_mag) * 100.0f;
+        target_speed[1] = (target_speed[1] / max_mag) * 100.0f;
+        target_speed[2] = (target_speed[2] / max_mag) * 100.0f;
+        target_speed[3] = (target_speed[3] / max_mag) * 100.0f;
     }
 
     return true;
@@ -168,7 +168,7 @@ bool Drivetrain::update()
     } else {
         front_right_motor.stop();
     }
-    front_right_motor.set_speed(std::abs(current_speed[0]));
+    front_right_motor.set_speed(std::fabs(current_speed[0]));
 
     if (current_speed[1] > 0.0) {
         back_right_motor.turn_clockwise();
@@ -177,7 +177,7 @@ bool Drivetrain::update()
     } else {
         back_right_motor.stop();
     }
-    back_right_motor.set_speed(std::abs(current_speed[1]));
+    back_right_motor.set_speed(std::fabs(current_speed[1]));
 
     if (current_speed[2] > 0.0) {
         front_left_motor.turn_clockwise();
@@ -186,7 +186,7 @@ bool Drivetrain::update()
     } else {
         front_left_motor.stop();
     }
-    front_left_motor.set_speed(std::abs(current_speed[2]));
+    front_left_motor.set_speed(std::fabs(current_speed[2]));
 
     if (current_speed[3] > 0.0) {
         back_left_motor.turn_clockwise();
@@ -195,7 +195,7 @@ bool Drivetrain::update()
     } else {
         back_left_motor.stop();
     }
-    back_left_motor.set_speed(std::abs(current_speed[3]));
+    back_left_motor.set_speed(std::fabs(current_speed[3]));
 
     return true;
 }

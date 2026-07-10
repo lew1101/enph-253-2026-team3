@@ -46,6 +46,8 @@ void drive_task(void *arg)
                     ESP_LOGW(TAG, "DriveMode::TAPE_FOLLOW not implemented");
                     break;
             }
+            s_drivetrain->update();
+            vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
         }
 
         EventBits_t flags = xEventGroupGetBits(g_robot_flags);
