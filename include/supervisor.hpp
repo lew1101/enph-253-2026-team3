@@ -11,7 +11,7 @@ constexpr uint32_t EVENT_QUEUE_LEN = 32;
 
 extern EventGroupHandle_t g_robot_flags;
 
-#define ROBOT_STATE_LIST(X)                                                                        \
+#define ROBOT_JOB_LIST(X)                                                                        \
     X(ROBOT_IDLE)                                                                                  \
     X(ROBOT_CALIBRATE)                                                                             \
     X(ROBOT_FOLLOW_TAPE)                                                                           \
@@ -28,9 +28,7 @@ extern EventGroupHandle_t g_robot_flags;
     X(TAPE_SEEN)                                                                                   \
     X(TAPE_LOST)                                                                                   \
     X(METAL_SEEN)                                                                                  \
-    X(METAL_LOST)                                                                                  \
     X(ROCK_FOUND)                                                                                  \
-    X(ROCK_LOST)                                                                                   \
     X(CALIBRATION_DONE)                                                                            \
     X(LIFT_AT_TARGET)                                                                              \
     X(DRIVE_TARGET_REACHED)                                                                        \
@@ -49,9 +47,9 @@ extern EventGroupHandle_t g_robot_flags;
     X(ROBOT_FLAG_METAL_SEEN, 7)                                                                    \
     X(ROBOT_FLAG_TAPE_SEEN, 8)
 
-enum class RobotState : uint8_t {
+enum class RobotJob : uint8_t {
 #define X(name) name,
-    ROBOT_STATE_LIST(X)
+    ROBOT_JOB_LIST(X)
 #undef X
 };
 
@@ -68,18 +66,22 @@ enum RobotFlag : EventBits_t {
 };
 
 void init();
+
+// Call this every loop to process events and update the robot job
 void update();
+
+//
 bool send_event(RobotEvent event, TickType_t timeout = 0);
 bool send_event_from_isr(RobotEvent event, BaseType_t *higher_priority_task_woken);
-bool get_state(RobotState &out, TickType_t timeout = 0);
+bool get_job(RobotJob &out, TickType_t timeout = 0);
 
-inline constexpr const char *to_string(RobotState mode)
+inline constexpr const char *to_string(RobotJob mode)
 {
     switch (mode) {
 #define X(name)                                                                                    \
-    case RobotState::name:                                                                         \
+    case RobotJob::name:                                                                         \
         return #name;
-        ROBOT_STATE_LIST(X)
+        ROBOT_JOB_LIST(X)
 #undef X
         default:
             return "ROBOT_UNKNOWN";
