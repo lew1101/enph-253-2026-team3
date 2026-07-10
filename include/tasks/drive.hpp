@@ -5,7 +5,7 @@ enum class DriveMode : uint8_t {
     STOP,
     SET_SPEED,          // vx, vy, omega
     TAPE_FOLLOW,
-    DRIVE_TO_POSE,     // x, y, theta target
+    DRIVE_TO_POSITION,     // x, y, theta target
 };
 
 struct DriveCommand {
@@ -27,6 +27,7 @@ struct DriveTaskConfig {
     float period_ms = 20.0f; // 50 Hz control loop
 };
 
+// 
 esp_err_t send_drive_cmd(const DriveCommand &cmd);
 esp_err_t start_drive_task(const control::Drivetrain::Config &drivetrain_cfg,
                            const DriveTaskConfig &task_cfg,

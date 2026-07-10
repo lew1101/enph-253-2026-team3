@@ -38,7 +38,7 @@ void drive_task(void *arg)
                     s_drivetrain->move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
                     break;
 
-                case DriveMode::DRIVE_TO_POSE:
+                case DriveMode::DRIVE_TO_POSITION:
                     ESP_LOGW(TAG, "DriveMode::DRIVE_TO_POSE not implemented");
                     break;
 
