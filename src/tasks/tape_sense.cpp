@@ -5,12 +5,13 @@
 #include "supervisor.hpp"
 #include "tasks/drive.hpp"
 #include "control/pid.hpp"
+#include "robot_states.hpp"
 
 using namespace supervisor;
+using namespace state;
 
 namespace {
     TapeSenseTaskConfig s_task_config;
-    control::PID tape_pid(15.0f, 0.0f, 1.2f);
 
     bool FL_sees_tape = false;
     bool FR_sees_tape = false;
@@ -59,21 +60,8 @@ void tape_task(void *arg)
 
         error = get_tape_error(FL_sees_tape, FR_sees_tape, prev_error);
         prev_error = error;
-
+        g_tape_error.store(error);
         ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);
-        
-        // Update PID controller
-        float dt_s = s_task_config.period_ms / 1000.0f; 
-        float correction = tape_pid.update(0.0f, error, dt_s);
-
-        // Send drive command based on PID correction
-        DriveCommand cmd;
-        cmd.mode = DriveMode::SET_SPEED;
-        cmd.x_speed = 0.0f; // No strafe
-        cmd.y_speed = 50.0f; // Constant forward speed
-        cmd.rot_speed = correction; // Apply correction to rotation
-
-        send_drive_cmd(cmd);
 
         vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_config.period_ms))); 
     }
