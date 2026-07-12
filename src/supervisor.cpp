@@ -5,25 +5,24 @@
 
 static constexpr char TAG[]{"supervisor"};
 
-EventGroupHandle_t g_flags = nullptr;
-
 namespace supervisor {
-namespace {
-RobotJob s_job;
-QueueHandle_t s_job_queue = nullptr;
-QueueHandle_t s_event_queue = nullptr;
+    EventGroupHandle_t g_robot_flags = nullptr;
+    namespace {
+    RobotJob s_job;
+    QueueHandle_t s_job_queue = nullptr;
+    QueueHandle_t s_event_queue = nullptr;
 
-void publish_job()
-{
-    configASSERT(s_job_queue == nullptr);
-    xQueueOverwrite(s_job_queue, &s_job);
+    void publish_job()
+    {
+        configASSERT(s_job_queue != nullptr);
+        xQueueOverwrite(s_job_queue, &s_job);
 
-    ESP_LOGI(TAG,
-             "mode=%s flags=0x%08lx seq=%lu",
-             to_string(s_job),
-             static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
-}
-} // namespace
+        ESP_LOGI(TAG,
+                "mode=%s flags=0x%08lx seq=%lu",
+                to_string(s_job),
+                static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
+    }
+    } 
 
 void init(RobotJob &initial_job)
 {
@@ -48,9 +47,13 @@ void update()
     RobotEvent event;
     RobotJob prev_job = s_job;
 
+    // Process the event and update the job accordingly
     while (xQueueReceive(s_event_queue, &event, 0) == pdTRUE) {
         switch (s_job) {
             case RobotJob::ROBOT_IDLE:
+                if (event == RobotEvent::START_REQUESTED) {
+                    s_job = RobotJob::ROBOT_DRIVE_TO_TARGET;
+                }
                 break;
             case RobotJob::ROBOT_CALIBRATE:
             case RobotJob::ROBOT_FOLLOW_TAPE:
@@ -64,8 +67,35 @@ void update()
         }
     }
 
+    // If job change, switch up the flags
     if (s_job != prev_job) {
         ESP_LOGD(TAG, "job: %s", to_string(s_job));
+        
+        // Wipe all flags when changing jobs to avoid stale flags
+        xEventGroupClearBits(g_robot_flags, RobotFlag::ROBOT_FLAGS_ALL);
+
+        switch(s_job) {
+            case RobotJob::ROBOT_IDLE:
+                break;
+            case RobotJob::ROBOT_CALIBRATE:
+                break;
+            case RobotJob::ROBOT_FOLLOW_TAPE:
+                xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED);
+                xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE);
+                break;
+            case RobotJob::ROBOT_DRIVE_TO_TARGET:
+                xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED);
+                break;
+            case RobotJob::ROBOT_FIND_ROCK:
+                break;
+            case RobotJob::ROBOT_DETECT_METAL:
+                xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_ENABLED);
+                break;
+            case RobotJob::ROBOT_ESTOP:
+                break;
+            case RobotJob::ROBOT_ERROR:
+                break;
+        }
     }
 
     publish_job();
@@ -89,4 +119,3 @@ bool get_job(RobotJob &out, TickType_t timeout)
     return xQueuePeek(s_job_queue, &out, timeout) == pdTRUE;
 }
 } // namespace supervisor
-
