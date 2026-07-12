@@ -62,17 +62,22 @@ enum class RobotEvent : uint8_t {
 enum RobotFlag : EventBits_t {
 #define X(name, bit) name = EventBits_t{1} << bit,
     ROBOT_FLAG_LIST(X)
+    ROBOT_FLAGS_ALL = 0xFFFFFF
 #undef X
 };
 
-void init();
+void init(RobotJob &initial_job);
 
 // Call this every loop to process events and update the robot job
 void update();
 
-//
+// Send event to supervisor
 bool send_event(RobotEvent event, TickType_t timeout = 0);
+
+// Send event to supervisor from Interrupt Service Routine for high priority tasks
 bool send_event_from_isr(RobotEvent event, BaseType_t *higher_priority_task_woken);
+
+// Get the current job from supervisor to update the rest of the robot
 bool get_job(RobotJob &out, TickType_t timeout = 0);
 
 inline constexpr const char *to_string(RobotJob mode)
