@@ -106,6 +106,4 @@ inline constexpr const char *to_string(RobotFlag flag)
             return "ROBOT_FLAG_UNKNOWN";
     }
 }
-
-void tape_follow();
 } // namespace supervisor

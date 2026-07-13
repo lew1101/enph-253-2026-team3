@@ -16,7 +16,6 @@ namespace supervisor {
     RobotJob s_job;
     QueueHandle_t s_job_queue = nullptr;
     QueueHandle_t s_event_queue = nullptr;
-    control::PID tape_pid(15.0f, 0.0f, 1.2f);
 
     void publish_job()
     {
@@ -112,7 +111,9 @@ void update()
         case RobotJob::ROBOT_CALIBRATE:
             break;
         case RobotJob::ROBOT_FOLLOW_TAPE:
-            tape_follow();
+            DriveCommand tape_cmd;
+            tape_cmd.mode = DriveMode::TAPE_FOLLOW;
+            send_drive_cmd(tape_cmd);
             break;
         case RobotJob::ROBOT_DRIVE_TO_TARGET:
             break;
@@ -146,21 +147,4 @@ bool get_job(RobotJob &out, TickType_t timeout)
     configASSERT(s_job_queue != nullptr);
     return xQueuePeek(s_job_queue, &out, timeout) == pdTRUE;
 }
-
-void tape_follow()
-{
-    // Update PID controller
-        float dt_s = 0.02f; 
-        float correction = tape_pid.update(0.0f, g_tape_error.load(), dt_s);
-
-        // Send drive command based on PID correction
-        DriveCommand cmd;
-        cmd.mode = DriveMode::SET_SPEED;
-        cmd.x_speed = 0.0f; // No strafe
-        cmd.y_speed = 50.0f; // Constant forward speed
-        cmd.rot_speed = correction; // Apply correction to rotation
-
-        send_drive_cmd(cmd);
 }
-} // namespace supervisor
-

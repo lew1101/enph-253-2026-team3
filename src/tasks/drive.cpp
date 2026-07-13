@@ -5,6 +5,8 @@
 #include "portmacro.h"
 #include "projdefs.h"
 #include "supervisor.hpp"
+#include "control/PID.hpp"
+#include "robot_states.hpp"
 
 using namespace control;
 using namespace supervisor;
@@ -17,6 +19,8 @@ TaskHandle_t s_task_handle = nullptr;
 
 Drivetrain *s_drivetrain = nullptr;
 DriveTaskConfig s_task_cfg;
+
+control::PID tape_pid(15.0f, 0.0f, 1.2f);
 
 void drive_task(void *arg)
 {
@@ -43,8 +47,14 @@ void drive_task(void *arg)
                     break;
 
                 case DriveMode::TAPE_FOLLOW:
-                    ESP_LOGW(TAG, "DriveMode::TAPE_FOLLOW not implemented");
-                    break;
+                    float dt_s = 0.02f; 
+                    float correction = tape_pid.update(0.0f, state::g_tape_error.load(), dt_s);
+
+                    // Send drive command based on PID correction
+                    float x_speed = 0.0f; // No strafe
+                    float y_speed = 50.0f; // Constant forward speed
+                    float rot_speed = correction; // Apply correction to rotation
+                    s_drivetrain->move_vector(x_speed, y_speed, rot_speed);
             }
             s_drivetrain->update();
             vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
