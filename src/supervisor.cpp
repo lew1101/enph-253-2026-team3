@@ -17,28 +17,51 @@ namespace supervisor {
     QueueHandle_t s_job_queue = nullptr;
     QueueHandle_t s_event_queue = nullptr;
 
-    void publish_job()
-    {
-        configASSERT(s_job_queue != nullptr);
-        xQueueOverwrite(s_job_queue, &s_job);
-
-        ESP_LOGI(TAG,
-                "mode=%s flags=0x%08lx seq=%lu",
-                to_string(s_job),
-                static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
-    }
-    } 
-
-void init(RobotJob &initial_job)
+void update_state(const RobotJob robot_job)
 {
+    switch (robot_job) {
+        case RobotJob::ROBOT_IDLE:
+            break;
+        case RobotJob::ROBOT_CALIBRATE:
+        case RobotJob::ROBOT_FOLLOW_TAPE:
+        case RobotJob::ROBOT_FIND_ROCK:
+        case RobotJob::ROBOT_DETECT_METAL:
+            xEventGroupSetBits(g_robot_flags, supervisor::RobotFlag::ROBOT_FLAG_METAL_ENABLED);
+            break;
+        case RobotJob::ROBOT_ESTOP:
+        case RobotJob::ROBOT_ERROR:
+            break;
+        case RobotJob::ROBOT_DRIVE_TO_TARGET:
+            break;
+    }
+
+    s_job = robot_job;
+}
+
+void publish_job()
+{
+    configASSERT(s_job_queue != nullptr);
+    xQueueOverwrite(s_job_queue, &s_job);
+
+    ESP_LOGI(TAG,
+             "mode=%s flags=0x%08lx seq=%lu",
+             to_string(s_job),
+             static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
+}
+} // namespace
+
+void init(const RobotJob initial_state)
+{
+    g_robot_flags = xEventGroupCreate();
+    configASSERT(g_robot_flags != nullptr);
+
     s_event_queue = xQueueCreate(EVENT_QUEUE_LEN, sizeof(RobotJob));
     configASSERT(s_event_queue != nullptr);
 
     s_job_queue = xQueueCreate(1, sizeof(RobotJob));
     configASSERT(s_job_queue != nullptr);
 
-    s_job = initial_job;
-
+    update_state(initial_state);
     publish_job();
 }
 
@@ -75,7 +98,7 @@ void update()
     // If job change, switch up the flags
     if (s_job != prev_job) {
         ESP_LOGD(TAG, "job: %s", to_string(s_job));
-        
+
         // Wipe all flags when changing jobs to avoid stale flags
         xEventGroupClearBits(g_robot_flags, RobotFlag::ROBOT_FLAGS_ALL);
 
