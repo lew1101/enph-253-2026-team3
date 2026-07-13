@@ -82,12 +82,14 @@ void update()
 
         switch(s_job) {
             case RobotJob::ROBOT_IDLE:
+                ESP_LOGI(TAG, "Robot is now idle. All flags cleared.");
                 break;
             case RobotJob::ROBOT_CALIBRATE:
                 break;
             case RobotJob::ROBOT_FOLLOW_TAPE:
                 xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED);
                 xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE);
+                ESP_LOGI(TAG, "Tape follow job started. Drive and tape sensing enabled.");
                 break;
             case RobotJob::ROBOT_DRIVE_TO_TARGET:
                 xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED);
