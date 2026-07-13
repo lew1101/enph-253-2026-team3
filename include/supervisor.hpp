@@ -41,8 +41,8 @@ extern EventGroupHandle_t g_robot_flags;
     X(ROBOT_FLAG_FAULT_ACTIVE, 1)                                                                  \
     X(ROBOT_FLAG_DRIVE_ENABLED, 2)                                                                 \
     X(ROBOT_FLAG_METAL_ENABLED, 3)                                                                 \
-    X(ROBOT_FLAG_METAL_CALIBRATING, 4)                                                              \
-    X(ROBOT_FLAG_METAL_RUNNING, 5)                                                              \
+    X(ROBOT_FLAG_METAL_CALIBRATING, 4)                                                             \
+    X(ROBOT_FLAG_METAL_RUNNING, 5)                                                                 \
     X(ROBOT_FLAG_TAPE_ACTIVE, 6)                                                                   \
     X(ROBOT_FLAG_METAL_SEEN, 7)                                                                    \
     X(ROBOT_FLAG_TAPE_SEEN, 8)
@@ -66,7 +66,7 @@ enum RobotFlag : EventBits_t {
 #undef X
 };
 
-void init(RobotJob &initial_job);
+void init(const RobotJob initial_job);
 
 // Call this every loop to process events and update the robot job
 void update();
@@ -108,4 +108,7 @@ inline constexpr const char *to_string(RobotFlag flag)
 }
 
 void tape_follow();
+inline bool has_flag(EventBits_t flags, EventBits_t flag) { return (flags & flag) != 0; }
+inline bool has_any_flag(EventBits_t flags, EventBits_t mask) { return (flags & mask) != 0; }
+inline bool has_all_flags(EventBits_t flags, EventBits_t mask) { return (flags & mask) == mask; }
 } // namespace supervisor
