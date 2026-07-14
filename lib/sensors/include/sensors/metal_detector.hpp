@@ -12,7 +12,7 @@ class MetalDetector {
         gpio_num_t gpio_md_pulse = GPIO_NUM_NC;
         gpio_num_t gpio_md_adc_in = GPIO_NUM_NC;
 
-        uint32_t md_pulse_us = 80;
+        uint32_t md_pulse_us = 100;
         uint32_t md_blank_us = 50;
 
         uint32_t detect_count_required = 4;
@@ -69,6 +69,7 @@ class MetalDetector {
     MetalDetector &operator=(const MetalDetector &other) = delete;
 
     esp_err_t init();
+    inline bool is_calibration_complete() {return _baseline_ready;}
 
     esp_err_t pulse_and_sample();
     esp_err_t update();
