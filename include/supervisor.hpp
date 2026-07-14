@@ -107,7 +107,6 @@ inline constexpr const char *to_string(RobotFlag flag)
     }
 }
 
-void tape_follow();
 inline bool has_flag(EventBits_t flags, EventBits_t flag) { return (flags & flag) != 0; }
 inline bool has_any_flag(EventBits_t flags, EventBits_t mask) { return (flags & mask) != 0; }
 inline bool has_all_flags(EventBits_t flags, EventBits_t mask) { return (flags & mask) == mask; }
