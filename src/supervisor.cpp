@@ -43,10 +43,10 @@ void publish_job()
     configASSERT(s_job_queue != nullptr);
     xQueueOverwrite(s_job_queue, &s_job);
 
-    ESP_LOGI(TAG,
-             "mode=%s flags=0x%08lx seq=%lu",
-             to_string(s_job),
-             static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
+    // ESP_LOGI(TAG,
+    //          "mode=%s flags=0x%08lx seq=%lu",
+    //          to_string(s_job),
+    //          static_cast<unsigned long>(xEventGroupGetBits(g_robot_flags)));
 }
 } // namespace
 
@@ -80,17 +80,24 @@ void update()
         switch (s_job) {
             case RobotJob::ROBOT_IDLE:
                 if (event == RobotEvent::START_REQUESTED) {
-                    s_job = RobotJob::ROBOT_DRIVE_TO_TARGET;
+                    s_job = RobotJob::ROBOT_FOLLOW_TAPE;
                 }
                 break;
             case RobotJob::ROBOT_CALIBRATE:
             case RobotJob::ROBOT_FOLLOW_TAPE:
+                if (event == RobotEvent::STOP_REQUESTED) {
+                    s_job = RobotJob::ROBOT_IDLE;
+                }
+                break;
             case RobotJob::ROBOT_FIND_ROCK:
             case RobotJob::ROBOT_DETECT_METAL:
             case RobotJob::ROBOT_ESTOP:
             case RobotJob::ROBOT_ERROR:
                 break;
             case RobotJob::ROBOT_DRIVE_TO_TARGET:
+                if (event == RobotEvent::STOP_REQUESTED) {
+                    s_job = RobotJob::ROBOT_IDLE;
+                }
                 break;
         }
     }
@@ -136,6 +143,9 @@ void update()
         case RobotJob::ROBOT_FOLLOW_TAPE:
             DriveCommand tape_cmd;
             tape_cmd.mode = DriveMode::TAPE_FOLLOW;
+            tape_cmd.x_speed = 0.0f; // No strafe
+            tape_cmd.y_speed = 70.0f; // Constant forward speed
+            tape_cmd.rot_speed = 0.0f; // Rotation will be handled by the PID controller in the drive task
             send_drive_cmd(tape_cmd);
             break;
         case RobotJob::ROBOT_DRIVE_TO_TARGET:
