@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package robot;
+
+message VelocityCommand {
+    float vx_mps = 1; // strafe velocity
+    float vy_mps = 2; // forward/backward velocity
+    float omega_rad_s = 3;
+}
+
+message PoseCommand {
+    float x_m = 1;
+    float y_m = 2;
+    float theta_rad = 3;
+}
+
+message TapeFollowCommand {
+    float forward_speed_mps = 1;
+}
+
+message StopCommand {
+    bool brake = 1;
+}
+
+message DriveCommand {
+    oneof command {
+        VelocityCommand velocity = 2;
+        PoseCommand pose = 3;
+        StopCommand stop = 4;
+        TapeFollowCommand tape_follow = 5;
+    }
+}

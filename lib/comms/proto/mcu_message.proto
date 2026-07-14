@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package robot;
+
+import "drive.proto";
+
+message McuMessage {
+    uint32 sequence = 1;
+
+    oneof payload {
+        DriveCommand drive_command = 3;
+    }
+}
