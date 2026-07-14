@@ -1,20 +1,24 @@
-#ifdef DEBUG
-#define LOG_LEVEL_LOCAL ESP_LOG_VERBOSE
-#endif
-
-#include "tasks/metal.hpp"
-
+#include "freertos/idf_additions.h"
+#include "portmacro.h"
 #include "esp32-hal-timer.h"
+
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
 
+#include "tasks/metal.hpp"
+#include "sensors/metal_detector.hpp"
+#include "supervisor.hpp"
+
 static constexpr char TAG[] = "metal_task";
 
 using namespace metal_detector;
+using namespace supervisor;
 
 namespace {
 constexpr uint32_t TIMER_FREQ = 1000000;
+
+QueueHandle_t s_metal_snapshot_queue = nullptr;
 
 hw_timer_t *s_md_timer = nullptr;
 TaskHandle_t s_task_handle = nullptr;
@@ -61,14 +65,34 @@ void metal_task(void *arg)
 
     arm_timer_us(s_task_cfg.start_delay_us);
 
+    xEventGroupClearBits(g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_RUNNING);
+    xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_CALIBRATING);
+
     while (true) {
+        xEventGroupWaitBits(
+            g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_ENABLED, pdFALSE, pdTRUE, portMAX_DELAY);
+
+        EventBits_t flags = xEventGroupGetBits(g_robot_flags);
+
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         s_md->pulse_and_sample();
         arm_timer_us(s_task_cfg.md_deadtime_us);
         s_md->update(); // update during the deadtime to give more consistent timing.
+
+        if (s_md->is_calibration_complete() &&
+            has_flag(flags, RobotFlag::ROBOT_FLAG_METAL_CALIBRATING)) {
+            xEventGroupClearBits(g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_CALIBRATING);
+            xEventGroupSetBits(g_robot_flags, RobotFlag::ROBOT_FLAG_METAL_RUNNING);
+        }
     }
 }
 } // namespace
+
+bool get_metal_detector_snapshot(MetalDetector::Snapshot &snapshot)
+{
+    configASSERT(s_metal_snapshot_queue != nullptr);
+    return xQueuePeek(s_metal_snapshot_queue, &snapshot, 0) == pdTRUE;
+}
 
 esp_err_t start_metal_detector_task(const MetalDetector::Config &cfg,
                                     const MetalTaskConfig &task_cfg,
@@ -92,6 +116,9 @@ esp_err_t start_metal_detector_task(const MetalDetector::Config &cfg,
     // initilize metal detector and pass it to static pointer
     static MetalDetector md{cfg};
     s_md = &md;
+
+    s_metal_snapshot_queue = xQueueCreate(1, sizeof(MetalDetector::Snapshot));
+    configASSERT(s_metal_snapshot_queue != nullptr);
 
     // set up metal_detector
     ESP_RETURN_ON_ERROR(s_md->init(), TAG, "metal detector setup failed");

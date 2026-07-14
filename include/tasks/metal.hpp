@@ -11,6 +11,9 @@ struct MetalTaskConfig {
     BaseType_t core_id = 1;
 };
 
+bool get_metal_detector_snapshot(const metal_detector::MetalDetector::Snapshot &snapshot);
 esp_err_t start_metal_detector_task(const metal_detector::MetalDetector::Config &cfg,
                                     const MetalTaskConfig &task_cfg,
                                     TaskHandle_t *out_handle = nullptr);
+
+

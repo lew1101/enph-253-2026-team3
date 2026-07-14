@@ -1,5 +1,8 @@
-#include "esp32-hal-adc.h"
+#include <Arduino.h>
+#include "esp32-hal-gpio.h"
 #include "esp_log.h"
+
+#include "esp32-hal-adc.h"
 #include "esp_check.h"
 #include "esp_err.h"
 
@@ -24,12 +27,13 @@ esp_err_t MetalDetector::init()
     pinMode(_cfg.gpio_md_adc_in, INPUT);
     pinMode(_cfg.gpio_md_pulse, OUTPUT);
 
-    gpio_set_level(_cfg.gpio_md_pulse, 0);
+    digitalWrite(_cfg.gpio_md_pulse, LOW);
 
     analogReadResolution(12);
     analogSetPinAttenuation(_cfg.gpio_md_adc_in, ADC_6db); // up to 2.2V
 
     _initialized = true;
+
     return ESP_OK;
 }
 
@@ -37,10 +41,10 @@ esp_err_t MetalDetector::pulse_and_sample()
 {
     ESP_RETURN_ON_FALSE(_initialized, ESP_ERR_INVALID_STATE, TAG, "not initialized");
 
-    gpio_set_level(_cfg.gpio_md_pulse, 1);
+    digitalWrite(_cfg.gpio_md_pulse, HIGH);
     esp_rom_delay_us(_cfg.md_pulse_us);
 
-    gpio_set_level(_cfg.gpio_md_pulse, 0);
+    digitalWrite(_cfg.gpio_md_pulse, LOW);
     esp_rom_delay_us(_cfg.md_blank_us);
 
     _raw = analogRead(_cfg.gpio_md_adc_in);
@@ -67,18 +71,16 @@ esp_err_t MetalDetector::update()
     _publish_snapshot();
 
     if (!_baseline_ready) {
-        ESP_LOGV(TAG,
-                 ">calibrating:%d,raw:%d,pulsed_baseline:%.3f\n",
-                 baseline_count,
-                 raw,
-                 pulsed_baseline);
+        Serial.printf(">calibrating:%d\n>raw:%d\n>pulsed_baseline:%.3f\n",
+                      _baseline_count,
+                      _raw,
+                      _pulsed_baseline);
     } else {
-        ESP_LOGV(TAG,
-                 ">md:%.3f,shifted:%.3f,raw:%d,pulsed_baseline:%.3f\n",
-                 sensor_out,
-                 adc_shifted,
-                 raw,
-                 pulsed_baseline);
+        Serial.printf(">md:%.3f\n>shifted:%.3f\n>raw:%d\n>pulsed_baseline:%.3f\n",
+                      _sensor_out,
+                      adc_shifted,
+                      _raw,
+                      _pulsed_baseline);
     }
 
     return ESP_OK;
