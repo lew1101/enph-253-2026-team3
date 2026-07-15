@@ -111,9 +111,9 @@ bool Drivetrain::turn(float speed_percentage)
 bool Drivetrain::move_vector(float vx, float vy, float omega)
 {
     target_speed[0] = vy - vx + omega * _config.rot_scalar;
-    target_speed[1] = vy - vx + omega * _config.rot_scalar;
-    target_speed[2] = -(vy - vx + omega * _config.rot_scalar);
-    target_speed[3] = -(vy - vx + omega * _config.rot_scalar);
+    target_speed[1] = vy + vx + omega * _config.rot_scalar;
+    target_speed[2] = -(vy + vx - omega * _config.rot_scalar);
+    target_speed[3] = -(vy - vx - omega * _config.rot_scalar);
 
     float max_mag = std::max({std::fabs(target_speed[0]),
                               std::fabs(target_speed[1]),
@@ -121,6 +121,7 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
                               std::fabs(target_speed[3])});
 
     if (max_mag > 100.0f) {
+        // ESP_LOGV(TAG, "clamping");
         target_speed[0] = (target_speed[0] / max_mag) * 100.0f;
         target_speed[1] = (target_speed[1] / max_mag) * 100.0f;
         target_speed[2] = (target_speed[2] / max_mag) * 100.0f;
