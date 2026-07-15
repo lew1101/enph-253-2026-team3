@@ -1,5 +1,6 @@
 #pragma once
 #include "control/drivetrain.hpp"
+#include "control/pid.hpp"
 
 enum class DriveMode : uint8_t {
     STOP,
@@ -32,4 +33,6 @@ esp_err_t send_drive_cmd(const DriveCommand &cmd);
 esp_err_t start_drive_task(const control::Drivetrain::Config &drivetrain_cfg,
                            const DriveTaskConfig &task_cfg,
                            TaskHandle_t *out_handle);
+
+extern control::PID tape_pid;
 

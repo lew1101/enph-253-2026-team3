@@ -13,6 +13,8 @@ using namespace supervisor;
 
 static constexpr char TAG[] = "drive_task";
 
+control::PID tape_pid(0.0f, 0.0f, 0.0f);
+
 namespace {
 QueueHandle_t s_drive_cmd_queue = nullptr;
 TaskHandle_t s_task_handle = nullptr;
@@ -20,50 +22,53 @@ TaskHandle_t s_task_handle = nullptr;
 Drivetrain *s_drivetrain = nullptr;
 DriveTaskConfig s_task_cfg;
 
-control::PID tape_pid(15.0f, 0.0f, 1.2f);
-
 void drive_task(void *arg)
 {
     (void)arg;
 
     while (true) {
-        xEventGroupWaitBits(
-            g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED, pdFALSE, pdTRUE, portMAX_DELAY);
+        if (xEventGroupGetBits(g_robot_flags) & RobotFlag::ROBOT_FLAG_DRIVE_ENABLED) {
+            // Drive is enabled, process commands
+            DriveCommand cmd;
+            if (xQueuePeek(s_drive_cmd_queue, &cmd, pdMS_TO_TICKS(20)) == pdTRUE) {
+                // run drivetrain command
+                switch (cmd.mode) {
+                    case DriveMode::STOP:
+                        s_drivetrain->stop();
+                        break;
 
-        DriveCommand cmd;
-        if (xQueuePeek(s_drive_cmd_queue, &cmd, pdMS_TO_TICKS(20)) == pdTRUE) {
-            // run drivetrain command
-            switch (cmd.mode) {
-                case DriveMode::STOP:
-                    s_drivetrain->stop();
-                    break;
+                    case DriveMode::SET_SPEED:
+                        s_drivetrain->move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
+                        break;
 
-                case DriveMode::SET_SPEED:
-                    s_drivetrain->move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
-                    break;
+                    case DriveMode::DRIVE_TO_POSITION:
+                        ESP_LOGW(TAG, "DriveMode::DRIVE_TO_POSE not implemented");
+                        break;
 
-                case DriveMode::DRIVE_TO_POSITION:
-                    ESP_LOGW(TAG, "DriveMode::DRIVE_TO_POSE not implemented");
-                    break;
+                    case DriveMode::TAPE_FOLLOW:
+                        float dt_s = 0.02f;
+                        float correction = tape_pid.update(0.0f, state::g_tape_error.load(), dt_s);
 
-                case DriveMode::TAPE_FOLLOW:
-                    float dt_s = 0.02f; 
-                    float correction = tape_pid.update(0.0f, state::g_tape_error.load(), dt_s);
+                        // Send drive command based on PID correction
+                        float x_speed = 0.0f;         // No strafe
+                        float y_speed = 50.0f;        // Constant forward speed
+                        float rot_speed = correction; // Apply correction to rotation
+                        // float rot_speed = 50.0f;
 
-                    // Send drive command based on PID correction
-                    float x_speed = 0.0f; // No strafe
-                    float y_speed = 50.0f; // Constant forward speed
-                    float rot_speed = correction; // Apply correction to rotation
-                    s_drivetrain->move_vector(x_speed, y_speed, rot_speed);
+                        ESP_LOGV(TAG,
+                                 "Tape error: %.2f, Correction: %.2f",
+                                 state::g_tape_error.load(),
+                                 rot_speed);
+                        s_drivetrain->move_vector(x_speed, y_speed, rot_speed);
+                }
             }
-            s_drivetrain->update();
-            vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
-        }
-
-        EventBits_t flags = xEventGroupGetBits(g_robot_flags);
-        if (!(flags & RobotFlag::ROBOT_FLAG_DRIVE_ENABLED)) {
+        } else {
+            // Drive is disabled, stop the drivetrain
             s_drivetrain->stop();
         }
+
+        s_drivetrain->update();
+        vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
     }
 }
 } // namespace
