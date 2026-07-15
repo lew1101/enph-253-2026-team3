@@ -10,6 +10,8 @@
 using namespace supervisor;
 using namespace state;
 
+constexpr float ALPHA = 0.2f; // Smoothing factor for the tape error
+
 namespace {
     TapeSenseTaskConfig s_task_config;
 
@@ -19,7 +21,6 @@ namespace {
     float left_sensor_value = 0.0f;
     float right_sensor_value = 0.0f;
     float error = 0.0f;
-    float prev_error = 0.0f;
 }
 
 void tape_task(void *arg)
@@ -27,8 +28,8 @@ void tape_task(void *arg)
     (void)arg;
 
     while (true) {
-        xEventGroupWaitBits(
-            g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
+        // xEventGroupWaitBits(
+        //     g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
 
         // Define the GPIO pins for the tape sensors and read them
         left_sensor_value = analogRead(s_task_config.fl_tape_pin);
@@ -36,11 +37,11 @@ void tape_task(void *arg)
 
         // hystersis and tape detection logic
         if (FL_sees_tape) {
-            if (left_sensor_value < 500.0) {
+            if (left_sensor_value < 200.0) {
                 FL_sees_tape = false;
             }
         }
-        else if (left_sensor_value > 1000.0) {
+        else if (left_sensor_value > 500.0) {
             FL_sees_tape = true;
         }
 
@@ -53,12 +54,15 @@ void tape_task(void *arg)
             FR_sees_tape = true;
         }
 
-        error = get_tape_error(FL_sees_tape, FR_sees_tape, prev_error);
-        prev_error = error;
+        float new_error = get_tape_error(FL_sees_tape, FR_sees_tape, error);
+        error = ALPHA * new_error + (1.0f - ALPHA) * error;
         g_tape_error.store(error);
-        ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);
+        // ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);
+
+        ESP_LOGV("TapeSense", "Left sensor: %.2f, Right sensor: %.2f, Error: %.2f", left_sensor_value, right_sensor_value, error);
 
         vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_config.period_ms))); 
+        // vTaskDelay(pdMS_TO_TICKS(200ul)); 
     }
 }
 
@@ -82,18 +86,15 @@ float get_tape_error(bool FL_sees_tape, bool FR_sees_tape, float prev_error)
     }
     else if (!FL_sees_tape && !FR_sees_tape) {
         // Both sensors do not see tape, use previous error to determine direction
-        // if (prev_error == 0.0f) {
-        //     return 0.0f; // No previous error, assume centered
-        // }
-        // else if (prev_error > 0.0f) {
-        //     return 5.0f; // Last known position was to the right
-        // }
-        // else if (prev_error < 0.0f) {
-        //     return -5.0f; // Last known position was to the left
-        // }
+        if (prev_error > 0.0f) {
+            return 5.0f; // Last known position was to the right
+        }
+        else if (prev_error < 0.0f) {
+            return -5.0f; // Last known position was to the left
+        }
 
         // If robot is centered when both sensors sees nothing
-        return 0.0f;
+        // return 0.0f;
     }
 
     return error;
