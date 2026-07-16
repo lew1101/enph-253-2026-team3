@@ -16,8 +16,8 @@ struct TapeSenseTaskConfig {
     gpio_num_t l1_tape_pin = GPIO_NUM_NC;
     gpio_num_t l2_tape_pin = GPIO_NUM_NC;
 
-    uint16_t high_threshold = 2000;
-    uint16_t low_threshold = 1500;
+    uint16_t high_threshold = 500;
+    uint16_t low_threshold = 300;
 
     uint32_t stack_depth = 4096;
     UBaseType_t priority = 4;
