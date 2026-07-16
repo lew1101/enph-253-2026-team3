@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package robot;
+
+import "drive.proto";
+
+enum UartEventType {
+    UART_EVENT_NONE = 0;
+    UART_EVENT_DRIVE_FAULT = 1;
+    UART_EVENT_TARGET_REACHED = 2;
+    UART_EVENT_ESTOP_PRESSED = 3;
+    UART_EVENT_METAL_SEEN = 4;
+}
+
+message RobotStateSync {
+    uint32 sequence = 1;
+    uint32 mode = 2;
+    uint32 flags = 3;
+}
+
+message RobotEventMessage {
+    uint32 sequence = 1;
+    UartEventType type = 2;
+    uint32 data = 3;
+}
+
+message RobotUartMessage {
+    oneof payload {
+        RobotStateSync state = 1;
+        RobotEventMessage event = 2;
+        DriveCommand drive_command = 3;
+    }
+}

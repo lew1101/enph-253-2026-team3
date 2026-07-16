@@ -165,8 +165,8 @@ esp_err_t UartLink::send(const uint8_t *payload, size_t payload_size, uint16_t &
 
 esp_err_t UartLink::receive(uint8_t *payload,
                             size_t payload_capacity,
-                            size_t &payload_size,
-                            uint16_t &sequence,
+                            uint16_t *payload_size,
+                            uint16_t *sequence,
                             TickType_t timeout)
 {
     payload_size = 0;
@@ -183,7 +183,9 @@ esp_err_t UartLink::receive(uint8_t *payload,
      */
     const TickType_t start = xTaskGetTickCount();
 
-    if (xSemaphoreTake(_rx_mutex, timeout) != pdTRUE) {
+    auto rx_mutex_take_ok = xSemaphoreTake(_rx_mutex, timeout);
+
+    if (rx_mutex_take_ok != pdTRUE) {
         return ESP_ERR_TIMEOUT;
     }
 
@@ -259,8 +261,8 @@ esp_err_t UartLink::receive(uint8_t *payload,
 
         memcpy(payload, _rx_buf.data(), header.payload_length);
 
-        payload_size = header.payload_length;
-        sequence = header.sequence;
+        *payload_size = header.payload_length;
+        *sequence = header.sequence;
     }
 
 cleanup:

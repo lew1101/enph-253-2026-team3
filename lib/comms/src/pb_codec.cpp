@@ -31,17 +31,17 @@ esp_err_t encode(const Message &message,
 }
 
 template <typename Message, const pb_msgdesc_t* Descriptor>
-esp_err_t decode(const uint8_t *buf, size_t &msg_len, Message &message)
+esp_err_t decode(const uint8_t *buf, size_t &msg_len, Message* message_out)
 {
     ESP_RETURN_ON_FALSE(buf != nullptr, ESP_ERR_INVALID_ARG, TAG, "istream cannot be nullptr");
 
-    message = {};
+    *message_out = {};
 
     pb_istream_t istream = pb_istream_from_buffer(buf, msg_len);
 
-    if (!pb_decode(&istream, Descriptor, &message)) {
+    if (!pb_decode(&istream, Descriptor, message_out)) {
         ESP_LOGE(TAG, "Protobuf decode failed: %s", PB_GET_ERROR(&istream));
-        message = {};
+        *message_out = {};
         return ESP_FAIL;
     }
 

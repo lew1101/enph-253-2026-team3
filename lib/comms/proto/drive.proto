@@ -23,10 +23,11 @@ message StopCommand {
 }
 
 message DriveCommand {
+    float sequence = 1;
     oneof command {
         VelocityCommand velocity = 2;
-        PoseCommand pose = 3;
-        StopCommand stop = 4;
-        TapeFollowCommand tape_follow = 5;
+        TapeFollowCommand tape_follow = 3;
+        PoseCommand pose = 4;
+        StopCommand stop = 5;
     }
 }

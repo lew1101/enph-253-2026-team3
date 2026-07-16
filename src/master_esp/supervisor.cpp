@@ -1,21 +1,20 @@
 #include "freertos/idf_additions.h"
 
-#include "supervisor.hpp"
 #include "esp_log.h"
 #include "robot_states.hpp"
 #include "control/pid.hpp"
-#include "tasks/drive.hpp"
+#include "supervisor.hpp"
 
 static constexpr char TAG[]{"supervisor"};
 
 using namespace state;
 
 namespace supervisor {
-    EventGroupHandle_t g_robot_flags = nullptr;
-    namespace {
-    RobotJob s_job;
-    QueueHandle_t s_job_queue = nullptr;
-    QueueHandle_t s_event_queue = nullptr;
+EventGroupHandle_t g_robot_flags = nullptr;
+namespace {
+RobotJob s_job;
+QueueHandle_t s_job_queue = nullptr;
+QueueHandle_t s_event_queue = nullptr;
 
 void update_state(const RobotJob robot_job)
 {
@@ -102,7 +101,7 @@ void update()
         // Wipe all flags when changing jobs to avoid stale flags
         xEventGroupClearBits(g_robot_flags, RobotFlag::ROBOT_FLAGS_ALL);
 
-        switch(s_job) {
+        switch (s_job) {
             case RobotJob::ROBOT_IDLE:
                 ESP_LOGI(TAG, "Robot is now idle. All flags cleared.");
                 break;
@@ -134,9 +133,6 @@ void update()
         case RobotJob::ROBOT_CALIBRATE:
             break;
         case RobotJob::ROBOT_FOLLOW_TAPE:
-            DriveCommand tape_cmd;
-            tape_cmd.mode = DriveMode::TAPE_FOLLOW;
-            send_drive_cmd(tape_cmd);
             break;
         case RobotJob::ROBOT_DRIVE_TO_TARGET:
             break;
@@ -170,4 +166,4 @@ bool get_job(RobotJob &out, TickType_t timeout)
     configASSERT(s_job_queue != nullptr);
     return xQueuePeek(s_job_queue, &out, timeout) == pdTRUE;
 }
-}
+} // namespace supervisor

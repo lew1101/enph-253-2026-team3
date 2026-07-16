@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package drive;
+
+message DriveUartMessage {
+    uint32 last_command_sequence = 1;
+    uint32 flags = 2;
+    uint32 fault = 3;
+    uint32 uptime_ms = 4;
+}

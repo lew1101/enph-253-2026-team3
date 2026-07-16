@@ -41,8 +41,8 @@ class UartLink {
     esp_err_t send(const uint8_t *payload, size_t payload_size, uint16_t &sequence);
     esp_err_t receive(uint8_t *payload,
                       size_t payload_capacity,
-                      size_t &payload_size,
-                      uint16_t &sequence,
+                      uint16_t *payload_size,
+                      uint16_t *sequence,
                       TickType_t timeout);
 
     [[nodiscard]] inline bool initialized() const { return _initialized; }
