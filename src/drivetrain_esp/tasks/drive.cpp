@@ -27,7 +27,11 @@ void _drive_task(void *arg)
     (void)arg;
     Drivetrain drivetrain{s_drive_cfg};
 
-    ESP_ERROR_CHECK(drivetrain.init());
+    esp_err_t err = drivetrain.init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "drivetrain init failed, deleting task");
+        vTaskDelete(nullptr);
+    }
 
     const float DT_S = static_cast<float>(s_task_cfg.period_ms) / 1000;
     TapeSnapshot tape_snapshot{};

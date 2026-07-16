@@ -42,6 +42,9 @@ struct TapeSnapshot {
     bool tape_l1 = false;
     bool tape_l2 = false;
     float left_err = 0.0f;
+
+    TickType_t tick;
+    bool valid;
 };
 
 //
