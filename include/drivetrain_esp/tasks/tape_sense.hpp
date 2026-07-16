@@ -22,7 +22,7 @@ struct TapeSenseTaskConfig {
     uint32_t stack_depth = 4096;
     UBaseType_t priority = 4;
     BaseType_t core_id = 1;
-    float period_ms = 20.0f; // 50 Hz control loop
+    float period_ms = 5.0f; // 200 Hz control loop
 };
 
 struct TapeSnapshot {
