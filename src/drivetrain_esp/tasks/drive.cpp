@@ -11,6 +11,8 @@ using namespace control;
 
 static constexpr char TAG[] = "drive_task";
 
+control::PID tape_pid(15.0f, 0.0f, 1.2f);
+
 namespace {
 TaskHandle_t s_task_handle = nullptr;
 QueueHandle_t s_drive_cmd_queue = nullptr;
@@ -19,8 +21,6 @@ DriveMode s_mode;
 
 DriveTaskConfig s_task_cfg;
 Drivetrain::Config s_drive_cfg;
-
-control::PID tape_pid(15.0f, 0.0f, 1.2f);
 
 void _drive_task(void *arg)
 {
@@ -79,21 +79,22 @@ void _drive_task(void *arg)
                         ESP_LOGW(TAG, "unable to get tape snapshot");
                         continue;
                     }
-
-                    float rot_correction = -tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    ESP_LOGI(TAG, "Tape snapshot: front_err = %f", tape_snapshot.front_err);
+                    float rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float rot_speed = rot_correction; // Apply correction to rotation
                     drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_correction);
                     break;
             }
         }
-    }
 
-    drivetrain.update();
-    vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
+        drivetrain.update();
+        vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
+    }
 }
 } // namespace
 
 esp_err_t start_drive_task(const DriveTaskConfig &task_cfg,
-                           Drivetrain::Config &drivetrain_cfg,
+                           const Drivetrain::Config &drivetrain_cfg,
                            TaskHandle_t *out_handle)
 {
     if (s_task_handle != nullptr) {

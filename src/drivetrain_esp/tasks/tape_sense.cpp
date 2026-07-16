@@ -98,11 +98,15 @@ void _tape_task(void *arg)
         s_snapshot.tape_l1 = _apply_hyteresis(s_snapshot.tape_l1, l1_adc_val);
         s_snapshot.tape_l2 = _apply_hyteresis(s_snapshot.tape_l2, l2_adc_val);
 
+        //using two tape sensors logic
         s_snapshot.front_err = _get_tape_error(
-            s_snapshot.tape_fl, s_snapshot.tape_fm, s_snapshot.tape_fr, s_snapshot.front_err);
+            s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
+        
+        // ESP_LOGI("TapeSense", "Left Reading: %d, Right Reading: %d, Front Error: %.2f", s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
 
+        //using two tape sensors logic
         s_snapshot.back_err = _get_tape_error(
-            s_snapshot.tape_bl, s_snapshot.tape_bm, s_snapshot.tape_br, s_snapshot.back_err);
+            s_snapshot.tape_bl, s_snapshot.tape_br, s_snapshot.back_err);
 
         s_snapshot.left_err =
             _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
