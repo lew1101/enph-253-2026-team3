@@ -24,6 +24,12 @@ class PID {
     }
 
     float update(float ref, float meas, float dt_s);
+    inline void set_gain(float kp, float ki, float kd)
+    {
+        _kp = kp;
+        _ki = ki;
+        _kd = kd;
+    }
     void reset();
 
   private:
