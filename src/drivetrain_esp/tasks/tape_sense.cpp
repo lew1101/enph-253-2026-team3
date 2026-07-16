@@ -60,6 +60,18 @@ void _tape_task(void *arg)
 {
     (void)arg;
 
+    // Define the GPIO pins for the tape sensors
+    gpio_set_direction(s_task_config.fl_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(s_task_config.fm_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(s_task_config.fr_tape_pin, GPIO_MODE_INPUT);
+
+    gpio_set_direction(s_task_config.bl_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(s_task_config.bm_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(s_task_config.br_tape_pin, GPIO_MODE_INPUT);
+
+    gpio_set_direction(s_task_config.l1_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(s_task_config.l2_tape_pin, GPIO_MODE_INPUT);
+
     while (true) {
         // xEventGroupWaitBits(
         //     g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
@@ -95,6 +107,9 @@ void _tape_task(void *arg)
         s_snapshot.left_err =
             _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
 
+        s_snapshot.tick = xTaskGetTickCount();
+        s_snapshot.valid = true;
+
         xQueueOverwrite(s_snapshot_queue, &s_snapshot);
 
         // s_tape_error.store(error);
@@ -105,11 +120,6 @@ void _tape_task(void *arg)
 }
 
 } // namespace
-
-bool get_tape_snapshot(TapeSnapshot *out, TickType_t timeout)
-{
-    return xQueuePeek(s_snapshot_queue, out, timeout) == pdTRUE;
-}
 
 esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHandle_t *out_handle)
 {
@@ -125,18 +135,6 @@ esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHand
 
     s_snapshot_queue = xQueueCreate(1, sizeof(TapeSnapshot));
     configASSERT(s_snapshot_queue != nullptr);
-
-    // Define the GPIO pins for the tape sensors
-    gpio_set_direction(s_task_config.fl_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.fm_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.fr_tape_pin, GPIO_MODE_INPUT);
-
-    gpio_set_direction(s_task_config.bl_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.bm_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.br_tape_pin, GPIO_MODE_INPUT);
-
-    gpio_set_direction(s_task_config.l1_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.l2_tape_pin, GPIO_MODE_INPUT);
 
     auto ok = xTaskCreatePinnedToCore(_tape_task,
                                       "tape_task",
@@ -157,4 +155,9 @@ esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHand
         *out_handle = s_task_handle;
     }
     return ESP_OK;
+}
+
+bool get_tape_snapshot(TapeSnapshot *out, TickType_t timeout)
+{
+    return xQueuePeek(s_snapshot_queue, out, timeout) == pdTRUE;
 }
