@@ -43,7 +43,7 @@ class Drivetrain {
     bool stopped = true;
 
     int timer_resolution_hz = 1'000'000;
-    int PWM_frequency_hz = 1'000;
+    int PWM_frequency_hz = 200;
     float period_tick = (static_cast<float>(timer_resolution_hz) / (PWM_frequency_hz * 2));
 
     driver::DCDriver front_right_motor;
