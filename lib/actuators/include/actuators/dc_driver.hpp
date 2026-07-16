@@ -24,8 +24,8 @@ class DCDriver {
             int group_id = 0;
             mcpwm_timer_handle_t timer = nullptr;
             uint32_t period_ticks = 0;
-            float clamp_percentage = 100.0f;
             float min_percentage = 0.0f;
+            float clamp_percentage = 100.0f;
         };
 
         DCDriver() = default;
