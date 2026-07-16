@@ -67,7 +67,9 @@ esp_err_t DCDriver::init()
 
 bool DCDriver::set_speed(float percentage) // 0% to 100%
 {
-    uint32_t compare_value = ((percentage * (_config.clamp_percentage / 100.0f) * _config.period_ticks) / 100.0f) / 2; // divide by 2 because we're using symmetry mode
+    float compare_percentage = (_config.clamp_percentage - _config.min_percentage) * (percentage / 100.0f) + _config.min_percentage;
+
+    uint32_t compare_value = ((compare_percentage * (_config.clamp_percentage / 100.0f) * _config.period_ticks) / 100.0f) / 2; // divide by 2 because we're using symmetry mode
 
     return (mcpwm_comparator_set_compare_value(motor_comparator, compare_value) == ESP_OK);
 }
