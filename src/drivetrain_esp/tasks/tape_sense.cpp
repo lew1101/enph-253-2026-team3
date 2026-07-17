@@ -23,6 +23,8 @@ float br_adc_val = 0.0f;
 float l1_adc_val = 0.0f;
 float l2_adc_val = 0.0f;
 
+float ALPHA = 0.5f;
+
 bool _apply_hyteresis(bool sees_tape, float adc_val)
 {
     if (sees_tape && adc_val < s_task_config.low_threshold)
@@ -98,26 +100,26 @@ void _tape_task(void *arg)
         s_snapshot.tape_l1 = _apply_hyteresis(s_snapshot.tape_l1, l1_adc_val);
         s_snapshot.tape_l2 = _apply_hyteresis(s_snapshot.tape_l2, l2_adc_val);
 
-        //using two tape sensors logic
-        s_snapshot.front_err = _get_tape_error(
-            s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
-        
-        // ESP_LOGI("TapeSense", "Left Reading: %d, Right Reading: %d, Front Error: %.2f", s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
+        float new_front_err = _get_tape_error(s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
+        s_snapshot.front_err = ALPHA * new_front_err + (1 - ALPHA) * s_snapshot.front_err;
 
-        //using two tape sensors logic
-        s_snapshot.back_err = _get_tape_error(
-            s_snapshot.tape_bl, s_snapshot.tape_br, s_snapshot.back_err);
+        ESP_LOGI("TapeSense",
+                 "Left Reading: %d, Right Reading: %d, Front Error: %.2f",
+                 s_snapshot.tape_fl,
+                 s_snapshot.tape_fr,
+                 s_snapshot.front_err);
 
-        s_snapshot.left_err =
-            _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
+        // using two tape sensors logic
+        float new_back_err = _get_tape_error(s_snapshot.tape_bl, s_snapshot.tape_br, s_snapshot.back_err);
+        s_snapshot.back_err = ALPHA * new_back_err + (1 - ALPHA) * s_snapshot.back_err;
+
+        float new_left_err = _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
+        s_snapshot.left_err = ALPHA * new_left_err + (1 - ALPHA) * s_snapshot.left_err;
 
         s_snapshot.tick = xTaskGetTickCount();
         s_snapshot.valid = true;
 
         xQueueOverwrite(s_snapshot_queue, &s_snapshot);
-
-        // s_tape_error.store(error);
-        // ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);
 
         vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_config.period_ms)));
     }
