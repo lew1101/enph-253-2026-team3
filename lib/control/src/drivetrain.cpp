@@ -112,8 +112,8 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
 {
     target_speed[0] = vy - vx + omega * _config.rot_scalar;
     target_speed[1] = vy + vx + omega * _config.rot_scalar;
-    target_speed[2] = -(vy + vx + omega * _config.rot_scalar);
-    target_speed[3] = -(vy - vx + omega * _config.rot_scalar);
+    target_speed[2] = -(vy + vx - omega * _config.rot_scalar);
+    target_speed[3] = -(vy - vx - omega * _config.rot_scalar);
 
     float max_mag = std::max({std::fabs(target_speed[0]),
                               std::fabs(target_speed[1]),
