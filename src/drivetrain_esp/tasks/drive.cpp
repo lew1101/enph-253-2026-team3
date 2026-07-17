@@ -79,10 +79,10 @@ void _drive_task(void *arg)
                         ESP_LOGW(TAG, "unable to get tape snapshot");
                         continue;
                     }
-                    ESP_LOGI(TAG, "Tape snapshot: front_err = %f", tape_snapshot.front_err);
                     float rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float rot_speed = rot_correction; // Apply correction to rotation
-                    drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_correction);
+                    float rot_speed = -rot_correction; // Apply correction to rotation
+                    // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
+                    drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_speed);
                     break;
             }
         }
