@@ -4,9 +4,79 @@
 #include "sensors/pcnt_encoder.hpp"
 
 #include "control/pose_estimator.hpp"
+#include "tasks/drive.hpp"
+
+namespace DriveTaskConfig {
+
+constexpr uint32_t TASK_STACK_DEPTH = 4096;
+constexpr UBaseType_t TASK_PRIORITY = 4;
+constexpr BaseType_t TASK_CORE_ID = 1;
+constexpr uint32_t TASK_PERIOD_MS = 20ul; // 50 Hz control loop
+
+constexpr gpio_num_t FR_MOTOR_CW_PIN = GPIO_NUM_45;
+constexpr gpio_num_t FR_MOTOR_CCW_PIN = GPIO_NUM_46;
+constexpr gpio_num_t BR_MOTOR_CW_PIN = GPIO_NUM_42;
+constexpr gpio_num_t BR_MOTOR_CCW_PIN = GPIO_NUM_41;
+constexpr gpio_num_t FL_MOTOR_CW_PIN = GPIO_NUM_16;
+constexpr gpio_num_t FL_MOTOR_CCW_PIN = GPIO_NUM_15;
+constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_17;
+constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_18;
+constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_1;
+constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_2;
+constexpr gpio_num_t FR_TAPE_PIN = GPIO_NUM_3;
+constexpr gpio_num_t BL_TAPE_PIN = GPIO_NUM_4;
+constexpr gpio_num_t BM_TAPE_PIN = GPIO_NUM_5;
+constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_6;
+constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_7;
+constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_8;
+
+constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
+    .timer_0 = nullptr,
+    .timer_1 = nullptr,
+    .front_right_motor_config{.clockwise_pwm_output = FR_MOTOR_CW_PIN,
+                              .c_clockwise_pwm_output = FR_MOTOR_CCW_PIN,
+                              .clamp_percentage = 100.0f},
+    .back_right_motor_config{.clockwise_pwm_output = BR_MOTOR_CW_PIN,
+                             .c_clockwise_pwm_output = BR_MOTOR_CCW_PIN,
+                             .clamp_percentage = 100.0f},
+    .front_left_motor_config{.clockwise_pwm_output = FL_MOTOR_CW_PIN,
+                             .c_clockwise_pwm_output = FL_MOTOR_CCW_PIN,
+                             .clamp_percentage = 95.0f},
+    .back_left_motor_config{.clockwise_pwm_output = BL_MOTOR_CW_PIN,
+                            .c_clockwise_pwm_output = BL_MOTOR_CCW_PIN,
+                            .clamp_percentage = 88.0f}};
+
+constexpr sensors::PcntEncoder::Config DEADWHL_X_CFG{
+    .gpio_a = GPIO_NUM_21,
+    .gpio_b = GPIO_NUM_40,
+    .glitch_filter_ns = 1000,
+    .invert_direction = false,
+};
+
+constexpr sensors::PcntEncoder::Config DEADWHL_Y_CFG{
+    .gpio_a = GPIO_NUM_39,
+    .gpio_b = GPIO_NUM_38,
+    .glitch_filter_ns = 1000,
+    .invert_direction = false,
+};
 
 constexpr float DEADWHEEL_DIAMETER_M = 0.0508f;
 constexpr int32_t COUNTS_PER_REV = 4096;
+
+constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
+    .deadwheel_x_count_to_m_scale = PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
+    .deadwheel_y_count_to_m_scale = PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
+    .deadwheel_x_y_offset_m = 0.0f,
+    .deadwheel_y_x_offset_m = 0.0f,
+};
+
+constexpr float POS_TOLERANCE_M = 0.02f;
+constexpr float HEADING_TOLERANCE_RAD = 0.05f;
+
+constexpr float IMU_TIMEOUT_MS = 100;
+}; // namespace DriveTaskConfig
+
+/// ========================================
 
 enum class DriveMode : uint8_t {
     STOP,
@@ -29,43 +99,6 @@ struct DriveCommand {
     float target_heading_rad; // [-pi, pi]
 };
 
-struct DriveTaskConfig {
-    uint32_t stack_depth = 4096;
-    UBaseType_t priority = 4;
-    BaseType_t core_id = 1;
-    uint32_t period_ms = 20ul; // 50 Hz control loop
-
-    sensors::PcntEncoderConfig deadwheel_x_cfg{
-        .gpio_a = GPIO_NUM_21,
-        .gpio_b = GPIO_NUM_40,
-        .glitch_filter_ns = 1000,
-        .invert_direction = false,
-    };
-
-    sensors::PcntEncoderConfig deadwheel_y_cfg{
-        .gpio_a = GPIO_NUM_39,
-        .gpio_b = GPIO_NUM_38,
-        .glitch_filter_ns = 1000,
-        .invert_direction = false,
-    };
-
-    control::PoseEstimator::Config pose_estimator_cfg{
-        .deadwheel_x_count_to_m_scale =
-            PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
-        .deadwheel_y_count_to_m_scale =
-            PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
-        .deadwheel_x_y_offset_m = 0.0f,
-        .deadwheel_y_x_offset_m = 0.0f,
-    };
-
-    float position_tolerance_m = 0.02f;
-    float heading_tolerance_rad = 0.05f;
-
-    float imu_timeout_ms = 100;
-};
-
 //
 esp_err_t send_drive_cmd(const DriveCommand &cmd);
-esp_err_t start_drive_task(const DriveTaskConfig &task_cfg,
-                           const control::Drivetrain::Config &drivetrain_cfg,
-                           TaskHandle_t *out_handle);
+esp_err_t start_drive_task(TaskHandle_t *out_handle);

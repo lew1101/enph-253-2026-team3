@@ -11,15 +11,15 @@
 
 #include "tasks/uart.hpp"
 
-using namespace comms;
-
 static constexpr char TAG[] = "uart_link";
+
+using namespace UartTaskConfig;
+using namespace comms;
 
 namespace {
 TaskHandle_t s_tx_task_handle = nullptr;
 TaskHandle_t s_rx_task_handle = nullptr;
 
-UartTaskConfig s_task_cfg;
 UartLink *s_uart_link;
 
 std::atomic_bool s_link_connected{false};
@@ -71,8 +71,7 @@ void _tx_task(void *arg)
     TickType_t last_state_sync = xTaskGetTickCount();
 
     while (true) {
-
-        vTaskDelay(s_task_cfg.tx_send_sync_period);
+        vTaskDelay(TX_SEND_SYNC_PERIOD);
     }
 }
 
@@ -92,7 +91,7 @@ void _rx_task(void *arg)
             payload.size(),
             &payload_size,
             &sequence,
-            s_task_cfg.rx_timeout);
+            RX_TIMEOUT);
 
         if (receive_err == ESP_OK) {
             robot_RobotUartMessage mcu_message = robot_RobotUartMessage_init_zero;
@@ -128,13 +127,13 @@ void _rx_task(void *arg)
             vTaskDelay(1); // avoid tight error loop
         }
 
-        if (s_task_cfg.link_timeout == 0) {
+        if (UART_LINK_TIMEOUT == 0) {
             continue;
         } else {
             const TickType_t now = xTaskGetTickCount();
 
             if (s_link_connected.load(std::memory_order_acquire) &&
-                (now - last_valid_receive) >= s_task_cfg.link_timeout) {
+                (now - last_valid_receive) >= UART_LINK_TIMEOUT) {
                 _set_link_connected(false);
             }
         }
@@ -142,16 +141,12 @@ void _rx_task(void *arg)
 }
 } // namespace
 
-
 esp_err_t get_latest_message(robot_RobotUartMessage *message_out, TickType_t timeout)
 {
     return xQueuePeek(s_rx_latest_queue, message_out, timeout) == pdTRUE ? ESP_OK : ESP_FAIL;
 }
 
-esp_err_t start_uart_tasks(const UartTaskConfig &task_cfg,
-                           const UartLink::Config &uart_link_cfg,
-                           TaskHandle_t *tx_handle_out,
-                           TaskHandle_t *rx_handle_out)
+esp_err_t start_uart_tasks(TaskHandle_t *tx_handle_out, TaskHandle_t *rx_handle_out)
 {
     if (s_rx_task_handle != nullptr) {
         if (rx_handle_out != nullptr) {
@@ -169,23 +164,22 @@ esp_err_t start_uart_tasks(const UartTaskConfig &task_cfg,
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_task_cfg = task_cfg;
 
     s_rx_latest_queue = xQueueCreate(1, sizeof(robot_RobotUartMessage));
     configASSERT(s_rx_latest_queue != nullptr);
 
     static UartLink uart_link{};
-    ESP_ERROR_CHECK(uart_link.init(uart_link_cfg));
+    ESP_ERROR_CHECK(uart_link.init(UART_LINK_CFG));
 
     s_uart_link = &uart_link;
 
     auto rx_ok = xTaskCreatePinnedToCore(_rx_task,
                                          "uart_rx_task",
-                                         s_task_cfg.rx_stack_depth,
+                                         TASK_RX_STACK_DEPTH,
                                          nullptr,
-                                         s_task_cfg.rx_priority,
+                                         TASK_RX_PRIORITY,
                                          &s_rx_task_handle,
-                                         s_task_cfg.rx_core_id);
+                                         TASK_RX_CORE_ID);
 
     if (rx_ok != pdPASS) {
         ESP_LOGE(TAG, "failed to instantiate uart rx task");
@@ -196,11 +190,11 @@ esp_err_t start_uart_tasks(const UartTaskConfig &task_cfg,
 
     auto tx_ok = xTaskCreatePinnedToCore(_rx_task,
                                          "uart_tx_task",
-                                         s_task_cfg.tx_stack_depth,
+                                         TASK_TX_STACK_DEPTH,
                                          nullptr,
-                                         s_task_cfg.tx_priority,
+                                         TASK_RX_PRIORITY,
                                          &s_tx_task_handle,
-                                         s_task_cfg.tx_core_id);
+                                         TASK_TX_CORE_ID);
 
     if (rx_ok != pdPASS) {
         ESP_LOGE(TAG, "failed to instantiate uart tx task");

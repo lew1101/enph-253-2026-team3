@@ -11,6 +11,8 @@
 #include "sensors/pcnt_encoder.hpp"
 #include "control/pid.hpp"
 
+using namespace DriveTaskConfig;
+
 using control::Drivetrain;
 using control::PID;
 using control::PoseEstimator;
@@ -28,10 +30,6 @@ QueueHandle_t s_pose_queue = nullptr;
 
 DriveMode s_mode = DriveMode::STOP;
 
-DriveTaskConfig s_task_cfg;
-Drivetrain::Config s_drive_cfg;
-PoseEstimator::Config s_pose_estimator_cfg;
-
 PcntEncoder s_encoder_x;
 PcntEncoder s_encoder_y;
 
@@ -42,14 +40,14 @@ PID heading_pid(15.0f, 0.0f, 1.2f, 0.4f, -0.5f, 0.5f);
 
 esp_err_t _initialize_deadwheels()
 {
-    esp_err_t err = s_encoder_x.init(s_task_cfg.deadwheel_x_cfg);
+    esp_err_t err = s_encoder_x.init(DEADWHL_X_CFG);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "x deadwheel startup failed");
         s_encoder_x.deinit();
         return err;
     }
 
-    err = s_encoder_y.init(s_task_cfg.deadwheel_y_cfg);
+    err = s_encoder_y.init(DEADWHL_Y_CFG);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "x deadwheel startup failed");
         s_encoder_x.deinit();
@@ -79,7 +77,7 @@ esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSna
 void _drive_task(void *arg)
 {
     (void)arg;
-    Drivetrain drivetrain{s_drive_cfg};
+    Drivetrain drivetrain{DRIVETRAIN_CFG};
 
     esp_err_t err = drivetrain.init();
 
@@ -99,9 +97,9 @@ void _drive_task(void *arg)
         vTaskDelete(nullptr);
     }
 
-    PoseEstimator pose_estimator{s_task_cfg.pose_estimator_cfg};
+    PoseEstimator pose_estimator{POSE_ESTIMATION_CFG};
 
-    const float DT_S = static_cast<float>(s_task_cfg.period_ms) / 1000;
+    const float DT_S = static_cast<float>(TASK_PERIOD_MS) / 1000;
 
     PoseSnapshot pose_snapshot;
     TapeSnapshot tape_snapshot;
@@ -110,10 +108,6 @@ void _drive_task(void *arg)
 
     TickType_t last_wake_tick = xTaskGetTickCount();
     while (true) {
-        //         xEventGroupWaitBits(
-        //             g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED, pdFALSE, pdTRUE,
-        //             portMAX_DELAY);
-
         esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "failed to get pose snapshot");
@@ -163,32 +157,31 @@ void _drive_task(void *arg)
                     const float heading_error =
                         control::wrap_angle_pi(cmd.target_heading_rad - pose_snapshot.heading_rad);
 
-                    const bool position_reached = position_error <= s_task_cfg.position_tolerance_m;
-                    const bool heading_reached =
-                        fabs(heading_error) <= s_task_cfg.heading_tolerance_rad;
+                    const bool position_reached = position_error <= POS_TOLERANCE_M;
+                    const bool heading_reached = fabs(heading_error) <= HEADING_TOLERANCE_RAD;
 
                     if (position_reached && heading_reached) {
                         drivetrain.stop();
                         break;
                     }
 
-                    const float x_cmd_field = position_reached
-                                            ? 0.0f
-                                            : x_pid.update(cmd.target_x_m, pose_snapshot.x_m, DT_S);
+                    const float x_cmd_field =
+                        position_reached ? 0.0f
+                                         : x_pid.update(cmd.target_x_m, pose_snapshot.x_m, DT_S);
 
-                    const float y_cmd_field = position_reached
-                                            ? 0.0f
-                                            : y_pid.update(cmd.target_y_m, pose_snapshot.y_m, DT_S);
+                    const float y_cmd_field =
+                        position_reached ? 0.0f
+                                         : y_pid.update(cmd.target_y_m, pose_snapshot.y_m, DT_S);
 
                     const float rotation_cmd = heading_reached //
-                                             ? 0.0f
-                                             : heading_pid.update(0.0f, -heading_error, DT_S);
+                                                   ? 0.0f
+                                                   : heading_pid.update(0.0f, -heading_error, DT_S);
 
                     const float sin_h = sinf(pose_snapshot.heading_rad);
                     const float cos_h = cosf(pose_snapshot.heading_rad);
 
-                    const float x_cmd_robot = x_cmd_field*cos_h + y_cmd_field*sin_h;
-                    const float y_cmd_robot = -x_cmd_field*sin_h + y_cmd_field*cos_h;
+                    const float x_cmd_robot = x_cmd_field * cos_h + y_cmd_field * sin_h;
+                    const float y_cmd_robot = -x_cmd_field * sin_h + y_cmd_field * cos_h;
 
                     drivetrain.move_vector(x_cmd_robot, y_cmd_robot, rotation_cmd);
                     break;
@@ -209,15 +202,12 @@ void _drive_task(void *arg)
         }
 
         drivetrain.update();
-        vTaskDelayUntil(&last_wake_tick,
-                        pdMS_TO_TICKS(static_cast<uint32_t>(s_task_cfg.period_ms)));
+        vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(TASK_PERIOD_MS));
     }
 }
 } // namespace
 
-esp_err_t start_drive_task(const DriveTaskConfig &task_cfg,
-                           const Drivetrain::Config &drivetrain_cfg,
-                           TaskHandle_t *out_handle)
+esp_err_t start_drive_task(TaskHandle_t *out_handle)
 {
     if (s_task_handle != nullptr) {
         if (out_handle != nullptr) {
@@ -227,9 +217,6 @@ esp_err_t start_drive_task(const DriveTaskConfig &task_cfg,
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_task_cfg = task_cfg;
-    s_drive_cfg = drivetrain_cfg;
-
     s_drive_cmd_queue = xQueueCreate(1, sizeof(DriveCommand));
     configASSERT(s_drive_cmd_queue != nullptr);
 
@@ -238,11 +225,11 @@ esp_err_t start_drive_task(const DriveTaskConfig &task_cfg,
 
     auto ok = xTaskCreatePinnedToCore(_drive_task,
                                       "drive_task",
-                                      s_task_cfg.stack_depth,
+                                      TASK_STACK_DEPTH,
                                       nullptr,
-                                      s_task_cfg.priority,
+                                      TASK_PRIORITY,
                                       &s_task_handle,
-                                      s_task_cfg.core_id);
+                                      TASK_CORE_ID);
     if (ok != pdPASS) {
         ESP_LOGE(TAG, "failed to instantiate drive task");
 

@@ -4,26 +4,26 @@
 #include "freertos/idf_additions.h"
 #include "portmacro.h"
 
-struct TapeSenseTaskConfig {
-    gpio_num_t fl_tape_pin = GPIO_NUM_NC;
-    gpio_num_t fm_tape_pin = GPIO_NUM_NC;
-    gpio_num_t fr_tape_pin = GPIO_NUM_NC;
+namespace TapeSenseTaskConfig {
+constexpr uint32_t TASK_STACK_DEPTH = 4096;
+constexpr UBaseType_t TASK_PRIORITY = 4;
+constexpr BaseType_t TASK_CORE_ID = 1;
+constexpr uint32_t TASK_PERIOD_MS = 20.0f; // 50 Hz control loop
 
-    gpio_num_t bl_tape_pin = GPIO_NUM_NC;
-    gpio_num_t bm_tape_pin = GPIO_NUM_NC;
-    gpio_num_t br_tape_pin = GPIO_NUM_NC;
+constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t FR_TAPE_PIN = GPIO_NUM_NC;
 
-    gpio_num_t l1_tape_pin = GPIO_NUM_NC;
-    gpio_num_t l2_tape_pin = GPIO_NUM_NC;
+constexpr gpio_num_t BL_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t BM_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_NC;
 
-    uint16_t high_threshold = 2000;
-    uint16_t low_threshold = 1500;
+constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_NC;
 
-    uint32_t stack_depth = 4096;
-    UBaseType_t priority = 4;
-    BaseType_t core_id = 1;
-    float period_ms = 20.0f; // 50 Hz control loop
-};
+constexpr uint16_t TAPE_HIGH_THRESHOLD = 2000;
+constexpr uint16_t TAPE_LOW_THRESHOLD = 1500;
+}; // namespace TapeSenseTaskConfig
 
 struct TapeSnapshot {
     // front
@@ -48,5 +48,5 @@ struct TapeSnapshot {
 };
 
 //
-esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHandle_t *out_handle);
+esp_err_t start_tape_sense_task(TaskHandle_t *out_handle);
 bool get_tape_snapshot(TapeSnapshot *out, TickType_t timeout);

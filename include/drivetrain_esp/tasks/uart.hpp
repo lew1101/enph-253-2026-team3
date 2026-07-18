@@ -1,6 +1,7 @@
 #pragma once
 
-#include "freertos/idf_additions.h"
+#include "hal/gpio_types.h"
+#include "hal/uart_types.h"
 
 #include "comms/uart_link.hpp"
 
@@ -10,28 +11,38 @@
 
 using UartRxHandler = void (*)(const robot_RobotUartMessage &message, uint16_t sequence);
 
-struct UartTaskConfig {
-    // RX task
-    uint32_t rx_stack_depth = 4096;
-    UBaseType_t rx_priority = 4;
-    BaseType_t rx_core_id = 0;
+namespace UartTaskConfig {
+// RX task
+constexpr uint32_t TASK_RX_STACK_DEPTH = 4096;
+constexpr UBaseType_t TASK_RX_PRIORITY = 4;
+constexpr BaseType_t TASK_RX_CORE_ID = 0;
 
-    // TX task
-    uint32_t tx_stack_depth = 4096;
-    UBaseType_t tx_priority = 3;
-    BaseType_t tx_core_id = 0;
+// TX task
+constexpr uint32_t TASK_TX_STACK_DEPTH = 4096;
+constexpr UBaseType_t TASK_TX_PRIORITY = 3;
+constexpr BaseType_t TASK_TX_CORE_ID = 0;
 
-    // UART receive behavior
-    TickType_t rx_timeout = pdMS_TO_TICKS(20);
-    TickType_t tx_send_sync_period = pdMS_TO_TICKS(100);
-    // Periodic state synchronization
+// UART receive behavior
+constexpr TickType_t RX_TIMEOUT = pdMS_TO_TICKS(20);
+constexpr TickType_t TX_SEND_SYNC_PERIOD = pdMS_TO_TICKS(100);
+// Periodic state synchronization
 
-    // Connection supervision
-    TickType_t link_timeout = pdMS_TO_TICKS(500);
+// Connection supervision
+constexpr TickType_t UART_LINK_TIMEOUT = pdMS_TO_TICKS(500);
+
+constexpr comms::UartLink::Config UART_LINK_CFG{
+    .port = UART_NUM_1,
+
+    .tx_pin = GPIO_NUM_14,
+    .rx_pin = GPIO_NUM_13,
+
+    .baud_rate = 460'800,
+
+    .rx_buffer_size = 2048,
+    .tx_buffer_size = 1024,
 };
+} // namespace UartTaskConfig
 
-esp_err_t start_uart_tasks(const UartTaskConfig &task_cfg,
-                           const comms::UartLink::Config &uart_link_cfg,
-                           TaskHandle_t *out_handle);
+esp_err_t start_uart_tasks(TaskHandle_t *out_handle);
 
-esp_err_t get_latest_message(robot_RobotUartMessage* message_out, TickType_t timeout);
+esp_err_t get_latest_message(robot_RobotUartMessage *message_out, TickType_t timeout);

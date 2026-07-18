@@ -2,32 +2,23 @@
 #include "tasks/tape_sense.hpp"
 
 #include "esp_err.h"
+#include "portmacro.h"
 
 static constexpr const char TAG[] = "tape_task";
+
+using namespace TapeSenseTaskConfig;
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
 QueueHandle_t s_snapshot_queue;
 
 TapeSnapshot s_snapshot;
-TapeSenseTaskConfig s_task_config;
-
-float fl_adc_val = 0.0f;
-float fm_adc_val = 0.0f;
-float fr_adc_val = 0.0f;
-
-float bl_adc_val = 0.0f;
-float bm_adc_val = 0.0f;
-float br_adc_val = 0.0f;
-
-float l1_adc_val = 0.0f;
-float l2_adc_val = 0.0f;
 
 bool _apply_hyteresis(bool sees_tape, float adc_val)
 {
-    if (sees_tape && adc_val < s_task_config.low_threshold)
+    if (sees_tape && adc_val < TAPE_LOW_THRESHOLD)
         return false;
-    else if (!sees_tape && adc_val > s_task_config.high_threshold)
+    else if (!sees_tape && adc_val > TAPE_HIGH_THRESHOLD)
         return true;
     return sees_tape;
 }
@@ -61,31 +52,44 @@ void _tape_task(void *arg)
     (void)arg;
 
     // Define the GPIO pins for the tape sensors
-    gpio_set_direction(s_task_config.fl_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.fm_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.fr_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(FL_TAPE_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(FM_TAPE_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(FR_TAPE_PIN, GPIO_MODE_INPUT);
 
-    gpio_set_direction(s_task_config.bl_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.bm_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.br_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(BL_TAPE_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(BM_TAPE_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(BR_TAPE_PIN, GPIO_MODE_INPUT);
 
-    gpio_set_direction(s_task_config.l1_tape_pin, GPIO_MODE_INPUT);
-    gpio_set_direction(s_task_config.l2_tape_pin, GPIO_MODE_INPUT);
+    gpio_set_direction(L1_TAPE_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(L2_TAPE_PIN, GPIO_MODE_INPUT);
+
+    float fl_adc_val = 0.0f;
+    float fm_adc_val = 0.0f;
+    float fr_adc_val = 0.0f;
+
+    float bl_adc_val = 0.0f;
+    float bm_adc_val = 0.0f;
+    float br_adc_val = 0.0f;
+
+    float l1_adc_val = 0.0f;
+    float l2_adc_val = 0.0f;
+
+    TickType_t last_wake_time = xTaskGetTickCount();
 
     while (true) {
         // xEventGroupWaitBits(
         //     g_robot_flags, RobotFlag::ROBOT_FLAG_TAPE_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
 
-        fl_adc_val = analogRead(s_task_config.fl_tape_pin);
-        fm_adc_val = analogRead(s_task_config.fm_tape_pin);
-        fr_adc_val = analogRead(s_task_config.fr_tape_pin);
+        fl_adc_val = analogRead(FL_TAPE_PIN);
+        fm_adc_val = analogRead(FM_TAPE_PIN);
+        fr_adc_val = analogRead(FR_TAPE_PIN);
 
-        bl_adc_val = analogRead(s_task_config.bl_tape_pin);
-        bm_adc_val = analogRead(s_task_config.bm_tape_pin);
-        br_adc_val = analogRead(s_task_config.br_tape_pin);
+        bl_adc_val = analogRead(BL_TAPE_PIN);
+        bm_adc_val = analogRead(BM_TAPE_PIN);
+        br_adc_val = analogRead(BR_TAPE_PIN);
 
-        l1_adc_val = analogRead(s_task_config.l1_tape_pin);
-        l2_adc_val = analogRead(s_task_config.l2_tape_pin);
+        l1_adc_val = analogRead(L1_TAPE_PIN);
+        l2_adc_val = analogRead(L2_TAPE_PIN);
 
         s_snapshot.tape_fl = _apply_hyteresis(s_snapshot.tape_fl, fl_adc_val);
         s_snapshot.tape_fm = _apply_hyteresis(s_snapshot.tape_fm, fm_adc_val);
@@ -115,13 +119,13 @@ void _tape_task(void *arg)
         // s_tape_error.store(error);
         // ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);
 
-        vTaskDelay(pdMS_TO_TICKS(static_cast<uint32_t>(s_task_config.period_ms)));
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(TASK_PERIOD_MS));
     }
 }
 
 } // namespace
 
-esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHandle_t *out_handle)
+esp_err_t start_tape_sense_task(TaskHandle_t *out_handle)
 {
     if (s_task_handle != nullptr) {
         if (out_handle != nullptr) {
@@ -131,18 +135,16 @@ esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHand
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_task_config = task_config;
-
     s_snapshot_queue = xQueueCreate(1, sizeof(TapeSnapshot));
     configASSERT(s_snapshot_queue != nullptr);
 
     auto ok = xTaskCreatePinnedToCore(_tape_task,
                                       "tape_task",
-                                      s_task_config.stack_depth,
+                                      TASK_STACK_DEPTH,
                                       nullptr,
-                                      s_task_config.priority,
+                                      TASK_PRIORITY,
                                       &s_task_handle,
-                                      s_task_config.core_id);
+                                      TASK_CORE_ID);
 
     if (ok != pdPASS) {
         ESP_LOGE(TAG, "failed to instantiate tape task");
