@@ -8,7 +8,7 @@ static constexpr char TAG[] = "encoder_driver";
 namespace sensors {
 PcntEncoder::~PcntEncoder() { PcntEncoder::deinit(); }
 
-esp_err_t PcntEncoder::init(const PcntEncoderConfig &cfg)
+esp_err_t PcntEncoder::init(const Config &cfg)
 {
     ESP_RETURN_ON_FALSE(
         _unit == nullptr, ESP_ERR_INVALID_STATE, TAG, "pcnt unit already initialized");
