@@ -25,11 +25,13 @@ void _imu_task(void *arg)
 
     if (!s_imu.begin(IMU_I2C_ADDRESS, Wire, s_task_cfg.int_pin, s_task_cfg.rst_pin)) {
         ESP_LOGE(TAG, "BNO086 not detected");
+        s_task_handle = nullptr;
         vTaskDelete(nullptr);
     }
 
     if (!_enable_rot_vec()) {
         ESP_LOGE(TAG, "failed to enable rotation vector");
+        s_task_handle = nullptr;
         vTaskDelete(nullptr);
     }
 
@@ -37,7 +39,7 @@ void _imu_task(void *arg)
 
     while (true) {
         if (s_imu.wasReset()) {
-            ESP_LOGW("imu", "IMU reset; re-enabling reports");
+            ESP_LOGW(TAG, "IMU reset; re-enabling reports");
             _enable_rot_vec();
         }
 
@@ -45,10 +47,6 @@ void _imu_task(void *arg)
             float yaw = s_imu.getYaw();
             float pitch = s_imu.getPitch();
             float roll = s_imu.getRoll();
-
-            if (yaw < 0.0f) yaw += TWO_PI;
-            if (pitch < 0.0f) pitch += TWO_PI;
-            if (roll < 0.0f) roll += TWO_PI;
 
             ESP_LOGV(TAG, "yaw=%.2f, pitch=%.2f, roll=%.2f", yaw, pitch, roll);
 
@@ -68,7 +66,7 @@ void _imu_task(void *arg)
 }
 } // namespace
 
-esp_err_t start_tape_sense_task(const ImuTaskConfig &task_cfg, TaskHandle_t *out_handle)
+esp_err_t start_imu_task(const ImuTaskConfig &task_cfg, TaskHandle_t *out_handle)
 {
     if (s_task_handle != nullptr) {
         if (out_handle != nullptr) {
