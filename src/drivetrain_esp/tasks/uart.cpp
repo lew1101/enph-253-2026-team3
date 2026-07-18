@@ -36,8 +36,10 @@ void _set_link_connected(bool connected)
 esp_err_t _send_message(drive_DriveUartMessage &message)
 {
     std::array<uint8_t, drive_DriveUartMessage_size> payload{};
+
+    size_t encoded_size = 0;
     esp_err_t err = comms::pbcodec::encode<drive_DriveUartMessage, drive_DriveUartMessage_fields>(
-        message, payload.data(), payload.size());
+        message, payload.data(), payload.size(), &encoded_size);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "failed to encode UART message: %s", esp_err_to_name(err));
@@ -47,7 +49,7 @@ esp_err_t _send_message(drive_DriveUartMessage &message)
 
     uint16_t sequence = 0;
 
-    err = s_uart_link->send(payload.data(), drive_DriveUartMessage_size, sequence);
+    err = s_uart_link->send(payload.data(), encoded_size, sequence);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "failed to send UART message: %s", esp_err_to_name(err));
@@ -58,10 +60,12 @@ esp_err_t _send_message(drive_DriveUartMessage &message)
     ESP_LOGV(TAG,
              "sent UART message: sequence=%u, payload_size=%u",
              static_cast<unsigned>(sequence),
-             static_cast<unsigned>(drive_DriveUartMessage_size));
+             static_cast<unsigned>(encoded_size));
 
     return ESP_OK;
 }
+
+void _handle_message(robot_RobotUartMessage &master_messsage) {}
 
 void _tx_task(void *arg)
 {
@@ -163,7 +167,6 @@ esp_err_t start_uart_tasks(TaskHandle_t *tx_handle_out, TaskHandle_t *rx_handle_
 
         return ESP_ERR_INVALID_STATE;
     }
-
 
     s_rx_latest_queue = xQueueCreate(1, sizeof(robot_RobotUartMessage));
     configASSERT(s_rx_latest_queue != nullptr);

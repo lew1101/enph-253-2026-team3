@@ -43,6 +43,5 @@ constexpr comms::UartLink::Config UART_LINK_CFG{
 };
 } // namespace UartTaskConfig
 
-esp_err_t start_uart_tasks(TaskHandle_t *out_handle);
-
+esp_err_t start_uart_tasks(TaskHandle_t *tx_handle_out, TaskHandle_t *rx_handle_out);
 esp_err_t get_latest_message(robot_RobotUartMessage *message_out, TickType_t timeout);
