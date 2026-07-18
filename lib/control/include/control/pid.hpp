@@ -23,16 +23,16 @@ class PID {
     {
     }
 
-    float update(float ref, float meas, float dt_s);
+    virtual float update(float ref, float meas, float dt_s);
     inline void set_gain(float kp, float ki, float kd)
     {
         _kp = kp;
         _ki = ki;
         _kd = kd;
     }
-    void reset();
+    virtual void reset();
 
-  private:
+  protected:
     float _kp;
     float _ki;
     float _kd;
