@@ -23,7 +23,7 @@ float br_adc_val = 0.0f;
 float l1_adc_val = 0.0f;
 float l2_adc_val = 0.0f;
 
-float ALPHA = 0.5f;
+float ALPHA = 1.0f;
 
 bool _apply_hyteresis(bool sees_tape, float adc_val)
 {
