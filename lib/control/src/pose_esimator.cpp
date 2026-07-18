@@ -1,8 +1,8 @@
 #include "control/pose_estimator.hpp"
 
 namespace control {
-const PoseSnapshot &PoseEstimator::update(int x_count,
-                                          int y_count,
+const PoseSnapshot &PoseEstimator::update(int32_t x_count,
+                                          int32_t y_count,
                                           float imu_heading_rad,
                                           TickType_t tick)
 {
