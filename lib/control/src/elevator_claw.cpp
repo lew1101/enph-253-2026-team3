@@ -3,14 +3,14 @@
 #include "actuators/servo.hpp"
 #include "FastAccelStepper.h"
 
-using control::ElevatorArm;
+using control::ElevatorClaw;
 
-ElevatorArm::ElevatorArm(const Config &config)
+ElevatorClaw::ElevatorClaw(const Config &config)
     : _config(config)
 {
 }
     
-esp_err_t ElevatorArm::init()
+esp_err_t ElevatorClaw::init()
 {
     if (_config.engine == nullptr) {
         return ESP_ERR_INVALID_ARG;
@@ -29,29 +29,29 @@ esp_err_t ElevatorArm::init()
     return ESP_OK;
 }
 
-void ElevatorArm::calibrate() {
+void ElevatorClaw::calibrate() {
     return;
 }
 
-void ElevatorArm::move_to_position(float step) {
+void ElevatorClaw::move_to_position(float step) {
     _stepper->moveTo(step);
 }
 
-void ElevatorArm::open_arm_tower() {
+void ElevatorClaw::open_claw_tower() {
     _arm_servo.set_deg(180.0f);
     return;
 }
 
-void ElevatorArm::open_arm_rock() {
+void ElevatorClaw::open_claw_rock() {
     _arm_servo.set_deg(180.0f);
     return;
 }
 
-void ElevatorArm::close_arm() {
+void ElevatorClaw::close_arm() {
     _arm_servo.set_deg(0.0f);
     return;
 }
 
-bool ElevatorArm::elevator_done() const {
+bool ElevatorClaw::elevator_done() const {
     return !_stepper->isRunning();
 }

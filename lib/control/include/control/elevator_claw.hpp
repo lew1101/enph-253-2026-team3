@@ -4,7 +4,7 @@
 
 namespace control {
 
-class ElevatorArm {
+class ElevatorClaw {
   public:
 
     struct Config {
@@ -30,16 +30,16 @@ class ElevatorArm {
 ;
     };
 
-    ElevatorArm() = default;
+    ElevatorClaw() = default;
 
-    explicit ElevatorArm(const Config &config);
+    explicit ElevatorClaw(const Config &config);
 
     esp_err_t init();
 
     void calibrate();
     void move_to_position(float step);
-    void open_arm_tower();
-    void open_arm_rock();
+    void open_claw_tower();
+    void open_claw_rock();
     void close_arm();
 
     bool elevator_done() const;
