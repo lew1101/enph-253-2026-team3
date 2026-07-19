@@ -15,7 +15,7 @@ class ElevatorClaw {
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
 
-        driver::ServoDriver ::Config arm_servo_config = {
+        driver::ServoDriver ::Config claw_servo_config = {
             .gpio = GPIO_NUM_NC,
             .channel = 1,
             .freq_hz = 50,
@@ -40,13 +40,13 @@ class ElevatorClaw {
     void move_to_position(float step);
     void open_claw_tower();
     void open_claw_rock();
-    void close_arm();
+    void close_claw();
 
     bool elevator_done() const;
 
   private:
     Config _config;
     FastAccelStepper *_stepper = nullptr;
-    driver::ServoDriver _arm_servo{_config.arm_servo_config};
+    driver::ServoDriver _claw_servo{_config.claw_servo_config};
 };
 }

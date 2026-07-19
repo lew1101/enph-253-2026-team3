@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "control/elevator_arm.hpp"
+#include "control/elevator_claw.hpp"
 #include "actuators/servo.hpp"
 #include "FastAccelStepper.h"
 
@@ -25,7 +25,7 @@ esp_err_t ElevatorClaw::init()
 
     _stepper->setSpeedInHz(_config.speed_hz);
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
-    _arm_servo.init();
+    _claw_servo.init();
     return ESP_OK;
 }
 
@@ -38,17 +38,17 @@ void ElevatorClaw::move_to_position(float step) {
 }
 
 void ElevatorClaw::open_claw_tower() {
-    _arm_servo.set_deg(180.0f);
+    _claw_servo.set_deg(180.0f);
     return;
 }
 
 void ElevatorClaw::open_claw_rock() {
-    _arm_servo.set_deg(180.0f);
+    _claw_servo.set_deg(180.0f);
     return;
 }
 
-void ElevatorClaw::close_arm() {
-    _arm_servo.set_deg(0.0f);
+void ElevatorClaw::close_claw() {
+    _claw_servo.set_deg(0.0f);
     return;
 }
 
