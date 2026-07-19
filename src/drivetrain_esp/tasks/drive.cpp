@@ -4,14 +4,14 @@
 #include "freertos/idf_additions.h"
 #include "portmacro.h"
 #include "projdefs.h"
-#include "control/PID.hpp"
+#include "control/tape_pid.hpp"
 #include "tasks/tape_sense.hpp"
 
 using namespace control;
 
 static constexpr char TAG[] = "drive_task";
 
-control::PID tape_pid(15.0f, 0.0f, 1.2f);
+control::TapePID tape_pid(15.0f, 0.0f, 1.2f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
