@@ -48,11 +48,11 @@ esp_err_t UartLink::init(const Config &config)
                         "TX buffer must either be zero or exceed UART FIFO size %d",
                         fifo_size);
 
-    _tx_mutex = xSemaphoreCreateMutex();
-    configASSERT(_tx_mutex != nullptr);
+    SemaphoreHandle_t tx_mutex = xSemaphoreCreateMutex();
+    configASSERT(tx_mutex != nullptr);
 
-    _rx_mutex = xSemaphoreCreateMutex();
-    configASSERT(_rx_mutex != nullptr);
+    SemaphoreHandle_t rx_mutex = xSemaphoreCreateMutex();
+    configASSERT(rx_mutex != nullptr);
 
     uart_config_t uart_cfg{
         .baud_rate = config.baud_rate,
@@ -63,33 +63,41 @@ esp_err_t UartLink::init(const Config &config)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_param_config(config.port, &uart_cfg));
-    ESP_ERROR_CHECK(uart_set_pin( //
-        config.port,
-        config.tx_pin,
-        config.rx_pin,
-        UART_PIN_NO_CHANGE,
-        UART_PIN_NO_CHANGE));
+    esp_err_t err = uart_param_config(config.port, &uart_cfg);
+    if (err != ESP_OK) {
+        goto fail;
+    }
 
-    ESP_ERROR_CHECK(uart_driver_install( //
-        config.port,
-        config.rx_buffer_size,
-        config.tx_buffer_size,
-        0,
-        nullptr,
-        0));
+    err = uart_set_pin(
+        config.port, config.tx_pin, config.rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (err != ESP_OK) {
+        goto fail;
+    }
+
+    err = uart_driver_install(
+        config.port, config.rx_buffer_size, config.tx_buffer_size, 0, nullptr, 0);
+    if (err != ESP_OK) {
+        goto fail;
+    }
 
     _port = config.port;
+    _tx_mutex = tx_mutex;
+    _rx_mutex = rx_mutex;
     _tx_sequence = 0;
     _initialized = true;
 
-    esp_err_t err = uart_flush_input(_port);
+    err = uart_flush_input(_port);
     if (err != ESP_OK) {
         deinit();
         return err;
     }
 
     return ESP_OK;
+
+fail:
+    vSemaphoreDelete(rx_mutex);
+    vSemaphoreDelete(tx_mutex);
+    return err;
 }
 
 esp_err_t UartLink::deinit()
@@ -120,9 +128,11 @@ esp_err_t UartLink::deinit()
     return err;
 }
 
-esp_err_t UartLink::send(const uint8_t *payload, size_t payload_size, uint16_t &sequence)
+esp_err_t UartLink::send(const uint8_t *payload, size_t payload_size, uint16_t *sequence)
 {
-    sequence = 0;
+    if (sequence != nullptr) {
+        *sequence = 0;
+    }
 
     ESP_RETURN_ON_FALSE(_initialized, ESP_ERR_INVALID_STATE, TAG, "UART link is not initialized");
     ESP_RETURN_ON_FALSE(payload != nullptr, ESP_ERR_INVALID_ARG, TAG, "payload cannot be nullptr");
@@ -154,7 +164,9 @@ esp_err_t UartLink::send(const uint8_t *payload, size_t payload_size, uint16_t &
     }
 
     if (err == ESP_OK) {
-        sequence = packet_sequence;
+        if (sequence != nullptr) {
+            *sequence = packet_sequence;
+        }
         ++_tx_sequence;
     }
 
@@ -169,13 +181,18 @@ esp_err_t UartLink::receive(uint8_t *payload,
                             uint16_t *sequence,
                             TickType_t timeout)
 {
-    payload_size = 0;
-    sequence = 0;
-
     ESP_RETURN_ON_FALSE(_initialized, ESP_ERR_INVALID_STATE, TAG, "UART link is not initialized");
     ESP_RETURN_ON_FALSE(payload != nullptr, ESP_ERR_INVALID_ARG, TAG, "payload cannot be nullptr");
     ESP_RETURN_ON_FALSE(
+        payload_size != nullptr, ESP_ERR_INVALID_ARG, TAG, "payload_size cannot be nullptr");
+    ESP_RETURN_ON_FALSE(
         payload_capacity > 0, ESP_ERR_INVALID_SIZE, TAG, "payload capacity must greater than zero");
+
+    *payload_size = 0;
+
+    if (sequence != nullptr) {
+        *sequence = 0;
+    }
 
     /*
      * Start before acquiring the mutex so the timeout applies
@@ -183,6 +200,7 @@ esp_err_t UartLink::receive(uint8_t *payload,
      */
     const TickType_t start = xTaskGetTickCount();
 
+    // rx mutex take
     auto rx_mutex_take_ok = xSemaphoreTake(_rx_mutex, timeout);
 
     if (rx_mutex_take_ok != pdTRUE) {
@@ -262,7 +280,9 @@ esp_err_t UartLink::receive(uint8_t *payload,
         memcpy(payload, _rx_buf.data(), header.payload_length);
 
         *payload_size = header.payload_length;
-        *sequence = header.sequence;
+        if (sequence != nullptr) {
+            *sequence = header.sequence;
+        }
     }
 
 cleanup:

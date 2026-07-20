@@ -9,8 +9,6 @@
 #include "robot_message.pb.h"
 #include "drive_message.pb.h"
 
-using UartRxHandler = void (*)(const robot_RobotUartMessage &message, uint16_t sequence);
-
 namespace UartTaskConfig {
 // RX task
 constexpr uint32_t TASK_RX_STACK_DEPTH = 4096;
@@ -44,4 +42,4 @@ constexpr comms::UartLink::Config UART_LINK_CFG{
 } // namespace UartTaskConfig
 
 esp_err_t start_uart_tasks(TaskHandle_t *tx_handle_out, TaskHandle_t *rx_handle_out);
-esp_err_t get_latest_message(robot_RobotUartMessage *message_out, TickType_t timeout);
+bool uart_link_connected();

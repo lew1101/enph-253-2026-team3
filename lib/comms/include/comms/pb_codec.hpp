@@ -13,6 +13,9 @@ namespace comms::pbcodec {
 template <typename Message, const pb_msgdesc_t *Descriptor>
 esp_err_t encode(const Message &message, pb_byte_t *buf, size_t buf_cap, size_t *encoded_size)
 {
+    static_assert(Descriptor != nullptr);
+    configASSERT(buf != nullptr);
+
     ESP_RETURN_ON_FALSE(
         buf != nullptr, ESP_ERR_INVALID_ARG, "pb_codec", "buffer cannot be nullptr");
     ESP_RETURN_ON_FALSE(
@@ -20,7 +23,9 @@ esp_err_t encode(const Message &message, pb_byte_t *buf, size_t buf_cap, size_t 
     ESP_RETURN_ON_FALSE(
         buf_cap > 0, ESP_ERR_INVALID_ARG, "pb_codec", "output capacity cannot be 0");
 
-    *encoded_size = 0;
+    if (encoded_size != nullptr) {
+        *encoded_size = 0;
+    }
 
     pb_ostream_t ostream = pb_ostream_from_buffer(buf, buf_cap);
 
@@ -36,6 +41,10 @@ esp_err_t encode(const Message &message, pb_byte_t *buf, size_t buf_cap, size_t 
 template <typename Message, const pb_msgdesc_t *Descriptor>
 esp_err_t decode(const pb_byte_t *buf, const size_t msg_len, Message *message_out)
 {
+    static_assert(Descriptor != nullptr);
+    configASSERT(buf != nullptr);
+    configASSERT(message_out != nullptr);
+
     ESP_RETURN_ON_FALSE(
         buf != nullptr, ESP_ERR_INVALID_ARG, "pb_codec", "istream cannot be nullptr");
 

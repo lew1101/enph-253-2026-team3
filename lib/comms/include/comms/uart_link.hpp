@@ -38,7 +38,7 @@ class UartLink {
     esp_err_t init(const Config &config);
     esp_err_t deinit();
 
-    esp_err_t send(const uint8_t *payload, size_t payload_size, uint16_t &sequence);
+    esp_err_t send(const uint8_t *payload, size_t payload_size, uint16_t *sequence);
     esp_err_t receive(uint8_t *payload,
                       size_t payload_capacity,
                       uint16_t *payload_size,
