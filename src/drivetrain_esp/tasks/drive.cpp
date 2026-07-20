@@ -242,6 +242,8 @@ void _drive_task(void *arg)
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
                         ESP_LOGW(TAG, "failed to get tape snapshot");
+                        drivetrain.stop();
+                        break;
                     }
 
                     float rot_correction = s_tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
