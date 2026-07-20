@@ -28,9 +28,9 @@ struct ImuSnapshot {
     float roll;
 
     TickType_t tick;
+    uint32_t reset_count;
     bool valid;
 };
 
 esp_err_t start_imu_task(TaskHandle_t *out_handle);
 bool get_imu_snapshot(ImuSnapshot *out, TickType_t timeout);
-

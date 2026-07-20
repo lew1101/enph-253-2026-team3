@@ -1,17 +1,19 @@
 #pragma once
 #include "Arduino.h"
 #include "control/drivetrain.hpp"
+#include "portmacro.h"
+#include "projdefs.h"
+
 #include "sensors/pcnt_encoder.hpp"
 
 #include "control/pose_estimator.hpp"
-#include "tasks/drive.hpp"
 
 namespace DriveTaskConfig {
 
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
 constexpr BaseType_t TASK_CORE_ID = 1;
-constexpr uint32_t TASK_PERIOD_MS = 20ul; // 50 Hz control loop
+constexpr float TASK_PERIOD_MS = 20.0f; // 50 Hz control loop
 
 constexpr gpio_num_t FR_MOTOR_CW_PIN = GPIO_NUM_45;
 constexpr gpio_num_t FR_MOTOR_CCW_PIN = GPIO_NUM_46;
@@ -21,14 +23,6 @@ constexpr gpio_num_t FL_MOTOR_CW_PIN = GPIO_NUM_16;
 constexpr gpio_num_t FL_MOTOR_CCW_PIN = GPIO_NUM_15;
 constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_17;
 constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_18;
-constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_1;
-constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_2;
-constexpr gpio_num_t FR_TAPE_PIN = GPIO_NUM_3;
-constexpr gpio_num_t BL_TAPE_PIN = GPIO_NUM_4;
-constexpr gpio_num_t BM_TAPE_PIN = GPIO_NUM_5;
-constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_6;
-constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_7;
-constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_8;
 
 constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
     .timer_0 = nullptr,
@@ -73,7 +67,7 @@ constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
 constexpr float POS_TOLERANCE_M = 0.02f;
 constexpr float HEADING_TOLERANCE_RAD = 0.05f;
 
-constexpr float IMU_TIMEOUT_MS = 100;
+constexpr uint32_t IMU_TIMEOUT_MS = 100;
 }; // namespace DriveTaskConfig
 
 /// ========================================
@@ -87,6 +81,7 @@ enum class DriveMode : uint8_t {
 
 struct DriveCommand {
     DriveMode mode;
+    uint32_t sequence = 0;
 
     float x_speed = 0.0f; // strafe velocity
     float y_speed = 0.0f; // forward/backward velocity
@@ -102,3 +97,5 @@ struct DriveCommand {
 //
 esp_err_t send_drive_cmd(const DriveCommand &cmd);
 esp_err_t start_drive_task(TaskHandle_t *out_handle);
+esp_err_t get_pose(control::PoseSnapshot* out);
+bool reached_pose();

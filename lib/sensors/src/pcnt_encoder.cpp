@@ -115,7 +115,7 @@ cleanup:
 
 esp_err_t PcntEncoder::get_count(int *count) const
 {
-    ESP_RETURN_ON_FALSE(_unit != nullptr || _initialized,
+    ESP_RETURN_ON_FALSE(_unit != nullptr && _initialized,
                         ESP_ERR_INVALID_STATE,
                         TAG,
                         "cannot get count before intialized");

@@ -6,16 +6,23 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
                                           float imu_heading_rad,
                                           TickType_t tick)
 {
+    if (!std::isfinite(imu_heading_rad) || !std::isfinite(_pose.x_m) || !std::isfinite(_pose.y_m) ||
+        !std::isfinite(_pose.heading_rad) || !std::isfinite(_cfg.deadwheel_x_count_to_m_scale) ||
+        !std::isfinite(_cfg.deadwheel_y_count_to_m_scale) ||
+        !std::isfinite(_cfg.deadwheel_x_y_offset_m) ||
+        !std::isfinite(_cfg.deadwheel_y_x_offset_m)) {
+        _pose.tick = tick;
+        _pose.valid = false;
+        return _pose;
+    }
+
     if (!_initialized) {
         _prev_x_count = x_count;
         _prev_y_count = y_count;
 
-        _heading_offset_rad = imu_heading_rad;
-        _prev_heading_rad = 0.0f;
-
-        _pose.heading_rad = _prev_heading_rad;
-        _pose.x_m = 0.0f;
-        _pose.y_m = 0.0f;
+        _pose.heading_rad = wrap_angle_2pi(_pose.heading_rad);
+        _heading_offset_rad = wrap_angle_pi(imu_heading_rad - _pose.heading_rad);
+        _prev_heading_rad = _pose.heading_rad;
 
         _pose.tick = tick;
         _pose.valid = true;
@@ -42,13 +49,17 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
     const float meas_delta_y_m =
         static_cast<float>(delta_y_count) * _cfg.deadwheel_y_count_to_m_scale;
 
+    // trapezoidal approx:
+    // should be good enough for a high enough control update rate
+    // dx_meas ~= dx_centre + y_offset * dtheta
+    // dy_meas ~= dy_centre - x_offset * dtheta
+    // theta_mid ~= theta_prev + 1/2*dtheta
     const float delta_x_robot_m = meas_delta_x_m + _cfg.deadwheel_x_y_offset_m * delta_heading_rad;
     const float delta_y_robot_m = meas_delta_y_m - _cfg.deadwheel_y_x_offset_m * delta_heading_rad;
+    const float mid_heading_rad = wrap_angle_pi(_prev_heading_rad + 0.5f * delta_heading_rad);
 
-    const float midpoint_heading_rad = _prev_heading_rad + 0.5f * delta_heading_rad;
-
-    const float sin_h = sinf(midpoint_heading_rad);
-    const float cos_h = cosf(midpoint_heading_rad);
+    float sin_h, cos_h;
+    sincosf(mid_heading_rad, &sin_h, &cos_h);
 
     const float delta_x_field_m = cos_h * delta_x_robot_m - sin_h * delta_y_robot_m;
     const float delta_y_field_m = sin_h * delta_x_robot_m + cos_h * delta_y_robot_m;
@@ -68,7 +79,9 @@ void PoseEstimator::reset(float x_m, float y_m, float heading_rad)
 {
     _pose.x_m = x_m;
     _pose.y_m = y_m;
-    _pose.heading_rad = heading_rad;
+    _pose.heading_rad = wrap_angle_2pi(heading_rad);
+    _pose.valid = false;
+    _initialized = false;
 }
 
 } // namespace control

@@ -13,6 +13,7 @@ static constexpr char TAG[] = "imu_task";
 namespace {
 TaskHandle_t s_task_handle;
 QueueHandle_t s_snapshot_queue;
+uint32_t s_reset_count = 0;
 
 BNO08x s_imu;
 
@@ -41,7 +42,10 @@ void _imu_task(void *arg)
     while (true) {
         if (s_imu.wasReset()) {
             ESP_LOGW(TAG, "IMU reset; re-enabling reports");
-            _enable_rot_vec();
+            ++s_reset_count;
+            if (!_enable_rot_vec()) {
+                ESP_LOGE(TAG, "failed to re-enable rotation vector");
+            }
         }
 
         if (s_imu.getSensorEvent() && s_imu.getSensorEventID() == SENSOR_REPORTID_ROTATION_VECTOR) {
@@ -56,6 +60,7 @@ void _imu_task(void *arg)
                 .pitch = pitch,
                 .roll = roll,
                 .tick = xTaskGetTickCount(),
+                .reset_count = s_reset_count,
                 .valid = true,
             };
 
@@ -104,5 +109,6 @@ esp_err_t start_imu_task(TaskHandle_t *out_handle)
 
 bool get_imu_snapshot(ImuSnapshot *out, TickType_t timeout)
 {
+    if (out == nullptr || s_snapshot_queue == nullptr) return false;
     return xQueuePeek(s_snapshot_queue, out, timeout) == pdTRUE;
 }

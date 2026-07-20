@@ -1,5 +1,8 @@
-#include "control/pose_estimator.hpp"
 #include "freertos/idf_additions.h"
+#include <atomic>
+#include <cmath>
+
+#include "control/pose_estimator.hpp"
 
 #include "esp_check.h"
 #include "esp_err.h"
@@ -33,10 +36,13 @@ DriveMode s_mode = DriveMode::STOP;
 PcntEncoder s_encoder_x;
 PcntEncoder s_encoder_y;
 
-PID tape_pid(15.0f, 0.0f, 1.2f);
-PID x_pid(15.0f, 0.0f, 1.2f, 15.0f, -70.0f, 70.0f);
-PID y_pid(15.0f, 0.0f, 1.2f, 15.0f, -70.0f, 70.0f);
-PID heading_pid(15.0f, 0.0f, 1.2f, 0.4f, -0.5f, 0.5f);
+// right strafe is +x, forward is +y, CCW rotation is +\theta
+PID s_tape_pid(15.0f, 0.0f, 1.2f);
+PID s_x_pid(15.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
+PID s_y_pid(15.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
+PID s_heading_pid(15.0f, 0.0f, 1.2f, 0.4f, -0.5f, 0.5f);
+
+std::atomic_bool s_reached_pose{false};
 
 esp_err_t _initialize_deadwheels()
 {
@@ -60,16 +66,36 @@ esp_err_t _initialize_deadwheels()
 
 esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSnapshot *out)
 {
+    static uint32_t last_imu_reset_count = 0;
+    static bool have_imu_reset_count = false;
+
     ImuSnapshot imu_snapshot;
     int x_count, y_count;
 
     ESP_RETURN_ON_FALSE(
         get_imu_snapshot(&imu_snapshot, 0), ESP_FAIL, TAG, "failed to get imu data");
+
+    const TickType_t now = xTaskGetTickCount();
+    const TickType_t max_imu_age = pdMS_TO_TICKS(IMU_TIMEOUT_MS);
+
+    ESP_RETURN_ON_FALSE(imu_snapshot.valid && std::isfinite(imu_snapshot.yaw),
+                        ESP_ERR_INVALID_STATE,
+                        TAG,
+                        "invalid imu data");
+    ESP_RETURN_ON_FALSE(
+        (now - imu_snapshot.tick) <= max_imu_age, ESP_ERR_TIMEOUT, TAG, "stale imu data");
     ESP_RETURN_ON_ERROR(s_encoder_x.get_count(&x_count), TAG, "failed to get x encoder count");
     ESP_RETURN_ON_ERROR(s_encoder_y.get_count(&y_count), TAG, "failed to get y encoder count;");
 
-    *out = pose_estimator.update(x_count, y_count, imu_snapshot.yaw, imu_snapshot.tick);
-    xQueueOverwrite(s_pose_queue, out);
+    if (have_imu_reset_count && imu_snapshot.reset_count != last_imu_reset_count) {
+        const PoseSnapshot &pose = pose_estimator.pose();
+        pose_estimator.reset(pose.x_m, pose.y_m, pose.heading_rad);
+    }
+
+    last_imu_reset_count = imu_snapshot.reset_count;
+    have_imu_reset_count = true;
+
+    *out = pose_estimator.update(x_count, y_count, imu_snapshot.yaw, now);
 
     return ESP_OK;
 }
@@ -105,17 +131,28 @@ void _drive_task(void *arg)
     TapeSnapshot tape_snapshot;
 
     DriveCommand cmd;
+    uint32_t previous_pose_sequence = 0;
 
     TickType_t last_wake_tick = xTaskGetTickCount();
+
     while (true) {
         esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "failed to get pose snapshot");
+            pose_snapshot.valid = false;
+            pose_snapshot.tick = xTaskGetTickCount();
+            s_reached_pose.store(false, std::memory_order_release);
         }
+
+        xQueueOverwrite(s_pose_queue, &pose_snapshot);
 
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
-            if (s_mode != cmd.mode) {
+            const bool mode_changed = s_mode != cmd.mode;
+            const bool new_pose_command = cmd.mode == DriveMode::DRIVE_TO_POSITION &&
+                                          (mode_changed || cmd.sequence != previous_pose_sequence);
+
+            if (mode_changed) {
                 s_mode = cmd.mode;
 
                 switch (s_mode) {
@@ -124,14 +161,19 @@ void _drive_task(void *arg)
                     case DriveMode::SET_SPEED:
                         break;
                     case DriveMode::TAPE_FOLLOW:
-                        tape_pid.reset();
+                        s_tape_pid.reset();
                         break;
                     case DriveMode::DRIVE_TO_POSITION:
-                        x_pid.reset();
-                        y_pid.reset();
-                        heading_pid.reset();
                         break;
                 }
+            }
+
+            if (new_pose_command) {
+                s_x_pid.reset();
+                s_y_pid.reset();
+                s_heading_pid.reset();
+                previous_pose_sequence = cmd.sequence;
+                s_reached_pose.store(false, std::memory_order_release);
             }
 
             switch (cmd.mode) {
@@ -150,40 +192,49 @@ void _drive_task(void *arg)
                         break;
                     }
 
+                    // calculate pos error in field coords
                     const float error_x_field = cmd.target_x_m - pose_snapshot.x_m;
                     const float error_y_field = cmd.target_y_m - pose_snapshot.y_m;
                     const float position_error = hypotf(error_x_field, error_y_field);
 
+                    // calculate heading error
                     const float heading_error =
                         control::wrap_angle_pi(cmd.target_heading_rad - pose_snapshot.heading_rad);
 
+                    // allow for small tolerance in pos/heading error
+                    // to avoid jitter near setpoint.
                     const bool position_reached = position_error <= POS_TOLERANCE_M;
-                    const bool heading_reached = fabs(heading_error) <= HEADING_TOLERANCE_RAD;
+                    const bool heading_reached = fabsf(heading_error) <= HEADING_TOLERANCE_RAD;
 
                     if (position_reached && heading_reached) {
                         drivetrain.stop();
+                        s_reached_pose.store(true, std::memory_order_relaxed);
                         break;
+                        // position reached... break
                     }
 
-                    const float x_cmd_field =
-                        position_reached ? 0.0f
-                                         : x_pid.update(cmd.target_x_m, pose_snapshot.x_m, DT_S);
+                    s_reached_pose.store(false, std::memory_order_relaxed);
 
-                    const float y_cmd_field =
-                        position_reached ? 0.0f
-                                         : y_pid.update(cmd.target_y_m, pose_snapshot.y_m, DT_S);
+                    // get both sin and cos at the same time
+                    float sin_h, cos_h;
+                    sincosf(pose_snapshot.heading_rad, &sin_h, &cos_h);
 
-                    const float rotation_cmd = heading_reached //
-                                                   ? 0.0f
-                                                   : heading_pid.update(0.0f, -heading_error, DT_S);
+                    float error_x_robot = 0.0f, error_y_robot = 0.0f;
+                    if (!position_reached) {
+                        error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
+                        error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
+                    }
+                    // update position pid
+                    // negative sign on error necessary for robot to move in the right direction
+                    const float x_cmd =
+                        position_reached ? 0.0f : s_x_pid.update(0.0f, -error_x_robot, DT_S);
+                    const float y_cmd =
+                        position_reached ? 0.0f : s_y_pid.update(0.0f, -error_y_robot, DT_S);
+                    const float rot_cmd = heading_reached //
+                                              ? 0.0f
+                                              : s_heading_pid.update(0.0f, -heading_error, DT_S);
 
-                    const float sin_h = sinf(pose_snapshot.heading_rad);
-                    const float cos_h = cosf(pose_snapshot.heading_rad);
-
-                    const float x_cmd_robot = x_cmd_field * cos_h + y_cmd_field * sin_h;
-                    const float y_cmd_robot = -x_cmd_field * sin_h + y_cmd_field * cos_h;
-
-                    drivetrain.move_vector(x_cmd_robot, y_cmd_robot, rotation_cmd);
+                    drivetrain.move_vector(x_cmd, y_cmd, rot_cmd);
                     break;
                 }
 
@@ -191,10 +242,9 @@ void _drive_task(void *arg)
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
                         ESP_LOGW(TAG, "failed to get tape snapshot");
-                        break;
                     }
 
-                    float rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float rot_correction = s_tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
                     drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_correction);
                     break;
                 }
@@ -246,9 +296,23 @@ esp_err_t start_drive_task(TaskHandle_t *out_handle)
 
 esp_err_t send_drive_cmd(const DriveCommand &cmd)
 {
+    ESP_RETURN_ON_FALSE(
+        s_drive_cmd_queue != nullptr, ESP_ERR_INVALID_STATE, TAG, "drive queue not initialized");
+
+    s_reached_pose.store(false, std::memory_order_release);
     ESP_RETURN_ON_FALSE(xQueueOverwrite(s_drive_cmd_queue, &cmd) == pdTRUE,
                         ESP_ERR_INVALID_STATE,
                         TAG,
                         "failed to write drive command");
     return ESP_OK;
 }
+
+esp_err_t get_pose(PoseSnapshot *out)
+{
+    ESP_RETURN_ON_FALSE(out != nullptr, ESP_ERR_INVALID_ARG, TAG, "pose output is null");
+    ESP_RETURN_ON_FALSE(
+        s_pose_queue != nullptr, ESP_ERR_INVALID_STATE, TAG, "pose queue not initialized!");
+    return xQueuePeek(s_pose_queue, out, 0) == pdTRUE ? ESP_OK : ESP_FAIL;
+}
+
+bool reached_pose() { return s_reached_pose.load(std::memory_order_relaxed); }

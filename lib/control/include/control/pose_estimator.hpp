@@ -1,7 +1,7 @@
 #pragma once
 
 #include "freertos/idf_additions.h"
-#include <math.h>
+#include <cmath>
 
 namespace control {
 inline constexpr float wrap_angle_2pi(float angle)

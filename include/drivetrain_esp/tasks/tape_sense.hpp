@@ -8,18 +8,18 @@ namespace TapeSenseTaskConfig {
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
 constexpr BaseType_t TASK_CORE_ID = 1;
-constexpr uint32_t TASK_PERIOD_MS = 20.0f; // 50 Hz control loop
+constexpr float TASK_PERIOD_MS = 20.0f; // 50 Hz control loop
 
-constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_NC;
-constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_NC;
-constexpr gpio_num_t FR_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_1;
+constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_2;
+constexpr gpio_num_t FR_TAPE_PIN = GPIO_NUM_3;
 
-constexpr gpio_num_t BL_TAPE_PIN = GPIO_NUM_NC;
-constexpr gpio_num_t BM_TAPE_PIN = GPIO_NUM_NC;
-constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t BL_TAPE_PIN = GPIO_NUM_4;
+constexpr gpio_num_t BM_TAPE_PIN = GPIO_NUM_5;
+constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_6;
 
-constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_NC;
-constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_NC;
+constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_7;
+constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_8;
 
 constexpr uint16_t TAPE_HIGH_THRESHOLD = 2000;
 constexpr uint16_t TAPE_LOW_THRESHOLD = 1500;
