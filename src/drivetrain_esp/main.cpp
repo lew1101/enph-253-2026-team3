@@ -11,10 +11,10 @@ TaskHandle_t imu_sensor_handle;
 TaskHandle_t tape_handle;
 
 void setup() {
-    start_uart_tasks(&uart_tx_handle, &uart_rx_handle);
-    start_drive_task(&drive_handle);
-    start_imu_task(&imu_sensor_handle);
-    start_tape_sense_task(&tape_handle);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(start_uart_tasks(&uart_tx_handle, &uart_rx_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(start_imu_task(&imu_sensor_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(start_drive_task(&drive_handle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(start_tape_sense_task(&tape_handle));
 
     vTaskDelete(nullptr);
 }
