@@ -97,23 +97,26 @@ bool Drivetrain::strafe(float speed_percentage) // right is positive, left is ne
     return true;
 }
 
-// positive is clockwise, negative is counter-clockwise
+// Positive is counter-clockwise
 bool Drivetrain::turn(float speed_percentage)
 {
-    target_speed[0] = -speed_percentage * _config.rot_scalar;
-    target_speed[1] = -speed_percentage * _config.rot_scalar;
-    target_speed[2] = -speed_percentage * _config.rot_scalar;
-    target_speed[3] = -speed_percentage * _config.rot_scalar;
+    target_speed[0] = speed_percentage * _config.rot_scalar;
+    target_speed[1] = speed_percentage * _config.rot_scalar;
+    target_speed[2] = speed_percentage * _config.rot_scalar;
+    target_speed[3] = speed_percentage * _config.rot_scalar;
 
     return true;
 }
 
 bool Drivetrain::move_vector(float vx, float vy, float omega)
 {
-    target_speed[0] = vy - vx + omega * _config.rot_scalar;
-    target_speed[1] = vy + vx + omega * _config.rot_scalar;
-    target_speed[2] = -(vy + vx + omega * _config.rot_scalar);
-    target_speed[3] = -(vy - vx + omega * _config.rot_scalar);
+    // Translation uses the robot frame: +vx is right and +vy is forward.
+    // Positive omega is counter-clockwise, matching the pose convention.
+    const float rotation = omega * _config.rot_scalar;
+    target_speed[0] = vy - vx + rotation;
+    target_speed[1] = vy + vx + rotation;
+    target_speed[2] = -(vy + vx) + rotation;
+    target_speed[3] = -(vy - vx) + rotation;
 
     float max_mag = std::max({std::fabs(target_speed[0]),
                               std::fabs(target_speed[1]),
