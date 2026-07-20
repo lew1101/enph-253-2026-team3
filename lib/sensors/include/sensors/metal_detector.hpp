@@ -69,15 +69,30 @@ class MetalDetector {
     MetalDetector &operator=(const MetalDetector &other) = delete;
 
     esp_err_t init();
-    inline bool is_calibration_complete() {return _baseline_ready;}
+    inline bool is_calibration_complete() { return _baseline_ready; }
 
     esp_err_t pulse_and_sample();
     esp_err_t update();
 
-    inline void get_snapshot(Snapshot &out)
+    inline void reset()
+    {
+        _baseline_ready = false;
+        _baseline_count = 0;
+        _baseline_sum = 0.0f;
+        _pulsed_baseline = 0.0f;
+
+        _adc_filter_initialized = false;
+        _sensor_out = 0.0f;
+
+        _detect_count = 0;
+        _clear_count = 0;
+        _state = MetalState::METAL_CALIBRATION;
+    }
+
+    inline void get_snapshot(Snapshot *out)
     {
         portENTER_CRITICAL(&_mux);
-        out = _snapshot;
+        *out = _snapshot;
         portEXIT_CRITICAL(&_mux);
     }
 
