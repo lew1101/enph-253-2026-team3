@@ -85,6 +85,7 @@ void metal_task(void *arg)
         ulTaskNotifyTake(pdTRUE, 0);
 
         arm_timer_us(MD_START_DELAY_US);
+        bool was_metal_seen = false;
 
         while (true) {
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -106,18 +107,24 @@ void metal_task(void *arg)
                     supervisor::notify_main(robot_flags::NOTIFY_METAL_CALIBRATED));
             }
 
-            bool metal_seen = snapshot.state == MetalState::METAL_DETECTED;
+            const bool metal_seen = snapshot.state == MetalState::METAL_DETECTED;
             if (metal_seen) {
                 // metal seen!
                 xEventGroupSetBits(supervisor::g_robot_status_flags,
                                    robot_flags::STATUS_METAL_SEEN);
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    supervisor::notify_main(robot_flags::NOTIFY_METAL_FOUND));
+
             } else {
                 // no metal :(
                 xEventGroupClearBits(supervisor::g_robot_status_flags,
                                      robot_flags::STATUS_METAL_SEEN);
             }
+
+            if (metal_seen && !was_metal_seen) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(
+                    supervisor::notify_main(robot_flags::NOTIFY_METAL_FOUND));
+            }
+
+            was_metal_seen = metal_seen;
         }
     }
 }
