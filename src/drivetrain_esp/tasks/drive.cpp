@@ -11,12 +11,13 @@ using namespace control;
 
 static constexpr char TAG[] = "drive_task";
 
-control::TapePID tape_pid(15.0f, 0.0f, 1.2f);
+control::TapePID tape_pid(22.0f, 460.0f, 0.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
 QueueHandle_t s_drive_cmd_queue = nullptr;
-
+bool is_stopped = true;
+TickType_t stop_timestamp = 0;
 DriveMode s_mode;
 
 DriveTaskConfig s_task_cfg;
@@ -62,18 +63,41 @@ void _drive_task(void *arg)
 
             switch (cmd.mode) {
                 case DriveMode::STOP:
-                    drivetrain.stop();
+                {
+                    if (is_stopped != true) {
+                        ESP_LOGI(TAG, "Stopping");
+                        is_stopped = true;
+                        stop_timestamp = xTaskGetTickCount();
+                    }
+                    bool stop_success = get_tape_snapshot(&tape_snapshot, 0);
+                    if (!stop_success) {
+                        ESP_LOGW(TAG, "unable to get tape snapshot");
+                        continue;
+                    }
+                    float stop_rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float stop_rot_speed = -stop_rot_correction / 5; // Apply correction to rotation
+                    
+                    if (xTaskGetTickCount() - stop_timestamp > pdMS_TO_TICKS(3000)) {
+                        drivetrain.stop();
+                    }
+                    else {
+                        drivetrain.move_vector(0.0f, 0.0f, stop_rot_speed);
+                    }
                     break;
-
+                }
                 case DriveMode::SET_SPEED:
+                {
                     drivetrain.move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
                     break;
-
+                }
                 case DriveMode::DRIVE_TO_POSITION:
+                {
                     ESP_LOGW(TAG, "DriveMode::DRIVE_TO_POSE not implemented");
                     break;
-
+                }
                 case DriveMode::TAPE_FOLLOW:
+                {
+                    is_stopped = false;
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
                         ESP_LOGW(TAG, "unable to get tape snapshot");
@@ -84,6 +108,7 @@ void _drive_task(void *arg)
                     // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
                     drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_speed);
                     break;
+                }
             }
         }
 
