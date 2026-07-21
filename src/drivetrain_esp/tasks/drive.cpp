@@ -22,7 +22,6 @@ TickType_t stop_timestamp = 0;
 float max_vy = 0.0f;
 float min_vy = 10.0f;
 float current_vy = 0.0f;
-float speed_penalty_multiplier = 0.5f; // Multiplier for speed penalty when tape is lost
 
 DriveMode s_mode;
 
@@ -112,7 +111,7 @@ void _drive_task(void *arg)
                     max_vy = cmd.tape_follow_speed;
                     float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
                     float rot_speed = -correction; // Apply correction to rotation
-                    float speed_penalty = abs(correction) * speed_penalty_multiplier;
+                    float speed_penalty = abs(correction) * cmd.speed_penalty_multiplier;
                     current_vy = max_vy - speed_penalty;
                     if (current_vy < min_vy) {
                         current_vy = min_vy; // Ensure we don't go below the minimum speed

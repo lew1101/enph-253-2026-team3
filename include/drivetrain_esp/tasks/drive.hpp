@@ -16,6 +16,7 @@ struct DriveCommand {
     float rot_speed = 0.0f;
 
     float tape_follow_speed = 0.0f;
+    float speed_penalty_multiplier = 0.5f; // Multiplier for speed penalty when tape is lost
 
     float target_x;
     float target_y;
