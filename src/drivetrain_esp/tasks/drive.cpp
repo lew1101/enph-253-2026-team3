@@ -11,13 +11,19 @@ using namespace control;
 
 static constexpr char TAG[] = "drive_task";
 
-control::TapePID tape_pid(22.0f, 460.0f, 0.0f);
+control::TapePID tape_pid(22.0f, 0.0f, 460.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
 QueueHandle_t s_drive_cmd_queue = nullptr;
 bool is_stopped = true;
 TickType_t stop_timestamp = 0;
+
+float max_vy = 0.0f;
+float min_vy = 10.0f;
+float current_vy = 0.0f;
+float speed_penalty_multiplier = 0.5f; // Multiplier for speed penalty when tape is lost
+
 DriveMode s_mode;
 
 DriveTaskConfig s_task_cfg;
@@ -75,9 +81,9 @@ void _drive_task(void *arg)
                         continue;
                     }
                     float stop_rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float stop_rot_speed = -stop_rot_correction / 5; // Apply correction to rotation
+                    float stop_rot_speed = -stop_rot_correction / 50; // Apply correction to rotation
                     
-                    if (xTaskGetTickCount() - stop_timestamp > pdMS_TO_TICKS(3000)) {
+                    if (xTaskGetTickCount() - stop_timestamp > pdMS_TO_TICKS(1000)) {
                         drivetrain.stop();
                     }
                     else {
@@ -103,10 +109,16 @@ void _drive_task(void *arg)
                         ESP_LOGW(TAG, "unable to get tape snapshot");
                         continue;
                     }
-                    float rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float rot_speed = -rot_correction; // Apply correction to rotation
+                    max_vy = cmd.tape_follow_speed;
+                    float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float rot_speed = -correction; // Apply correction to rotation
+                    float speed_penalty = abs(correction) * speed_penalty_multiplier;
+                    current_vy = max_vy - speed_penalty;
+                    if (current_vy < min_vy) {
+                        current_vy = min_vy; // Ensure we don't go below the minimum speed
+                    }
                     // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
-                    drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_speed);
+                    drivetrain.move_vector(0.0f, current_vy, rot_speed);
                     break;
                 }
             }
