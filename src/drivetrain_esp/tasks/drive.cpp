@@ -109,12 +109,19 @@ void _drive_task(void *arg)
                         continue;
                     }
                     max_vy = cmd.tape_follow_speed;
-                    float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float rot_speed = -correction; // Apply correction to rotation
-                    float speed_penalty = abs(correction) * cmd.speed_penalty_multiplier;
+                    float speed_penalty = abs(tape_snapshot.front_err) * cmd.speed_penalty_multiplier;
                     current_vy = max_vy - speed_penalty;
                     if (current_vy < min_vy) {
                         current_vy = min_vy; // Ensure we don't go below the minimum speed
+                    }
+
+                    float max_rot_speed = 100.0f - current_vy; // Adjust max rotation speed based on current forward speed
+                    float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float rot_speed = -correction; // Apply correction to rotation
+                    if (rot_speed > max_rot_speed) {
+                        rot_speed = max_rot_speed;
+                    } else if (rot_speed < -max_rot_speed) {
+                        rot_speed = -max_rot_speed;
                     }
                     // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
                     drivetrain.move_vector(0.0f, current_vy, rot_speed);
