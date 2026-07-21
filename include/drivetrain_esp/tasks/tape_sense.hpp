@@ -48,5 +48,6 @@ struct TapeSnapshot {
 };
 
 //
+void change_outer_error(float new_outer_error);
 esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHandle_t *out_handle);
 bool get_tape_snapshot(TapeSnapshot *out, TickType_t timeout);

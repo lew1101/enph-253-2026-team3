@@ -24,6 +24,7 @@ float l1_adc_val = 0.0f;
 float l2_adc_val = 0.0f;
 
 float ALPHA = 1.0f;
+float outer_error = 5.0f;
 
 bool _apply_hyteresis(bool sees_tape, float adc_val)
 {
@@ -43,9 +44,9 @@ float _get_tape_error(bool left, bool right, float prev_error)
     } else if (!left && !right) {
         // Both sensors do not see tape, use previous error to determine direction
         if (prev_error > 0.0f) {
-            return 5.0f; // Last known position was to the right
+            return outer_error; // Last known position was to the right
         } else if (prev_error < 0.0f) {
-            return -5.0f; // Last known position was to the left
+            return -outer_error; // Last known position was to the left
         }
     }
 
@@ -126,6 +127,11 @@ void _tape_task(void *arg)
 }
 
 } // namespace
+
+void change_outer_error(float new_outer_error)
+{
+    outer_error = new_outer_error;
+}
 
 esp_err_t start_tape_sense_task(const TapeSenseTaskConfig &task_config, TaskHandle_t *out_handle)
 {
