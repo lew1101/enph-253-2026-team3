@@ -31,8 +31,9 @@ class Drivetrain {
     bool forward(float speed_percentage); // -100 to 100
     bool strafe(float speed_percentage);  // -100 to 100
     bool turn(float speed_percentage);    // -100 to 100, positive is clockwise, negative is
-                                          // counter-clockwise
-
+    // counter-clockwise
+    
+    bool move_vector(float vx, float vy, float omega, float max_clamp);
     bool move_vector(float vx, float vy, float omega);
     bool tape_follow(float vy, float omega);
     bool stop();

@@ -108,7 +108,7 @@ bool Drivetrain::turn(float speed_percentage)
     return true;
 }
 
-bool Drivetrain::move_vector(float vx, float vy, float omega)
+bool Drivetrain::move_vector(float vx, float vy, float omega, float max_clamp)
 {
     target_speed[0] = vy - vx + omega * _config.rot_scalar;
     target_speed[1] = vy + vx + omega * _config.rot_scalar;
@@ -120,28 +120,34 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
                               std::fabs(target_speed[2]),
                               std::fabs(target_speed[3])});
 
-    if (max_mag > 100.0f) {
-        target_speed[0] = (target_speed[0] / max_mag) * 100.0f;
-        target_speed[1] = (target_speed[1] / max_mag) * 100.0f;
-        target_speed[2] = (target_speed[2] / max_mag) * 100.0f;
-        target_speed[3] = (target_speed[3] / max_mag) * 100.0f;
+    if (max_mag > max_clamp) {
+        target_speed[0] = (target_speed[0] / max_mag) * max_clamp;
+        target_speed[1] = (target_speed[1] / max_mag) * max_clamp;
+        target_speed[2] = (target_speed[2] / max_mag) * max_clamp;
+        target_speed[3] = (target_speed[3] / max_mag) * max_clamp;
     }
 
     return true;
 }
 
+bool Drivetrain::move_vector(float vx, float vy, float omega)
+{
+    return move_vector(vx, vy, omega, 100.0f);
+}
+
 bool Drivetrain::tape_follow(float vy, float omega)
 {
-    target_speed[0] = vy + omega * _config.rot_scalar + 0.5; // add a bit of juice to front right and back right to balance the offset
-    target_speed[1] = vy + omega * _config.rot_scalar + 0.5;
+    target_speed[0] = vy + omega * _config.rot_scalar; // add a bit of juice to front right and back
+                                                       // right to balance the offset
+    target_speed[1] = vy + omega * _config.rot_scalar;
     target_speed[2] = -vy + omega * _config.rot_scalar;
     target_speed[3] = -vy + omega * _config.rot_scalar;
 
-    // clamp the speeds so they never drive backward)
-    if (target_speed[0] < 0.0f) target_speed[0] = 0.0f;
-    if (target_speed[1] < 0.0f) target_speed[1] = 0.0f;
-    if (target_speed[2] > 0.0f) target_speed[2] = 0.0f;
-    if (target_speed[3] > 0.0f) target_speed[3] = 0.0f;
+    // clamp the speeds so they only drive backward a little bit)
+    if (target_speed[0] < -5.0f) target_speed[0] = -5.0f;
+    if (target_speed[1] < -5.0f) target_speed[1] = -5.0f;
+    if (target_speed[2] > 5.0f) target_speed[2] = 5.0f;
+    if (target_speed[3] > 5.0f) target_speed[3] = 5.0f;
 
     float max_mag = std::max({std::fabs(target_speed[0]),
                               std::fabs(target_speed[1]),
