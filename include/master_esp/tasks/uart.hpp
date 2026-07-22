@@ -6,6 +6,9 @@
 #include "robot_message.pb.h"
 
 namespace MasterUartTaskConfig {
+constexpr gpio_num_t RX_PIN = GPIO_NUM_48;
+constexpr gpio_num_t TX_PIN = GPIO_NUM_47;
+
 constexpr uint32_t TASK_RX_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_RX_PRIORITY = 4;
 constexpr BaseType_t TASK_RX_CORE_ID = 0;
@@ -25,8 +28,8 @@ constexpr size_t TX_QUEUE_LENGTH = 8;
 
 constexpr comms::UartLink::Config UART_LINK_CFG{
     .port = UART_NUM_1,
-    .tx_pin = GPIO_NUM_17,
-    .rx_pin = GPIO_NUM_39,
+    .tx_pin = TX_PIN,
+    .rx_pin = RX_PIN,
     .baud_rate = 460'800,
     .rx_buffer_size = 2048,
     .tx_buffer_size = 1024,
@@ -35,10 +38,8 @@ constexpr comms::UartLink::Config UART_LINK_CFG{
 
 esp_err_t start_master_uart_tasks(TaskHandle_t *tx_handle_out = nullptr,
                                   TaskHandle_t *rx_handle_out = nullptr);
-esp_err_t send_robot_message(const robot_RobotUartMessage &message,
-                             TickType_t timeout = 0);
+esp_err_t send_robot_message(const robot_RobotUartMessage &message, TickType_t timeout = 0);
 esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeout = 0);
-
 
 esp_err_t get_drive_status(drive_DriveUartMessage *out, TickType_t timeout = 0);
 

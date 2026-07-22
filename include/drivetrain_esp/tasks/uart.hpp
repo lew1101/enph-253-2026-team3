@@ -8,8 +8,12 @@
 #include "portmacro.h"
 #include "robot_message.pb.h"
 #include "drive_message.pb.h"
+#include "soc/gpio_num.h"
 
 namespace UartTaskConfig {
+constexpr gpio_num_t RX_PIN = GPIO_NUM_13;
+constexpr gpio_num_t TX_PIN = GPIO_NUM_14;
+
 // RX task
 constexpr uint32_t TASK_RX_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_RX_PRIORITY = 4;
@@ -31,8 +35,8 @@ constexpr TickType_t UART_LINK_TIMEOUT = pdMS_TO_TICKS(500);
 constexpr comms::UartLink::Config UART_LINK_CFG{
     .port = UART_NUM_1,
 
-    .tx_pin = GPIO_NUM_14,
-    .rx_pin = GPIO_NUM_13,
+    .tx_pin = TX_PIN,
+    .rx_pin = RX_PIN,
 
     .baud_rate = 460'800,
 

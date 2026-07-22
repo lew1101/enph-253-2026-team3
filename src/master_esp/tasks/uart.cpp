@@ -194,6 +194,7 @@ void _rx_task(void *)
             xEventGroupSetBits(supervisor::g_robot_status_flags,
                                robot_flags::STATUS_FAULT_ACTIVE |
                                    robot_flags::STATUS_DRIVE_FAULT_ACTIVE);
+
             supervisor::notify_main(robot_flags::NOTIFY_FAULT);
 
             ESP_LOGW(TAG, "drivetrain UART disconnected");
