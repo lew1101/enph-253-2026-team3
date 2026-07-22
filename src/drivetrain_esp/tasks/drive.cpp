@@ -136,15 +136,15 @@ void _drive_task(void *arg)
     TickType_t last_wake_tick = xTaskGetTickCount();
 
     while (true) {
-        esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "failed to get pose snapshot");
-            pose_snapshot.valid = false;
-            pose_snapshot.tick = xTaskGetTickCount();
-            s_reached_pose.store(false, std::memory_order_release);
-        }
+        // esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
+        // if (err != ESP_OK) {
+        //     ESP_LOGW(TAG, "failed to get pose snapshot");
+        //     pose_snapshot.valid = false;
+        //     pose_snapshot.tick = xTaskGetTickCount();
+        //     s_reached_pose.store(false, std::memory_order_release);
+        // }
 
-        xQueueOverwrite(s_pose_queue, &pose_snapshot);
+        // xQueueOverwrite(s_pose_queue, &pose_snapshot);
 
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
@@ -178,10 +178,12 @@ void _drive_task(void *arg)
 
             switch (cmd.mode) {
                 case DriveMode::STOP:
+                    ESP_LOGD(TAG, "drivetrain stop");
                     drivetrain.stop();
                     break;
 
                 case DriveMode::SET_SPEED:
+                    ESP_LOGD(TAG, "moving at speed: x=%.2f, y=%.2f, rot=%.2f", cmd.x_speed, cmd.y_speed, cmd.rot_speed);
                     drivetrain.move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
                     break;
 
@@ -239,6 +241,7 @@ void _drive_task(void *arg)
                 }
 
                 case DriveMode::TAPE_FOLLOW: {
+                    ESP_LOGD(TAG, "tape following");
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
                         ESP_LOGW(TAG, "failed to get tape snapshot");
