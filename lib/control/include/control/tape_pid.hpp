@@ -13,7 +13,7 @@ class TapePID : public PID {
     protected:
     float _d_alpha = 0.1f; // Low-pass filter coefficient for derivative term
     float _filtered_derivative = 0.0f;
-    float _d_clamp_error = 5.0f; // Clamp error for derivative term to avoid spikes
+    float _d_clamp_error = 1.50f; // Clamp error for derivative term to avoid spikes
 };
 
 }// namespace control

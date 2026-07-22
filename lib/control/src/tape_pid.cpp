@@ -16,7 +16,7 @@ float TapePID::update(float ref, float meas, float dt_s)
 
     float derivative_error = clamp((error - _prev_err), -_d_clamp_error, _d_clamp_error);
 	float raw_derivative = _initialized ? derivative_error / dt_s : 0.0f;
-    ESP_LOGD("TapePID", "derivative_error: %.4f, raw_derivative: %.4f", derivative_error, raw_derivative);
+    // ESP_LOGD("TapePID", "derivative_error: %.4f, raw_derivative: %.4f", derivative_error, raw_derivative);
 	_filtered_derivative = _d_alpha * raw_derivative + (1.0f - _d_alpha) * _filtered_derivative;
     float final_derivative = _kd * _filtered_derivative;
 
