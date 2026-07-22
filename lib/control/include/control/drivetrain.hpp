@@ -34,6 +34,7 @@ class Drivetrain {
                                           // counter-clockwise
 
     bool move_vector(float vx, float vy, float omega);
+    bool tape_follow(float vy, float omega);
     bool stop();
 
     bool update();
