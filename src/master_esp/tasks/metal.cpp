@@ -83,6 +83,7 @@ void metal_task(void *arg)
 
         // Remove any notification left from a previous enabled period.
         ulTaskNotifyTake(pdTRUE, 0);
+        s_md.reset();
 
         arm_timer_us(MD_START_DELAY_US);
         bool was_metal_seen = false;
@@ -125,6 +126,11 @@ void metal_task(void *arg)
             }
 
             was_metal_seen = metal_seen;
+
+            const EventBits_t control_flags = xEventGroupGetBits(supervisor::g_robot_control_flags);
+            if (!robot_flags::has_flag(control_flags, robot_flags::CONTROL_METAL_ENABLED)) {
+                break;
+            }
         }
     }
 }
