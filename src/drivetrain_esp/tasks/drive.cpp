@@ -11,7 +11,7 @@ using namespace control;
 
 static constexpr char TAG[] = "drive_task";
 
-control::TapePID tape_pid(22.0f, 0.0f, 460.0f);
+control::TapePID tape_pid(16.0f, 0.0f, 450.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
@@ -109,14 +109,29 @@ void _drive_task(void *arg)
                         continue;
                     }
                     max_vy = cmd.tape_follow_speed;
-                    current_vy = max_vy;
-                    if (abs(tape_snapshot.front_err) > 1.5f) {
-                        float speed_penalty = abs(tape_snapshot.front_err) * cmd.speed_penalty_multiplier;
-                        current_vy = max_vy - speed_penalty;
-                        if (current_vy < min_vy) {
-                            current_vy = min_vy; // Ensure we don't go below the minimum speed
-                        }
+                float target_vy = max_vy; // This is where the math WANTS us to be
+                
+                // 2. Calculate the target based on error
+                if (abs(tape_snapshot.front_err) > 1.5f) {
+                    float speed_penalty = abs(tape_snapshot.front_err) * cmd.speed_penalty_multiplier;
+                    target_vy = max_vy - speed_penalty;
+                    if (target_vy < min_vy) {
+                        target_vy = min_vy; 
                     }
+                }
+                
+                // 3. The Slew Rate Limiter (The Decay)
+                float brake_step = 10.0f; // Decelerate aggressively into corners
+                float accel_step = 0.8f; // Accelerate smoothly out to avoid mecanum slip
+                
+                if (current_vy > target_vy) {
+                    current_vy -= brake_step; // Hit the brakes
+                    if (current_vy < target_vy) current_vy = target_vy; // Clamp to target
+                } 
+                else if (current_vy < target_vy) {
+                    current_vy += accel_step; // Roll on the throttle
+                    if (current_vy > target_vy) current_vy = target_vy; // Clamp to target
+                }
                     float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
                     float rot_speed = -correction; // Apply correction to rotation
                     // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
