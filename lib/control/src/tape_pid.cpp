@@ -14,17 +14,21 @@ float TapePID::update(float ref, float meas, float dt_s)
 
 	float proportional = _kp * error;
 
-    float derivative_error = clamp((error - _prev_err), -_d_clamp_error, _d_clamp_error);
-	float raw_derivative = _initialized ? derivative_error / dt_s : 0.0f;
-    // ESP_LOGD("TapePID", "derivative_error: %.4f, raw_derivative: %.4f", derivative_error, raw_derivative);
-	_filtered_derivative = _d_alpha * raw_derivative + (1.0f - _d_alpha) * _filtered_derivative;
-    float final_derivative = _kd * _filtered_derivative;
+    if (error != _prev_err) {
+        float prev_derivative_reference = _prev_err;
+        float prev_derivative_reference_time = millis();
+    }
+
+    float derivative = _kd * (error - prev_derivative_reference) / (millis() - prev_derivative_reference_time) * 1000.0f; // Convert to seconds
 
     // candidate integral update
     float candidate_integral = clamp(_integral + error * dt_s, -_integral_limit, _integral_limit);
 
-    float candidate_output = proportional + _ki * candidate_integral + final_derivative;
+    float candidate_output = proportional + _ki * candidate_integral + derivative;
     float output = clamp(candidate_output, _min_output, _max_output);
+    if (error != _prev_err) {
+        ESP_LOGI("TapePID", "Error: %.2f, Proportional: %.2f, Integral: %.2f, Derivative: %.2f, Output: %.2f", error, proportional, _ki * candidate_integral, derivative, candidate_output);
+    }
 
     bool saturated_high = candidate_output > _max_output;
     bool saturated_low = candidate_output < _min_output;
@@ -41,12 +45,6 @@ float TapePID::update(float ref, float meas, float dt_s)
 	_initialized = true;
 
 	return output;
-}
-
-void TapePID::reset()
-{
-	PID::reset();
-	_filtered_derivative = 0.0f;
 }
 
 } // namespace control

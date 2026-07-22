@@ -3,17 +3,14 @@
 namespace control {
 class TapePID : public PID {
   public:
-    explicit TapePID(float kp, float ki, float kd, float d_alpha = 0.2f)
-        : PID(kp, ki, kd), _d_alpha(d_alpha), _filtered_derivative(0.0f) {}
+    explicit TapePID(float kp, float ki, float kd, float d_alpha = 0.0f)
+        : PID(kp, ki, kd), prev_derivative_reference(prev_derivative_reference), prev_derivative_reference_time(0) {}
 
     float update(float ref, float meas, float dt_s) override;
-    void set_derivative_error (float clamp_error) { _d_clamp_error = clamp_error; }
-    void reset() override;
 
     protected:
-    float _d_alpha = 0.1f; // Low-pass filter coefficient for derivative term
-    float _filtered_derivative = 0.0f;
-    float _d_clamp_error = 1.50f; // Clamp error for derivative term to avoid spikes
+    float prev_derivative_reference = 0.0f; // Low-pass filter coefficient for derivative term
+    unsigned long prev_derivative_reference_time = 0; // Time of the last derivative reference update
 };
 
 }// namespace control
