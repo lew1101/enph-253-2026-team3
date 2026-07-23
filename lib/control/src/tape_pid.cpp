@@ -19,7 +19,9 @@ float TapePID::update(float ref, float meas, float dt_s)
         _prev_time_elapse = 0.0f;
     }
     _prev_time_elapse += dt_s;
-    float derivative = _kd * (error - _prev_derivative_reference) / _prev_time_elapse; // Convert to seconds
+    float derivative_dE = error - _prev_derivative_reference;
+    derivative_dE = clamp(derivative_dE, -4.0f, 4.0f);
+    float derivative = _kd * (derivative_dE) / _prev_time_elapse; // Convert to seconds
 
     // candidate integral update
     float candidate_integral = clamp(_integral + error * dt_s, -_integral_limit, _integral_limit);
@@ -27,8 +29,10 @@ float TapePID::update(float ref, float meas, float dt_s)
     float candidate_output = proportional + _ki * candidate_integral + derivative;
     float output = clamp(candidate_output, _min_output, _max_output);
     // ESP_LOGI("TapePID", "Error: %.2f, Proportional: %.2f, Integral: %.2f, Derivative: %.2f, Output: %.2f, raw dE: %.2f, dds: %.2f", error, proportional, _ki * candidate_integral, derivative, candidate_output, error - _prev_derivative_reference, _prev_time_elapse);
-    // ESP_LOGI("TapePID", "Error: %d, Proportional: %.2f, Derivative: %.2f, Output: %.2f", error, proportional, derivative, candidate_output);
-    ESP_LOGI("TapePID", "Error: %.2f, Derivative: %.2f", error, derivative);
+    if (error != _prev_err) {
+    ESP_LOGI("TapePID", "Error: %.2f, Proportional: %.2f, Derivative: %.2f, Output: %.2f", error, proportional, derivative, candidate_output);
+    }
+    // ESP_LOGI("TapePID", "Error: %.2f, Derivative: %.2f", error, derivative);
 
 
     bool saturated_high = candidate_output > _max_output;
