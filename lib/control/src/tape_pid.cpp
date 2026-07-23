@@ -28,7 +28,6 @@ float TapePID::update(float ref, float meas, float dt_s)
 
     float candidate_output = proportional + _ki * candidate_integral + derivative;
     float output = clamp(candidate_output, _min_output, _max_output);
-    // ESP_LOGI("TapePID", "Error: %.2f, Proportional: %.2f, Integral: %.2f, Derivative: %.2f, Output: %.2f, raw dE: %.2f, dds: %.2f", error, proportional, _ki * candidate_integral, derivative, candidate_output, error - _prev_derivative_reference, _prev_time_elapse);
     if (error != _prev_err) {
     ESP_LOGI("TapePID", "Error: %.2f, Proportional: %.2f, Derivative: %.2f, Output: %.2f", error, proportional, derivative, candidate_output);
     }
