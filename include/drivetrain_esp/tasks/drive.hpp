@@ -1,6 +1,7 @@
 #pragma once
 #include "Arduino.h"
 #include "control/drivetrain.hpp"
+#include "drive.pb.h"
 #include "portmacro.h"
 #include "projdefs.h"
 
@@ -72,30 +73,8 @@ constexpr uint32_t IMU_TIMEOUT_MS = 100;
 
 /// ========================================
 
-enum class DriveMode : uint8_t {
-    STOP,
-    SET_SPEED, // vx, vy, omega
-    TAPE_FOLLOW,
-    DRIVE_TO_POSITION, // x, y, theta target
-};
-
-struct DriveCommand {
-    DriveMode mode;
-    uint32_t sequence = 0;
-
-    float x_speed = 0.0f; // strafe velocity
-    float y_speed = 0.0f; // forward/backward velocity
-    float rot_speed = 0.0f;
-
-    float tape_follow_speed = 0.0f;
-
-    float target_x_m;
-    float target_y_m;
-    float target_heading_rad; // [-pi, pi]
-};
-
 //
-esp_err_t send_drive_cmd(const DriveCommand &cmd);
+esp_err_t send_drive_cmd(const robot_DriveCommand &cmd);
 esp_err_t start_drive_task(TaskHandle_t *out_handle);
 esp_err_t get_pose(control::PoseSnapshot* out);
 bool reached_pose();

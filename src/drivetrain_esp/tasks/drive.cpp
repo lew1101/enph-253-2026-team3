@@ -1,3 +1,4 @@
+#include "drive.pb.h"
 #include "freertos/idf_additions.h"
 #include <atomic>
 #include <cmath>
@@ -30,8 +31,6 @@ TaskHandle_t s_task_handle = nullptr;
 
 QueueHandle_t s_drive_cmd_queue = nullptr;
 QueueHandle_t s_pose_queue = nullptr;
-
-DriveMode s_mode = DriveMode::STOP;
 
 PcntEncoder s_encoder_x;
 PcntEncoder s_encoder_y;
@@ -127,81 +126,110 @@ void _drive_task(void *arg)
 
     const float DT_S = static_cast<float>(TASK_PERIOD_MS) / 1000;
 
-    PoseSnapshot pose_snapshot;
+    PoseSnapshot pose_snapshot{};
     TapeSnapshot tape_snapshot;
 
-    DriveCommand cmd;
+    float target_x_m = 0.0f;
+    float target_y_m = 0.0f;
+    float target_heading_rad = 0.0f;
+    bool pose_target_valid = false;
+
+    pb_size_t s_command_tag = robot_DriveCommand_stop_tag;
+
+    robot_DriveCommand cmd = robot_DriveCommand_init_zero; // most recent command;
     uint32_t previous_pose_sequence = 0;
 
     TickType_t last_wake_tick = xTaskGetTickCount();
 
     while (true) {
-        // esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
-        // if (err != ESP_OK) {
-        //     ESP_LOGW(TAG, "failed to get pose snapshot");
-        //     pose_snapshot.valid = false;
-        //     pose_snapshot.tick = xTaskGetTickCount();
-        //     s_reached_pose.store(false, std::memory_order_release);
-        // }
+        esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
+        if (err != ESP_OK) {
+            pose_snapshot.valid = false;
+            pose_snapshot.tick = xTaskGetTickCount();
+            s_reached_pose.store(false, std::memory_order_release);
+        }
 
-        // xQueueOverwrite(s_pose_queue, &pose_snapshot);
+        xQueueOverwrite(s_pose_queue, &pose_snapshot);
 
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
-            const bool mode_changed = s_mode != cmd.mode;
-            const bool new_pose_command = cmd.mode == DriveMode::DRIVE_TO_POSITION &&
+            const bool mode_changed = s_command_tag != cmd.which_command;
+            const bool new_pose_command = cmd.which_command == robot_DriveCommand_pose_tag &&
                                           (mode_changed || cmd.sequence != previous_pose_sequence);
 
             if (mode_changed) {
-                s_mode = cmd.mode;
+                s_command_tag = cmd.which_command;
 
-                switch (s_mode) {
-                    case DriveMode::STOP:
+                switch (s_command_tag) {
+                    case robot_DriveCommand_stop_tag:
                         break;
-                    case DriveMode::SET_SPEED:
+                    case robot_DriveCommand_velocity_tag:
                         break;
-                    case DriveMode::TAPE_FOLLOW:
+                    case robot_DriveCommand_tape_follow_tag:
                         s_tape_pid.reset();
                         break;
-                    case DriveMode::DRIVE_TO_POSITION:
+                    case robot_DriveCommand_pose_tag:
                         break;
                 }
             }
 
             if (new_pose_command) {
-                s_x_pid.reset();
-                s_y_pid.reset();
-                s_heading_pid.reset();
-                previous_pose_sequence = cmd.sequence;
-                s_reached_pose.store(false, std::memory_order_release);
+                const auto &pose_command = cmd.command.pose;
+
+                // Resolve relative commands once, against the measured pose at receipt.
+                if (!pose_command.relative || pose_snapshot.valid) {
+                    target_x_m = pose_command.relative ? pose_snapshot.x_m + pose_command.x_m
+                                                       : pose_command.x_m;
+                    target_y_m = pose_command.relative ? pose_snapshot.y_m + pose_command.y_m
+                                                       : pose_command.y_m;
+                    target_heading_rad = control::wrap_angle_pi(
+                        pose_command.relative
+                            ? pose_snapshot.heading_rad + pose_command.theta_rad
+                            : pose_command.theta_rad);
+                    pose_target_valid = true;
+
+                    s_x_pid.reset();
+                    s_y_pid.reset();
+                    s_heading_pid.reset();
+                    previous_pose_sequence = cmd.sequence;
+                    s_reached_pose.store(false, std::memory_order_release);
+                } else {
+                    pose_target_valid = false;
+                }
             }
 
-            switch (cmd.mode) {
-                case DriveMode::STOP:
+            switch (cmd.which_command) {
+                case robot_DriveCommand_stop_tag:
                     ESP_LOGD(TAG, "drivetrain stop");
                     drivetrain.stop();
                     break;
 
-                case DriveMode::SET_SPEED:
-                    ESP_LOGD(TAG, "moving at speed: x=%.2f, y=%.2f, rot=%.2f", cmd.x_speed, cmd.y_speed, cmd.rot_speed);
-                    drivetrain.move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
+                case robot_DriveCommand_velocity_tag: {
+                    const auto &velocity = cmd.command.velocity;
+                    ESP_LOGD(TAG,
+                             "moving at speed: x=%.2f, y=%.2f, rot=%.2f",
+                             velocity.vx_percent,
+                             velocity.vy_percent,
+                             velocity.omega_percent);
+                    drivetrain.move_vector(
+                        velocity.vx_percent, velocity.vy_percent, velocity.omega_percent);
                     break;
+                }
 
-                case DriveMode::DRIVE_TO_POSITION: {
-                    if (!pose_snapshot.valid) {
+                case robot_DriveCommand_pose_tag: {
+                    if (!pose_snapshot.valid || !pose_target_valid) {
                         drivetrain.stop();
-                        ESP_LOGE(TAG, "invalid pose");
                         break;
                     }
 
                     // calculate pos error in field coords
-                    const float error_x_field = cmd.target_x_m - pose_snapshot.x_m;
-                    const float error_y_field = cmd.target_y_m - pose_snapshot.y_m;
+                    const float error_x_field = target_x_m - pose_snapshot.x_m;
+                    const float error_y_field = target_y_m - pose_snapshot.y_m;
                     const float position_error = hypotf(error_x_field, error_y_field);
 
                     // calculate heading error
                     const float heading_error =
-                        control::wrap_angle_pi(cmd.target_heading_rad - pose_snapshot.heading_rad);
+                        control::wrap_angle_pi(target_heading_rad - pose_snapshot.heading_rad);
 
                     // allow for small tolerance in pos/heading error
                     // to avoid jitter near setpoint.
@@ -240,7 +268,7 @@ void _drive_task(void *arg)
                     break;
                 }
 
-                case DriveMode::TAPE_FOLLOW: {
+                case robot_DriveCommand_tape_follow_tag: {
                     ESP_LOGD(TAG, "tape following");
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
@@ -250,9 +278,14 @@ void _drive_task(void *arg)
                     }
 
                     float rot_correction = s_tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    drivetrain.move_vector(0.0f, cmd.tape_follow_speed, rot_correction);
+                    drivetrain.move_vector(
+                        0.0f, cmd.command.tape_follow.forward_speed_percent, rot_correction);
                     break;
                 }
+
+                default:
+                    drivetrain.stop();
+                    break;
             }
         }
 
@@ -272,7 +305,7 @@ esp_err_t start_drive_task(TaskHandle_t *out_handle)
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_drive_cmd_queue = xQueueCreate(1, sizeof(DriveCommand));
+    s_drive_cmd_queue = xQueueCreate(1, sizeof(robot_DriveCommand));
     configASSERT(s_drive_cmd_queue != nullptr);
 
     s_pose_queue = xQueueCreate(1, sizeof(PoseSnapshot));
@@ -299,7 +332,7 @@ esp_err_t start_drive_task(TaskHandle_t *out_handle)
     return ESP_OK;
 }
 
-esp_err_t send_drive_cmd(const DriveCommand &cmd)
+esp_err_t send_drive_cmd(const robot_DriveCommand &cmd)
 {
     ESP_RETURN_ON_FALSE(
         s_drive_cmd_queue != nullptr, ESP_ERR_INVALID_STATE, TAG, "drive queue not initialized");

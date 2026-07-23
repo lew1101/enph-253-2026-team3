@@ -12,6 +12,9 @@ message PoseCommand {
     float x_m = 1;
     float y_m = 2;
     float theta_rad = 3;
+    // When true, x/y are field-frame offsets from the measured pose and
+    // theta is an offset from the measured heading.
+    bool relative = 4;
 }
 
 message TapeFollowCommand {

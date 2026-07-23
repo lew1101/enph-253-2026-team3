@@ -19,7 +19,7 @@ class DriveMessageHandler {
     drive_DriveUartMessage make_status(bool link_connected, uint32_t uptime_ms) const;
 
   private:
-    esp_err_t _apply_command(const robot_DriveCommand &message);
+    esp_err_t _apply_command(robot_DriveCommand message);
     void _stop();
     static bool _is_newer_sequence(uint32_t sequence, uint32_t previous);
 

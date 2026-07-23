@@ -20,8 +20,8 @@ bool DriveMessageHandler::_is_newer_sequence(uint32_t sequence, uint32_t previou
 
 void DriveMessageHandler::_stop()
 {
-    DriveCommand command{};
-    command.mode = DriveMode::STOP;
+    robot_DriveCommand command = robot_DriveCommand_init_zero;
+    command.which_command = robot_DriveCommand_stop_tag;
 
     if (send_drive_cmd(command) != ESP_OK) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
@@ -30,7 +30,7 @@ void DriveMessageHandler::_stop()
     };
 }
 
-esp_err_t DriveMessageHandler::_apply_command(const robot_DriveCommand &message)
+esp_err_t DriveMessageHandler::_apply_command(robot_DriveCommand message)
 {
     xSemaphoreTake(_mutex, portMAX_DELAY);
     auto have_sequence = _have_sequence;
@@ -56,46 +56,39 @@ esp_err_t DriveMessageHandler::_apply_command(const robot_DriveCommand &message)
     if (!tape_enabled && message.which_command == robot_DriveCommand_tape_follow_tag)
         return ESP_ERR_INVALID_STATE;
 
-    DriveCommand cmd{};
-    cmd.sequence = message.sequence;
-
     switch (message.which_command) {
         case robot_DriveCommand_velocity_tag: {
-            const auto &m = message.command.velocity;
+            auto &m = message.command.velocity;
+
             if (!std::isfinite(m.vx_percent) || !std::isfinite(m.vy_percent) ||
                 !std::isfinite(m.omega_percent))
                 return ESP_ERR_INVALID_ARG;
-            cmd.mode = DriveMode::SET_SPEED;
-            cmd.x_speed = std::clamp(m.vx_percent, -100.0f, 100.0f);
-            cmd.y_speed = std::clamp(m.vy_percent, -100.0f, 100.0f);
-            cmd.rot_speed = std::clamp(m.omega_percent, -100.0f, 100.0f);
+
+            m.vx_percent = std::clamp(m.vx_percent, -100.0f, 100.0f);
+            m.vy_percent = std::clamp(m.vy_percent, -100.0f, 100.0f);
+            m.omega_percent = std::clamp(m.omega_percent, -100.0f, 100.0f);
             break;
         }
         case robot_DriveCommand_tape_follow_tag: {
-            const float speed = message.command.tape_follow.forward_speed_percent;
-            if (!std::isfinite(speed)) return ESP_ERR_INVALID_ARG;
-            cmd.mode = DriveMode::TAPE_FOLLOW;
-            cmd.tape_follow_speed = std::clamp(speed, -100.0f, 100.0f);
+            auto &m = message.command.tape_follow;
+
+            if (!std::isfinite(m.forward_speed_percent)) return ESP_ERR_INVALID_ARG;
+            m.forward_speed_percent = std::clamp(m.forward_speed_percent, -100.0f, 100.0f);
             break;
         }
         case robot_DriveCommand_pose_tag: {
-            const auto &m = message.command.pose;
+            auto &m = message.command.pose;
             if (!std::isfinite(m.x_m) || !std::isfinite(m.y_m) || !std::isfinite(m.theta_rad))
                 return ESP_ERR_INVALID_ARG;
-            cmd.mode = DriveMode::DRIVE_TO_POSITION;
-            cmd.target_x_m = m.x_m;
-            cmd.target_y_m = m.y_m;
-            cmd.target_heading_rad = m.theta_rad;
             break;
         }
         case robot_DriveCommand_stop_tag:
-            cmd.mode = DriveMode::STOP;
             break;
         default:
             return ESP_ERR_INVALID_ARG;
     }
 
-    const esp_err_t err = send_drive_cmd(cmd);
+    const esp_err_t err = send_drive_cmd(message);
     if (err != ESP_OK) return err;
 
     xSemaphoreTake(_mutex, portMAX_DELAY);
