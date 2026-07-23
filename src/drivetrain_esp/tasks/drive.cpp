@@ -116,8 +116,8 @@ void _drive_task(void *arg)
                         continue;
                     }
                     float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float left_speed = cmd.tape_follow_speed - correction;
-                    float right_speed = cmd.tape_follow_speed + correction;
+                    float left_speed = cmd.tape_follow_speed + correction;
+                    float right_speed = cmd.tape_follow_speed - correction;
                     drivetrain.move_rear(left_speed, right_speed);
                     break;
 

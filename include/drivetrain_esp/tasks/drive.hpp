@@ -4,6 +4,7 @@
 enum class DriveMode : uint8_t {
     STOP,
     SET_SPEED, // vx, vy, omega
+    REAR_DRIVE, // left_speed, right_speed
     TAPE_FOLLOW,
     DRIVE_TO_POSITION, // x, y, theta target
 };
