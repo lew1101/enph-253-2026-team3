@@ -18,8 +18,8 @@ class Drivetrain {
         driver::DCDriver::Config front_left_motor_config;
         driver::DCDriver::Config back_left_motor_config;
 
-        float rot_scalar = 0.2015f;
-        float acceleration_rate = 0.2f; // percentage per update
+        float rot_scalar = 1.0f;
+        float acceleration_rate = 1.0f; // percentage per update
     };
 
     Drivetrain() = default;
@@ -35,6 +35,7 @@ class Drivetrain {
     
     bool move_vector(float vx, float vy, float omega, float max_clamp);
     bool move_vector(float vx, float vy, float omega);
+    bool move_rear(float left_speed, float right_speed);
     bool tape_follow(float vy, float omega);
     bool stop();
 
@@ -43,6 +44,8 @@ class Drivetrain {
   private:
     Config _config;
     bool stopped = true;
+    float wheelbase = 13.0f; // distance between front and back wheels
+    float trackwidth = 27.0f; // distance between left and right wheels
 
     int timer_resolution_hz = 1'000'000;
     int PWM_frequency_hz = 250;
