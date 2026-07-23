@@ -58,6 +58,8 @@ void _drive_task(void *arg)
                         break;
                     case DriveMode::SET_SPEED:
                         break;
+                    case DriveMode::REAR_DRIVE:
+                        break;
                     case DriveMode::TAPE_FOLLOW:
                         tape_pid.reset();
                         break;
@@ -95,6 +97,11 @@ void _drive_task(void *arg)
                     drivetrain.move_vector(cmd.x_speed, cmd.y_speed, cmd.rot_speed);
                     break;
                 }
+                case DriveMode::REAR_DRIVE:
+                {
+                    drivetrain.move_rear(cmd.left_speed, cmd.right_speed);
+                    break;
+                }
                 case DriveMode::DRIVE_TO_POSITION:
                 {
                     ESP_LOGW(TAG, "DriveMode::DRIVE_TO_POSE not implemented");
@@ -108,35 +115,13 @@ void _drive_task(void *arg)
                         ESP_LOGW(TAG, "unable to get tape snapshot");
                         continue;
                     }
-                    max_vy = cmd.tape_follow_speed;
-                float target_vy = max_vy; // This is where the math WANTS us to be
-                
-                // 2. Calculate the target based on error
-                if (abs(tape_snapshot.front_err) > 1.5f) {
-                    float speed_penalty = abs(tape_snapshot.front_err) * cmd.speed_penalty_multiplier;
-                    target_vy = max_vy - speed_penalty;
-                    if (target_vy < min_vy) {
-                        target_vy = min_vy; 
-                    }
-                }
-                
-                // 3. The Slew Rate Limiter (The Decay)
-                float brake_step = 10.0f; // Decelerate aggressively into corners
-                float accel_step = 0.8f; // Accelerate smoothly out to avoid mecanum slip
-                
-                if (current_vy > target_vy) {
-                    current_vy -= brake_step; // Hit the brakes
-                    if (current_vy < target_vy) current_vy = target_vy; // Clamp to target
-                } 
-                else if (current_vy < target_vy) {
-                    current_vy += accel_step; // Roll on the throttle
-                    if (current_vy > target_vy) current_vy = target_vy; // Clamp to target
-                }
                     float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float rot_speed = -correction; // Apply correction to rotation
-                    // ESP_LOGI(TAG, "Tape snapshot: front_err = %f, rot speed: %f", tape_snapshot.front_err, rot_speed);
-                    drivetrain.tape_follow(current_vy, rot_speed);
+                    float left_speed = cmd.tape_follow_speed - correction;
+                    float right_speed = cmd.tape_follow_speed + correction;
+                    drivetrain.move_rear(left_speed, right_speed);
                     break;
+
+
                 }
             }
         }

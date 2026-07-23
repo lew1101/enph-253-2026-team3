@@ -15,8 +15,12 @@ struct DriveCommand {
     float y_speed = 0.0f; // forward/backward velocity
     float rot_speed = 0.0f;
 
+    float left_speed = 0.0f; // left rear wheel speed
+    float right_speed = 0.0f; // right rear wheel speed
+
     float tape_follow_speed = 0.0f;
-    float speed_penalty_multiplier = 10.0f; // Multiplier for speed penalty when tape is lost
+    float omega_threshold = 0.0f; // Multiplier for when tape is lost
+    float max_clamp = 50.0f; // Maximum speed clamp for tape following
 
     float target_x;
     float target_y;
