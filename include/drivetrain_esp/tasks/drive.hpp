@@ -20,8 +20,6 @@ struct DriveCommand {
     float right_speed = 0.0f; // right rear wheel speed
 
     float tape_follow_speed = 0.0f;
-    float omega_threshold = 0.0f; // Multiplier for when tape is lost
-    float max_clamp = 50.0f; // Maximum speed clamp for tape following
 
     float target_x;
     float target_y;

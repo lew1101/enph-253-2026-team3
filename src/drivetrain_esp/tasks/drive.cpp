@@ -19,10 +19,6 @@ QueueHandle_t s_drive_cmd_queue = nullptr;
 bool is_stopped = true;
 TickType_t stop_timestamp = 0;
 
-float max_vy = 0.0f;
-float min_vy = 35.0f;
-float current_vy = 0.0f;
-
 DriveMode s_mode;
 
 DriveTaskConfig s_task_cfg;
@@ -43,10 +39,6 @@ void _drive_task(void *arg)
     TapeSnapshot tape_snapshot{};
 
     while (true) {
-        //         xEventGroupWaitBits(
-        //             g_robot_flags, RobotFlag::ROBOT_FLAG_DRIVE_ENABLED, pdFALSE, pdTRUE,
-        //             portMAX_DELAY);
-
         DriveCommand cmd;
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
@@ -71,25 +63,6 @@ void _drive_task(void *arg)
             switch (cmd.mode) {
                 case DriveMode::STOP:
                 {
-                    if (is_stopped != true) {
-                        ESP_LOGI(TAG, "Stopping");
-                        is_stopped = true;
-                        stop_timestamp = xTaskGetTickCount();
-                    }
-                    bool stop_success = get_tape_snapshot(&tape_snapshot, 0);
-                    if (!stop_success) {
-                        ESP_LOGW(TAG, "unable to get tape snapshot");
-                        continue;
-                    }
-                    float stop_rot_correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float stop_rot_speed = -stop_rot_correction / 50; // Apply correction to rotation
-                    
-                    if (xTaskGetTickCount() - stop_timestamp > pdMS_TO_TICKS(1000)) {
-                        drivetrain.stop();
-                    }
-                    else {
-                        drivetrain.tape_follow(0.0f, stop_rot_speed);
-                    }
                     break;
                 }
                 case DriveMode::SET_SPEED:
