@@ -79,20 +79,20 @@ esp_err_t Drivetrain::init()
 
 bool Drivetrain::forward(float speed_percentage)
 {
-    target_speed[0] = speed_percentage;
-    target_speed[1] = speed_percentage;
-    target_speed[2] = -speed_percentage;
-    target_speed[3] = -speed_percentage;
+    target_speed[FR] = speed_percentage;
+    target_speed[RR] = speed_percentage;
+    target_speed[FL] = -speed_percentage;
+    target_speed[RL] = -speed_percentage;
 
     return true;
 }
 
 bool Drivetrain::strafe(float speed_percentage) // right is positive, left is negative
 {
-    target_speed[0] = -speed_percentage;
-    target_speed[1] = speed_percentage;
-    target_speed[2] = -speed_percentage;
-    target_speed[3] = speed_percentage;
+    target_speed[FR] = -speed_percentage;
+    target_speed[RR] = speed_percentage;
+    target_speed[FL] = -speed_percentage;
+    target_speed[RL] = speed_percentage;
 
     return true;
 }
@@ -100,34 +100,39 @@ bool Drivetrain::strafe(float speed_percentage) // right is positive, left is ne
 // Positive is counter-clockwise
 bool Drivetrain::turn(float speed_percentage)
 {
-    target_speed[0] = speed_percentage * _config.rot_scalar;
-    target_speed[1] = speed_percentage * _config.rot_scalar;
-    target_speed[2] = speed_percentage * _config.rot_scalar;
-    target_speed[3] = speed_percentage * _config.rot_scalar;
+    target_speed[FR] = speed_percentage * _config.rot_scalar;
+    target_speed[RR] = speed_percentage * _config.rot_scalar;
+    target_speed[FL] = speed_percentage * _config.rot_scalar;
+    target_speed[RL] = speed_percentage * _config.rot_scalar;
 
     return true;
 }
 
 bool Drivetrain::move_vector(float vx, float vy, float omega)
 {
+    return move_vector(vx, vy, omega, 100.0f);
+}
+
+bool Drivetrain::move_vector(float vx, float vy, float omega, float max_mag_clamp)
+{
     // Translation uses the robot frame: +vx is right and +vy is forward.
     // Positive omega is counter-clockwise, matching the pose convention.
     const float rotation = omega * _config.rot_scalar;
-    target_speed[0] = vy - vx + rotation;
-    target_speed[1] = vy + vx + rotation;
-    target_speed[2] = -(vy + vx) + rotation;
-    target_speed[3] = -(vy - vx) + rotation;
+    target_speed[FR] = vy - vx + rotation;
+    target_speed[RR] = vy + vx + rotation;
+    target_speed[FL] = -(vy + vx) + rotation;
+    target_speed[RL] = -(vy - vx) + rotation;
 
-    float max_mag = std::max({std::fabs(target_speed[0]),
-                              std::fabs(target_speed[1]),
-                              std::fabs(target_speed[2]),
-                              std::fabs(target_speed[3])});
+    float max_mag = std::max({std::fabs(target_speed[FR]),
+                              std::fabs(target_speed[RR]),
+                              std::fabs(target_speed[FL]),
+                              std::fabs(target_speed[RL])});
 
-    if (max_mag > 100.0f) {
-        target_speed[0] = (target_speed[0] / max_mag) * 100.0f;
-        target_speed[1] = (target_speed[1] / max_mag) * 100.0f;
-        target_speed[2] = (target_speed[2] / max_mag) * 100.0f;
-        target_speed[3] = (target_speed[3] / max_mag) * 100.0f;
+    if (max_mag > max_mag_clamp) {
+        target_speed[FR] = (target_speed[FR] / max_mag) * 100.0f;
+        target_speed[RR] = (target_speed[RR] / max_mag) * 100.0f;
+        target_speed[FL] = (target_speed[FL] / max_mag) * 100.0f;
+        target_speed[RL] = (target_speed[RL] / max_mag) * 100.0f;
     }
 
     return true;
@@ -135,10 +140,10 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
 
 bool Drivetrain::stop()
 {
-    target_speed[0] = 0.0;
-    target_speed[1] = 0.0;
-    target_speed[2] = 0.0;
-    target_speed[3] = 0.0;
+    target_speed[FR] = 0.0;
+    target_speed[RR] = 0.0;
+    target_speed[FL] = 0.0;
+    target_speed[RL] = 0.0;
 
     stopped = true;
     return true;
@@ -164,41 +169,41 @@ bool Drivetrain::update()
         }
     }
 
-    if (current_speed[0] > 0.0) {
+    if (current_speed[FR] > 0.0) {
         front_right_motor.turn_clockwise();
-    } else if (current_speed[0] < 0.0) {
+    } else if (current_speed[FR] < 0.0) {
         front_right_motor.turn_c_clockwise();
     } else {
         front_right_motor.stop();
     }
-    front_right_motor.set_speed(std::fabs(current_speed[0]));
+    front_right_motor.set_speed(std::fabs(current_speed[FR]));
 
-    if (current_speed[1] > 0.0) {
+    if (current_speed[RR] > 0.0) {
         back_right_motor.turn_clockwise();
-    } else if (current_speed[1] < 0.0) {
+    } else if (current_speed[RR] < 0.0) {
         back_right_motor.turn_c_clockwise();
     } else {
         back_right_motor.stop();
     }
-    back_right_motor.set_speed(std::fabs(current_speed[1]));
+    back_right_motor.set_speed(std::fabs(current_speed[RR]));
 
-    if (current_speed[2] > 0.0) {
+    if (current_speed[FL] > 0.0) {
         front_left_motor.turn_clockwise();
-    } else if (current_speed[2] < 0.0) {
+    } else if (current_speed[FL] < 0.0) {
         front_left_motor.turn_c_clockwise();
     } else {
         front_left_motor.stop();
     }
-    front_left_motor.set_speed(std::fabs(current_speed[2]));
+    front_left_motor.set_speed(std::fabs(current_speed[FL]));
 
-    if (current_speed[3] > 0.0) {
+    if (current_speed[RL] > 0.0) {
         back_left_motor.turn_clockwise();
-    } else if (current_speed[3] < 0.0) {
+    } else if (current_speed[RL] < 0.0) {
         back_left_motor.turn_c_clockwise();
     } else {
         back_left_motor.stop();
     }
-    back_left_motor.set_speed(std::fabs(current_speed[3]));
+    back_left_motor.set_speed(std::fabs(current_speed[RL]));
 
     return true;
 }

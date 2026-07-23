@@ -8,6 +8,14 @@ namespace control {
 using std::array;
 
 class Drivetrain {
+  private:
+    enum DrivetrainIndex : size_t {
+        FR = 0,
+        RR = 1,
+        FL = 2,
+        RL = 3,
+    };
+
   public:
     struct Config {
         mcpwm_timer_handle_t timer_0 = nullptr;
@@ -20,6 +28,8 @@ class Drivetrain {
 
         float rot_scalar = 0.2015f;
         float acceleration_rate = 0.2f; // percentage per update
+        float wheelbase_width_m ;
+        float wheelbase_length_m  ;
     };
 
     Drivetrain() = default;
@@ -30,10 +40,11 @@ class Drivetrain {
 
     bool forward(float speed_percentage); // -100 to 100
     bool strafe(float speed_percentage);  // -100 to 100
-    bool turn(float speed_percentage); // -100 to 100, positive is counter-clockwise
+    bool turn(float speed_percentage);    // -100 to 100, positive is counter-clockwise
 
     // Robot frame: +vx right, +vy forward, +omega counter-clockwise.
     bool move_vector(float vx, float vy, float omega);
+    bool move_vector(float vx, float vy, float omega, float max_mag_clamp);
     bool stop();
 
     bool update();
