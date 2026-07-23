@@ -104,12 +104,6 @@ void _tape_task(void *arg)
         float new_front_err = _get_tape_error(s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
         s_snapshot.front_err = ALPHA * new_front_err + (1 - ALPHA) * s_snapshot.front_err;
 
-        ESP_LOGI("TapeSense",
-                 "Left Reading: %d, Right Reading: %d, Front Error: %.2f",
-                 s_snapshot.tape_fl,
-                 s_snapshot.tape_fr,
-                 s_snapshot.front_err);
-
         // using two tape sensors logic
         float new_back_err = _get_tape_error(s_snapshot.tape_bl, s_snapshot.tape_br, s_snapshot.back_err);
         s_snapshot.back_err = ALPHA * new_back_err + (1 - ALPHA) * s_snapshot.back_err;
