@@ -56,7 +56,6 @@ class Drivetrain {
     driver::DCDriver back_right_motor;
     driver::DCDriver back_left_motor;
 
-    // acceleration parameters
     // front right, back right, front left, back left
     array<float, 4> target_speed{0.0, 0.0, 0.0, 0.0};
     array<float, 4> current_speed{0.0, 0.0, 0.0, 0.0};

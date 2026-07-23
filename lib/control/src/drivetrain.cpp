@@ -138,16 +138,11 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
 bool Drivetrain::move_rear(float left_speed, float right_speed)
 { 
     float sweep_ratio = wheelbase / trackwidth;
-
-    // 3. Calculate how much the front needs to swing based on the turn sharpness
     float turn_diff = (left_speed - right_speed) * sweep_ratio;
 
-    // 4. Map directly to the wheels
-    // The rear wheels act exactly like a standard differential drive
     target_speed[3] = -left_speed;   // Back Left
     target_speed[1] = right_speed;  // Back Right
 
-    // The front wheels drive the tank speed + the lateral sweep vector
     target_speed[2] = -(left_speed + turn_diff);   // Front Left
     target_speed[0] = right_speed - turn_diff;  // Front Right
     return true;
