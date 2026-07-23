@@ -144,12 +144,13 @@ bool Drivetrain::move_rear(float left_speed, float right_speed)
 
     // 4. Map directly to the wheels
     // The rear wheels act exactly like a standard differential drive
-    target_speed[3] = left_speed;   // Back Left
+    target_speed[3] = -left_speed;   // Back Left
     target_speed[1] = right_speed;  // Back Right
 
     // The front wheels drive the tank speed + the lateral sweep vector
-    target_speed[2] = left_speed + turn_diff;   // Front Left
+    target_speed[2] = -(left_speed + turn_diff);   // Front Left
     target_speed[0] = right_speed - turn_diff;  // Front Right
+    return true;
 }
 
 bool Drivetrain::tape_follow(float vy, float omega)
