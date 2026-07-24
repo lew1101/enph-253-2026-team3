@@ -1,3 +1,4 @@
+#pragma once
 #include "FastAccelStepper.h"
 
 #include "soc/gpio_num.h"

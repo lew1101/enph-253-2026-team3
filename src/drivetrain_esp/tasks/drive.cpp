@@ -273,6 +273,8 @@ void _drive_task(void *arg)
                 }
 
                 case robot_DriveCommand_tape_follow_tag: {
+                    auto& m = cmd.command.tape_follow;
+
                     ESP_LOGD(TAG, "tape following");
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
@@ -280,11 +282,12 @@ void _drive_task(void *arg)
                         drivetrain.stop();
                         break;
                     }
+
                     float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    float left_speed = cmd.tape_follow.forward_speed_percent + correction;
-                    float right_speed = cmd.tape_follow.forward_speed_percent - correction;
+                    float left_speed = m.forward_speed_percent + correction;
+                    float right_speed = m.forward_speed_percent - correction;
                     drivetrain.move_rear(left_speed, right_speed);
-                  
+
                     break;
                 }
               default:

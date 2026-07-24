@@ -10,7 +10,8 @@ TaskHandle_t drive_handle;
 TaskHandle_t imu_sensor_handle;
 TaskHandle_t tape_handle;
 
-void setup() {
+void setup()
+{
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_uart_tasks(&uart_tx_handle, &uart_rx_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_imu_task(&imu_sensor_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_drive_task(&drive_handle));
@@ -19,3 +20,4 @@ void setup() {
     vTaskDelete(nullptr);
 }
 
+void loop() {}

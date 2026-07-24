@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Arduino.h>
 #include <array>
 
@@ -28,6 +30,9 @@ class Drivetrain {
 
         float rot_scalar = 1.0f;
         float acceleration_rate = 1.0f; // percentage per update
+
+        float wheelbase = 13.0f;  // distance between front and back wheels
+        float trackwidth = 27.0f; // distance between left and right wheels
     };
 
     Drivetrain() = default;
@@ -40,11 +45,10 @@ class Drivetrain {
     bool strafe(float speed_percentage);  // -100 to 100
     bool turn(float speed_percentage);    // -100 to 100, positive is clockwise, negative is
     // counter-clockwise
-    
+
     bool move_vector(float vx, float vy, float omega, float max_clamp);
     bool move_vector(float vx, float vy, float omega);
     bool move_rear(float left_speed, float right_speed);
-    bool tape_follow(float vy, float omega);
     bool stop();
 
     bool update();
@@ -52,8 +56,6 @@ class Drivetrain {
   private:
     Config _config;
     bool stopped = true;
-    float wheelbase = 13.0f; // distance between front and back wheels
-    float trackwidth = 27.0f; // distance between left and right wheels
 
     int timer_resolution_hz = 1'000'000;
     int PWM_frequency_hz = 250;

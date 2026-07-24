@@ -1,3 +1,4 @@
+#pragma once
 #include <Arduino.h>
 #include "FastAccelStepper.h"
 #include "actuators/servo.hpp"

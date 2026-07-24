@@ -7,7 +7,7 @@
 
 #include "sensors/pcnt_encoder.hpp"
 
-#include "control/pose_estimator.hpp"z
+#include "control/pose_estimator.hpp"
 
 namespace DriveTaskConfig {
 
