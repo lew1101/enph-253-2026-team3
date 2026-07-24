@@ -38,19 +38,12 @@ void ElevatorClaw::move_to_position(int32_t step) {
     _stepper->moveTo(step);
 }
 
-void ElevatorClaw::open_claw_tower() {
-    _claw_servo.set_deg(180.0f);
-    return;
+void ElevatorClaw::set_claw(float deg) {
+    _claw_servo.set_deg(deg);
 }
 
-void ElevatorClaw::open_claw_rock() {
-    _claw_servo.set_deg(180.0f);
-    return;
-}
-
-void ElevatorClaw::close_claw() {
-    _claw_servo.set_deg(0.0f);
-    return;
+void ElevatorClaw::stop_elevator() {
+    _stepper->forceStop();
 }
 
 bool ElevatorClaw::elevator_done() const {

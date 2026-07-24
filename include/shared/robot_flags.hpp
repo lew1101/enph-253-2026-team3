@@ -18,8 +18,9 @@ enum RobotControlFlag : EventBits_t {
     CONTROL_TAPE_ENABLED = 1U << 1,
     CONTROL_BEACON_ENABLED = 1U << 2,
     CONTROL_METAL_ENABLED = 1U << 3,
-    CONTROL_ESTOP_ACTIVE = 1U << 4,
-    CONTROL_CLEAR_DRIVE_FAULT = 1U << 5,
+    CONTROL_CAMERA_ENABLE = 1U << 4,
+    CONTROL_ESTOP_ACTIVE = 1U << 5,
+    CONTROL_CLEAR_DRIVE_FAULT = 1U << 6,
     CONTROL_ALL = CONTROL_DRIVE_ENABLED | CONTROL_TAPE_ENABLED | CONTROL_BEACON_ENABLED |
                   CONTROL_METAL_ENABLED | CONTROL_ESTOP_ACTIVE | CONTROL_CLEAR_DRIVE_FAULT
 };
@@ -33,7 +34,8 @@ enum RobotStatusFlag : EventBits_t {
     STATUS_TAPE_SEEN = 1U << 4,
     STATUS_BEACON_SEEN = 1U << 5,
     STATUS_METAL_SEEN = 1U << 6,
-    STATUS_DRIVE_FAULT_ACTIVE = 1U << 7,
+    STATUS_TELETUBBY_SEEN = 1U << 7,
+    STATUS_DRIVE_FAULT_ACTIVE = 1U << 8,
 };
 
 // Master task-notification bits. These are one-shot notifications, not UART state.

@@ -9,7 +9,7 @@ WormSpear::WormSpear(const Config &config)
     : _config(config)
 {
 }
-    
+
 esp_err_t WormSpear::init()
 {
     if (_config.engine == nullptr) {
@@ -37,14 +37,8 @@ void WormSpear::move_to_position(float step) {
     _stepper->moveTo(step);
 }
 
-void WormSpear::spear_up() {
-    _spear_servo.set_deg(180.0f);
-    return;
-}
-
-void WormSpear::spear_down() {
-    _spear_servo.set_deg(0.0f);
-    return;
+void WormSpear::spear_angle(float deg) {
+    _spear_servo.set_deg(deg);
 }
 
 bool WormSpear::worm_done() const {

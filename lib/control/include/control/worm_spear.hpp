@@ -39,8 +39,7 @@ class WormSpear {
 
     void calibrate();
     void move_to_position(float step);
-    void spear_up();
-    void spear_down();
+    void spear_angle(float deg);
 
     bool worm_done() const;
 
