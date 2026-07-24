@@ -113,6 +113,46 @@ bool Drivetrain::move_vector(float vx, float vy, float omega)
     return move_vector(vx, vy, omega, 100.0f);
 }
 
+bool Drivetrain::move_rear(float left_speed, float right_speed)
+{ 
+    float sweep_ratio = wheelbase / trackwidth;
+    float turn_diff = (left_speed - right_speed) * sweep_ratio;
+
+    target_speed[3] = -left_speed;   // Back Left
+    target_speed[1] = right_speed;  // Back Right
+
+    target_speed[2] = -(left_speed + turn_diff);   // Front Left
+    target_speed[0] = right_speed - turn_diff;  // Front Right
+    return true;
+}
+
+bool Drivetrain::tape_follow(float vy, float omega)
+{
+    target_speed[0] = vy + omega * _config.rot_scalar; // add a bit of juice to front right and back
+                                                       // right to balance the offset
+    target_speed[1] = vy + omega * _config.rot_scalar;
+    target_speed[2] = -vy + omega * _config.rot_scalar;
+    target_speed[3] = -vy + omega * _config.rot_scalar;
+
+    // clamp the speeds so they only drive backward a little bit)
+    if (target_speed[0] < -5.0f) target_speed[0] = -5.0f;
+    if (target_speed[1] < -5.0f) target_speed[1] = -5.0f;
+    if (target_speed[2] > 5.0f) target_speed[2] = 5.0f;
+    if (target_speed[3] > 5.0f) target_speed[3] = 5.0f;
+
+    float max_mag = std::max({std::fabs(target_speed[0]),
+                              std::fabs(target_speed[1]),
+                              std::fabs(target_speed[2]),
+                              std::fabs(target_speed[3])});
+
+    if (max_mag > 100.0f) {
+        target_speed[0] = (target_speed[0] / max_mag) * 100.0f;
+        target_speed[1] = (target_speed[1] / max_mag) * 100.0f;
+        target_speed[2] = (target_speed[2] / max_mag) * 100.0f;
+        target_speed[3] = (target_speed[3] / max_mag) * 100.0f;
+    return move_vector(vx, vy, omega, 100.0f);
+}
+
 bool Drivetrain::move_vector(float vx, float vy, float omega, float max_mag_clamp)
 {
     // Translation uses the robot frame: +vx is right and +vy is forward.

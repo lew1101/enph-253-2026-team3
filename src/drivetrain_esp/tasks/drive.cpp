@@ -10,6 +10,8 @@
 
 #include "tasks/drive.hpp"
 #include "portmacro.h"
+#include "projdefs.h"
+#include "control/tape_pid.hpp"
 #include "tasks/tape_sense.hpp"
 #include "tasks/imu.hpp"
 #include "sensors/pcnt_encoder.hpp"
@@ -25,6 +27,8 @@ using control::PoseSnapshot;
 using sensors::PcntEncoder;
 
 static constexpr char TAG[] = "drive_task";
+
+control::TapePID tape_pid(16.0f, 0.0f, 450.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
@@ -276,16 +280,15 @@ void _drive_task(void *arg)
                         drivetrain.stop();
                         break;
                     }
-
-                    float rot_correction = s_tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
-                    drivetrain.move_vector(
-                        0.0f, cmd.command.tape_follow.forward_speed_percent, rot_correction);
+                    float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    float left_speed = cmd.tape_follow.forward_speed_percent + correction;
+                    float right_speed = cmd.tape_follow.forward_speed_percent - correction;
+                    drivetrain.move_rear(left_speed, right_speed);
+                  
                     break;
                 }
-
-                default:
-                    drivetrain.stop();
-                    break;
+              default:
+                break;
             }
         }
 

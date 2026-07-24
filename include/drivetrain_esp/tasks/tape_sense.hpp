@@ -21,8 +21,8 @@ constexpr gpio_num_t BR_TAPE_PIN = GPIO_NUM_6;
 constexpr gpio_num_t L1_TAPE_PIN = GPIO_NUM_7;
 constexpr gpio_num_t L2_TAPE_PIN = GPIO_NUM_8;
 
-constexpr uint16_t TAPE_HIGH_THRESHOLD = 2000;
-constexpr uint16_t TAPE_LOW_THRESHOLD = 1500;
+constexpr uint16_t TAPE_HIGH_THRESHOLD = 500;
+constexpr uint16_t TAPE_LOW_THRESHOLD = 300;
 }; // namespace TapeSenseTaskConfig
 
 struct TapeSnapshot {

@@ -14,6 +14,9 @@ QueueHandle_t s_snapshot_queue;
 
 TapeSnapshot s_snapshot;
 
+float ALPHA = 1.0f;
+float outer_error = 5.0f;
+
 bool _apply_hyteresis(bool sees_tape, float adc_val)
 {
     if (sees_tape && adc_val < TAPE_LOW_THRESHOLD)
@@ -32,9 +35,9 @@ float _get_tape_error(bool left, bool right, float prev_error)
     } else if (!left && !right) {
         // Both sensors do not see tape, use previous error to determine direction
         if (prev_error > 0.0f) {
-            return 5.0f; // Last known position was to the right
+            return outer_error; // Last known position was to the right
         } else if (prev_error < 0.0f) {
-            return -5.0f; // Last known position was to the left
+            return -outer_error; // Last known position was to the left
         }
     }
 
@@ -102,14 +105,15 @@ void _tape_task(void *arg)
         s_snapshot.tape_l1 = _apply_hyteresis(s_snapshot.tape_l1, l1_adc_val);
         s_snapshot.tape_l2 = _apply_hyteresis(s_snapshot.tape_l2, l2_adc_val);
 
-        s_snapshot.front_err = _get_tape_error(
-            s_snapshot.tape_fl, s_snapshot.tape_fm, s_snapshot.tape_fr, s_snapshot.front_err);
+        float new_front_err = _get_tape_error(s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
+        s_snapshot.front_err = ALPHA * new_front_err + (1 - ALPHA) * s_snapshot.front_err;
 
-        s_snapshot.back_err = _get_tape_error(
-            s_snapshot.tape_bl, s_snapshot.tape_bm, s_snapshot.tape_br, s_snapshot.back_err);
+        // using two tape sensors logic
+        float new_back_err = _get_tape_error(s_snapshot.tape_bl, s_snapshot.tape_br, s_snapshot.back_err);
+        s_snapshot.back_err = ALPHA * new_back_err + (1 - ALPHA) * s_snapshot.back_err;
 
-        s_snapshot.left_err =
-            _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
+        float new_left_err = _get_tape_error(s_snapshot.tape_l1, s_snapshot.tape_l2, s_snapshot.left_err);
+        s_snapshot.left_err = ALPHA * new_left_err + (1 - ALPHA) * s_snapshot.left_err;
 
         s_snapshot.tick = xTaskGetTickCount();
         s_snapshot.valid = true;

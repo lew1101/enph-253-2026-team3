@@ -19,4 +19,3 @@ void setup() {
     vTaskDelete(nullptr);
 }
 
-void loop() {}
