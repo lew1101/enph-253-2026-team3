@@ -18,12 +18,12 @@ constexpr float TASK_PERIOD_MS = 10.0f; // 100 Hz control loop
 
 constexpr gpio_num_t FR_MOTOR_CW_PIN = GPIO_NUM_45;
 constexpr gpio_num_t FR_MOTOR_CCW_PIN = GPIO_NUM_46;
-constexpr gpio_num_t BR_MOTOR_CW_PIN = GPIO_NUM_42;
-constexpr gpio_num_t BR_MOTOR_CCW_PIN = GPIO_NUM_41;
-constexpr gpio_num_t FL_MOTOR_CW_PIN = GPIO_NUM_16;
-constexpr gpio_num_t FL_MOTOR_CCW_PIN = GPIO_NUM_15;
-constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_17;
-constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_18;
+constexpr gpio_num_t BR_MOTOR_CW_PIN = GPIO_NUM_41;
+constexpr gpio_num_t BR_MOTOR_CCW_PIN = GPIO_NUM_42;
+constexpr gpio_num_t FL_MOTOR_CW_PIN = GPIO_NUM_17;
+constexpr gpio_num_t FL_MOTOR_CCW_PIN = GPIO_NUM_18;
+constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_15;
+constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_16;
 
 constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
     .timer_0 = nullptr,

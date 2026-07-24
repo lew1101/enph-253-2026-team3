@@ -146,12 +146,12 @@ void _drive_task(void *arg)
     TickType_t last_wake_tick = xTaskGetTickCount();
 
     while (true) {
-        esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
-        if (err != ESP_OK) {
-            pose_snapshot.valid = false;
-            pose_snapshot.tick = xTaskGetTickCount();
-            s_reached_pose.store(false, std::memory_order_release);
-        }
+        // esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
+        // if (err != ESP_OK) {
+        //     pose_snapshot.valid = false;
+        //     pose_snapshot.tick = xTaskGetTickCount();
+        //     s_reached_pose.store(false, std::memory_order_release);
+        // }
 
         xQueueOverwrite(s_pose_queue, &pose_snapshot);
 
@@ -204,17 +204,17 @@ void _drive_task(void *arg)
 
             switch (cmd.which_command) {
                 case robot_DriveCommand_stop_tag:
-                    ESP_LOGD(TAG, "drivetrain stop");
+                    // ESP_LOGD(TAG, "drivetrain stop");
                     drivetrain.stop();
                     break;
 
                 case robot_DriveCommand_velocity_tag: {
                     const auto &velocity = cmd.command.velocity;
-                    ESP_LOGD(TAG,
-                             "moving at speed: x=%.2f, y=%.2f, rot=%.2f",
-                             velocity.vx_percent,
-                             velocity.vy_percent,
-                             velocity.omega_percent);
+                    // ESP_LOGD(TAG,
+                    //          "moving at speed: x=%.2f, y=%.2f, rot=%.2f",
+                    //          velocity.vx_percent,
+                    //          velocity.vy_percent,
+                    //          velocity.omega_percent);
                     drivetrain.move_vector(
                         velocity.vx_percent, velocity.vy_percent, velocity.omega_percent);
                     break;
@@ -275,7 +275,7 @@ void _drive_task(void *arg)
                 case robot_DriveCommand_tape_follow_tag: {
                     auto& m = cmd.command.tape_follow;
 
-                    ESP_LOGD(TAG, "tape following");
+                    // ESP_LOGD(TAG, "tape following");
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
                     if (!success) {
                         ESP_LOGW(TAG, "failed to get tape snapshot");
