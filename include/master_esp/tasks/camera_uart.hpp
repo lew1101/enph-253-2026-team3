@@ -4,8 +4,8 @@
 #include "vision.pb.h"
 
 namespace CameraUartTaskConfig {
-constexpr gpio_num_t RX_PIN = GPIO_NUM_18;
-constexpr gpio_num_t TX_PIN = GPIO_NUM_17;
+constexpr gpio_num_t TX_PIN = GPIO_NUM_39;
+constexpr gpio_num_t RX_PIN = GPIO_NUM_38;
 
 constexpr uint32_t TASK_RX_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_RX_PRIORITY = 4;

@@ -1,5 +1,7 @@
 #include "tasks/camera_uart.hpp"
 
+#include <Arduino.h>
+
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -45,39 +47,77 @@ void _set_link_connected(bool connected)
 {
     const bool previous = s_link_connected.exchange(connected, std::memory_order_acq_rel);
     if (previous != connected)
-        ESP_LOGI(TAG, "camera UART %s", connected ? "connected" : "disconnected");
+        log_i("%s: camera UART %s", TAG, connected ? "connected" : "disconnected");
 }
 
 void _rx_task(void *)
 {
+    log_i("%s: starting camera task", TAG);
+
     std::array<uint8_t, vision_TeletubbyDetection_size> payload{};
     TickType_t last_valid_receive = xTaskGetTickCount();
+    uint32_t consecutive_timeouts = 0;
 
     while (true) {
         uint16_t payload_size = 0;
         uint16_t packet_sequence = 0;
-        const esp_err_t receive_err = s_uart_link.receive(payload.data(),
-                                                         payload.size(),
-                                                         &payload_size,
-                                                         &packet_sequence,
-                                                         RX_TIMEOUT);
+        const esp_err_t receive_err = s_uart_link.receive(
+            payload.data(), payload.size(), &payload_size, &packet_sequence, RX_TIMEOUT);
 
         if (receive_err == ESP_OK) {
+            consecutive_timeouts = 0;
+            // log_v("%s: received frame: packet_sequence=%u payload_size=%u",
+            //       TAG,
+            //       static_cast<unsigned>(packet_sequence),
+            //       static_cast<unsigned>(payload_size));
+
             vision_TeletubbyDetection detection = vision_TeletubbyDetection_init_zero;
             const esp_err_t decode_err =
-                comms::pbcodec::decode<vision_TeletubbyDetection,
-                                       vision_TeletubbyDetection_fields>(
+                comms::pbcodec::decode<vision_TeletubbyDetection, vision_TeletubbyDetection_fields>(
                     payload.data(), payload_size, &detection);
 
             if (decode_err == ESP_OK && _is_valid_detection(detection)) {
                 xQueueOverwrite(s_detection_queue, &detection);
                 last_valid_receive = xTaskGetTickCount();
                 _set_link_connected(true);
+
+                switch (detection.teletubby_type) {
+                    case vision_TeletubbyType_TELETUBBY_TYPE_YELLOW:
+                        log_v("%s: teletubby: yellow", TAG);
+                        break;
+
+                    case vision_TeletubbyType_TELETUBBY_TYPE_GREEN:
+                        log_v("%s: teletubby: green", TAG);
+                        break;
+                    case vision_TeletubbyType_TELETUBBY_TYPE_RED:
+                        log_v("%s: teletubby: red", TAG);
+                        break;
+                    case vision_TeletubbyType_TELETUBBY_TYPE_PURPLE:
+                        log_v("%s: teletubby: purple", TAG);
+                        break;
+                    default:
+                        break;
+                }
+
             } else {
-                ESP_LOGW(TAG, "invalid camera detection payload");
+                log_w("%s: invalid detection: decode=%s detected=%d type=%d image=%ux%u box=%d",
+                      TAG,
+                      esp_err_to_name(decode_err),
+                      detection.detected,
+                      static_cast<int>(detection.teletubby_type),
+                      static_cast<unsigned>(detection.image_width),
+                      static_cast<unsigned>(detection.image_height),
+                      detection.has_bounding_box);
             }
+        } else if (receive_err == ESP_ERR_TIMEOUT) {
+            ++consecutive_timeouts;
+            if (consecutive_timeouts % 50 == 0)
+                log_i("%s: waiting for UART frames (%u consecutive timeouts)",
+                      TAG,
+                      static_cast<unsigned>(consecutive_timeouts));
         } else if (receive_err != ESP_ERR_TIMEOUT) {
-            ESP_LOGW(TAG, "camera UART receive failed: %s", esp_err_to_name(receive_err));
+            consecutive_timeouts = 0;
+            log_w("%s: camera UART receive failed: %s", TAG, esp_err_to_name(receive_err));
         }
 
         if (s_link_connected.load(std::memory_order_acquire) &&
@@ -102,13 +142,15 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
         return err;
     }
 
-    const BaseType_t task_created = xTaskCreatePinnedToCore(_rx_task,
-                                                            "camera_uart_rx",
-                                                            CameraUartTaskConfig::TASK_RX_STACK_DEPTH,
-                                                            nullptr,
-                                                            CameraUartTaskConfig::TASK_RX_PRIORITY,
-                                                            &s_rx_task_handle,
-                                                            CameraUartTaskConfig::TASK_RX_CORE_ID);
+    const BaseType_t task_created =
+        xTaskCreatePinnedToCore(_rx_task,
+                                "camera_uart_rx",
+                                CameraUartTaskConfig::TASK_RX_STACK_DEPTH,
+                                nullptr,
+                                CameraUartTaskConfig::TASK_RX_PRIORITY,
+                                &s_rx_task_handle,
+                                CameraUartTaskConfig::TASK_RX_CORE_ID);
+
     if (task_created != pdPASS) {
         s_rx_task_handle = nullptr;
         s_uart_link.deinit();
@@ -128,7 +170,4 @@ esp_err_t get_teletubby_detection(vision_TeletubbyDetection *out, TickType_t tim
     return xQueuePeek(s_detection_queue, out, timeout) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-bool camera_uart_connected()
-{
-    return s_link_connected.load(std::memory_order_acquire);
-}
+bool camera_uart_connected() { return s_link_connected.load(std::memory_order_acquire); }

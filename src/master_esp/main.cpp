@@ -65,6 +65,7 @@
 #include "control/worm_spear.hpp"
 #include "control/elevator_claw.hpp"
 #include "FastAccelStepper.h"
+#include "freertos/idf_additions.h"
 #include "tasks/camera_uart.hpp"
 
 #define SPEAR_SERVO_PIN GPIO_NUM_6
@@ -124,52 +125,27 @@ control::ElevatorClaw elevator_claw;
 void setup()
 {
     Serial.begin(115200);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(start_camera_uart_task());
     delay(1000);
 
-    engine.init();
-    worm_config.engine = &engine;
-    elevator_config.engine = &engine;
-    worm_spear = control::WormSpear(worm_config);
-    elevator_claw = control::ElevatorClaw(elevator_config);
-    if (worm_spear.init() != ESP_OK) {
-        Serial.println("Failed to initialize WormSpear");
-    }
-    if (elevator_claw.init() != ESP_OK) {
-        Serial.println("Failed to initialize ElevatorClaw");
-    } else {
-        Serial.println("WormSpear and ElevatorClaw initialized successfully");
-    }
+    const esp_err_t camera_uart_err = start_camera_uart_task();
+    log_i("camera UART task start: %s", esp_err_to_name(camera_uart_err));
+
+    // engine.init();
+    // worm_config.engine = &engine;
+    // elevator_config.engine = &engine;
+    // worm_spear = control::WormSpear(worm_config);
+    // elevator_claw = control::ElevatorClaw(elevator_config);
+    // if (worm_spear.init() != ESP_OK) {
+    //     Serial.println("Failed to initialize WormSpear");
+    // }
+    // if (elevator_claw.init() != ESP_OK) {
+    //     Serial.println("Failed to initialize ElevatorClaw");
+    // } else {
+    //     Serial.println("WormSpear and ElevatorClaw initialized successfully");
+    // }
+
+    vTaskDelete(nullptr);
 }
 void loop()
 {
-    if (Serial.available() > 0) {
-        String command = Serial.readStringUntil('\n');
-        command.trim(); // Remove newline/spaces
-
-        if (command == "u") {
-            Serial.println("spear up");
-            worm_spear.spear_up();
-        } else if (command == "d") {
-            Serial.println("spear down");
-            worm_spear.spear_down();
-        } else if (command == "o") {
-            Serial.println("claw open");
-            elevator_claw.open_claw_tower();
-        } else if (command == "c") {
-            Serial.println("claw close");
-            elevator_claw.close_claw();
-        } else if (command == "r") {
-            Serial.println("rock claw open");
-            elevator_claw.open_claw_rock();
-        } else if (command.startsWith("w")) {
-            float worm_step = command.substring(1).toFloat();
-            Serial.printf("Moving worm to step: %.2f\n", worm_step);
-            worm_spear.move_to_position(worm_step);
-        } else if (command.startsWith("e")) {
-            float elevator_step = command.substring(1).toFloat();
-            Serial.printf("Moving elevator to step: %.2f\n", elevator_step);
-            elevator_claw.move_to_position(-elevator_step);
-        }
-    }
 }
