@@ -4,30 +4,29 @@
 #include "driver/pulse_cnt.h"
 #include "esp_err.h"
 
-namespace sensor {
-
-struct PcntEncoderConfig {
-    gpio_num_t gpio_a;
-    gpio_num_t gpio_b;
-
-    uint32_t glitch_filter_ns = 1000; // Ignore pulses shorter than this.
-    // Flip the reported direction without changing wiring.
-    bool invert_direction = false;
-};
-
-class PCntEncoder {
+namespace sensors {
+class PcntEncoder {
   private:
     static constexpr int kHighLimit = 30000;
     static constexpr int kLowLimit = -30000;
 
   public:
-    PCntEncoder() = default;
-    ~PCntEncoder();
+    struct Config {
+        gpio_num_t gpio_a;
+        gpio_num_t gpio_b;
 
-    PCntEncoder(const PCntEncoder &) = delete;
-    PCntEncoder &operator=(const PCntEncoder &) = delete;
+        uint32_t glitch_filter_ns = 1000; // Ignore pulses shorter than this.
+        // Flip the reported direction without changing wiring.
+        bool invert_direction = false;
+    };
 
-    esp_err_t init(const PcntEncoderConfig &cfg);
+    PcntEncoder() = default;
+    ~PcntEncoder();
+
+    PcntEncoder(const PcntEncoder &) = delete;
+    PcntEncoder &operator=(const PcntEncoder &) = delete;
+
+    esp_err_t init(const Config &cfg);
     esp_err_t get_count(int *count) const;
     esp_err_t clear();
     esp_err_t deinit();
@@ -41,4 +40,4 @@ class PCntEncoder {
     bool _enabled = false;
     bool _initialized = false;
 };
-} // namespace sensor
+} // namespace sensors

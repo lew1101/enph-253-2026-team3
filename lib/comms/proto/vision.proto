@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package vision;
+
+enum TeletubbyType {
+    TELETUBBY_TYPE_UNSPECIFIED = 0;
+    TELETUBBY_TYPE_YELLOW = 1;
+    TELETUBBY_TYPE_GREEN = 2;
+    TELETUBBY_TYPE_RED = 3;
+    TELETUBBY_TYPE_PURPLE = 4;
+}
+
+// Pixel coordinates in the source image. x/y are the top-left corner.
+message BoundingBox {
+    uint32 x = 1;
+    uint32 y = 2;
+    uint32 width = 3;
+    uint32 height = 4;
+}
+
+// The highest-confidence teletubby detection from one camera frame.
+// When detected is false, confidence and bounding_box are left at zero.
+message TeletubbyDetection {
+    uint32 frame_sequence = 1;
+    uint32 image_width = 2;
+    uint32 image_height = 3;
+
+    bool detected = 4;
+    float confidence = 5; // 0.0 to 1.0
+    BoundingBox bounding_box = 6;
+    TeletubbyType teletubby_type = 7;
+}

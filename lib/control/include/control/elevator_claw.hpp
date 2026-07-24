@@ -1,5 +1,9 @@
-#include <Arduino.h>
 #include "FastAccelStepper.h"
+
+#include "soc/gpio_num.h"
+#include <cstdint>
+#include <esp_err.h>
+
 #include "actuators/servo.hpp"
 
 namespace control {
@@ -37,7 +41,7 @@ class ElevatorClaw {
     esp_err_t init();
 
     void calibrate();
-    void move_to_position(float step);
+    void move_to_position(int32_t step);
     void open_claw_tower();
     void open_claw_rock();
     void close_claw();

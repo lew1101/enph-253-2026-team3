@@ -3,19 +3,22 @@ syntax = "proto3";
 package robot;
 
 message VelocityCommand {
-    float vx_mps = 1; // strafe velocity
-    float vy_mps = 2; // forward/backward velocity
-    float omega_rad_s = 3;
+    float vx_percent = 1; // strafe velocity
+    float vy_percent = 2; // forward/backward velocity
+    float omega_percent = 3;
 }
 
 message PoseCommand {
     float x_m = 1;
     float y_m = 2;
     float theta_rad = 3;
+    // When true, x/y are field-frame offsets from the measured pose and
+    // theta is an offset from the measured heading.
+    bool relative = 4;
 }
 
 message TapeFollowCommand {
-    float forward_speed_mps = 1;
+    float forward_speed_percent = 1;
 }
 
 message StopCommand {
@@ -23,7 +26,7 @@ message StopCommand {
 }
 
 message DriveCommand {
-    float sequence = 1;
+    uint32 sequence = 1;
     oneof command {
         VelocityCommand velocity = 2;
         TapeFollowCommand tape_follow = 3;

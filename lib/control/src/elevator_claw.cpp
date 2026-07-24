@@ -9,7 +9,7 @@ ElevatorClaw::ElevatorClaw(const Config &config)
     : _config(config)
 {
 }
-    
+
 esp_err_t ElevatorClaw::init()
 {
     if (_config.engine == nullptr) {
@@ -25,6 +25,7 @@ esp_err_t ElevatorClaw::init()
 
     _stepper->setSpeedInHz(_config.speed_hz);
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
+    _stepper->setCurrentPosition(0);
     _claw_servo.init();
     return ESP_OK;
 }
@@ -33,7 +34,7 @@ void ElevatorClaw::calibrate() {
     return;
 }
 
-void ElevatorClaw::move_to_position(float step) {
+void ElevatorClaw::move_to_position(int32_t step) {
     _stepper->moveTo(step);
 }
 

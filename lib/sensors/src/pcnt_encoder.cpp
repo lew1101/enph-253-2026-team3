@@ -5,10 +5,10 @@
 
 static constexpr char TAG[] = "encoder_driver";
 
-namespace sensor {
-PCntEncoder::~PCntEncoder() { PCntEncoder::deinit(); }
+namespace sensors {
+PcntEncoder::~PcntEncoder() { PcntEncoder::deinit(); }
 
-esp_err_t PCntEncoder::init(const PcntEncoderConfig &cfg)
+esp_err_t PcntEncoder::init(const Config &cfg)
 {
     ESP_RETURN_ON_FALSE(
         _unit == nullptr, ESP_ERR_INVALID_STATE, TAG, "pcnt unit already initialized");
@@ -113,9 +113,9 @@ cleanup:
     return err;
 }
 
-esp_err_t PCntEncoder::get_count(int *count) const
+esp_err_t PcntEncoder::get_count(int *count) const
 {
-    ESP_RETURN_ON_FALSE(_unit != nullptr || _initialized,
+    ESP_RETURN_ON_FALSE(_unit != nullptr && _initialized,
                         ESP_ERR_INVALID_STATE,
                         TAG,
                         "cannot get count before intialized");
@@ -128,7 +128,7 @@ esp_err_t PCntEncoder::get_count(int *count) const
     return ESP_OK;
 }
 
-esp_err_t PCntEncoder::clear()
+esp_err_t PcntEncoder::clear()
 {
     ESP_RETURN_ON_FALSE( //
         _unit != nullptr,
@@ -139,7 +139,7 @@ esp_err_t PCntEncoder::clear()
     return pcnt_unit_clear_count(_unit);
 }
 
-esp_err_t PCntEncoder::deinit()
+esp_err_t PcntEncoder::deinit()
 {
     esp_err_t first_err = ESP_OK;
     esp_err_t err;

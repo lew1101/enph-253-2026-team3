@@ -8,6 +8,14 @@ namespace control {
 using std::array;
 
 class Drivetrain {
+  private:
+    enum DrivetrainIndex : size_t {
+        FR = 0,
+        RR = 1,
+        FL = 2,
+        RL = 3,
+    };
+
   public:
     struct Config {
         mcpwm_timer_handle_t timer_0 = nullptr;

@@ -2,9 +2,18 @@ syntax = "proto3";
 
 package drive;
 
+message Pose {
+    float x_m = 1;
+    float y_m = 2;
+    float heading_rad = 3;
+    uint32 tick = 4;
+}
+
 message DriveUartMessage {
     uint32 last_command_sequence = 1;
     uint32 flags = 2;
     uint32 fault = 3;
     uint32 uptime_ms = 4;
+
+    Pose pose = 5;
 }

@@ -20,10 +20,8 @@ DCDriver::DCDriver(const Config &config)
 
 esp_err_t DCDriver::init()
 {
-    if (_config.clockwise_pwm_output == GPIO_NUM_NC ||
-        _config.c_clockwise_pwm_output == GPIO_NUM_NC)
-        return false;
-    if (_config.timer == nullptr) return false;
+    if (_config.clockwise_pwm_output == GPIO_NUM_NC || _config.c_clockwise_pwm_output == GPIO_NUM_NC) return ESP_ERR_INVALID_ARG;
+    if (_config.timer == nullptr) return ESP_ERR_INVALID_ARG;
 
     // Set up MCPWM
     ESP_LOGD(TAG, "Set up MCPWM Operator");
