@@ -99,3 +99,17 @@ void ElevatorClaw::stop_elevator() {
 bool ElevatorClaw::elevator_done() const {
     return !_stepper->isRunning();
 }
+
+// ONLY FOR TUNING PURPOSES
+void ElevatorClaw::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s) {
+    _stepper->setSpeedInHz(speed_hz);
+    _stepper->setAcceleration(acceleration_hz_per_s);
+}
+
+void ElevatorClaw::set_home_position() {
+    _stepper->setCurrentPosition(0);
+}
+
+int32_t ElevatorClaw::get_current_position() {
+    return _stepper->getCurrentPosition();
+}

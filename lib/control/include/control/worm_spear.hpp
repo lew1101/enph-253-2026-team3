@@ -44,6 +44,11 @@ class WormSpear {
 
     bool worm_done() const;
 
+    // ONLY FOR TUNING PURPOSES
+    void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);
+    void set_home_position();
+    int32_t get_current_position();
+
   private:
     Config _config;
     FastAccelStepper *_stepper = nullptr;

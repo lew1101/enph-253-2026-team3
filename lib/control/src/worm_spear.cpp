@@ -92,3 +92,17 @@ void WormSpear::spear_angle(float deg) {
 bool WormSpear::worm_done() const {
     return !_stepper->isRunning();
 }
+
+// ONLY FOR TUNING PURPOSES
+void WormSpear::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s) {
+    _stepper->setSpeedInHz(speed_hz);
+    _stepper->setAcceleration(acceleration_hz_per_s);
+}
+
+void WormSpear::set_home_position() {
+    _stepper->setCurrentPosition(0);
+}
+
+int32_t WormSpear::get_current_position() {
+    return _stepper->getCurrentPosition();
+}
