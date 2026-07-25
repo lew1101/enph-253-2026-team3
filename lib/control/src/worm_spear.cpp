@@ -30,6 +30,54 @@ esp_err_t WormSpear::init()
 }
 
 void WormSpear::calibrate() {
+    // move quickly to switch
+    _stepper->setSpeedInHz(2000);
+    if (_config.direction == 1) {
+        _stepper->runForward();
+    } else {
+        _stepper->runBackward();
+    }
+
+    // debounce
+    int stableCount = 0;
+    while (stableCount < 5) {
+        if (digitalRead(_config.worm_calibration_switch_pin) == switch_presed) { 
+            stableCount++;
+        } else {
+            stableCount = 0; // Reset if it was just a noise spike
+        }
+        vTaskDelay(1);
+    }
+    
+    // back up
+    _stepper->forceStopAndNewPosition(0);
+    vTaskDelay(pdMS_TO_TICKS(10)); 
+    _stepper->move(-200 * _config.direction); 
+    
+    while (_stepper->isRunning()) {
+        vTaskDelay(1); 
+    }
+
+    // move slowly to switch
+    _stepper->setSpeedInHz(500);
+    if (_config.direction == 1) {
+        _stepper->runForward();
+    } else {
+        _stepper->runBackward();
+    }
+
+    stableCount = 0;
+    while (stableCount < 5) {
+        if (digitalRead(_config.worm_calibration_switch_pin) == switch_presed) {
+            stableCount++;
+        } else {
+            stableCount = 0;
+        }
+        vTaskDelay(1);
+    }
+    
+    _stepper->forceStopAndNewPosition(0);
+    _stepper->setSpeedInHz(_config.speed_hz);
     return;
 }
 
