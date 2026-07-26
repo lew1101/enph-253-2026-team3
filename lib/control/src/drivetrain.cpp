@@ -114,11 +114,25 @@ bool Drivetrain::move_rear(float left_speed, float right_speed)
     float sweep_ratio = _config.wheelbase / _config.trackwidth;
     float turn_diff = (left_speed - right_speed) * sweep_ratio;
 
-    target_speed[3] = -left_speed; // Back Left
-    target_speed[1] = right_speed; // Back Right
+    target_speed[RL] = -left_speed; // Back Left
+    target_speed[RR] = right_speed; // Back Right
 
-    target_speed[2] = -(left_speed + turn_diff); // Front Left
-    target_speed[0] = right_speed - turn_diff;   // Front Right
+    target_speed[FL] = -(left_speed + turn_diff); // Front Left
+    target_speed[FR] = right_speed - turn_diff;   // Front Right
+
+    return true;
+}
+
+bool Drivetrain::move_front(float left_speed, float right_speed)
+{
+    float sweep_ratio = _config.wheelbase / _config.trackwidth;
+    float turn_diff = (left_speed - right_speed) * sweep_ratio;
+
+    target_speed[FL] = -(left_speed); // Front Left
+    target_speed[FR] = right_speed;   // Front Right
+
+    target_speed[RL] = -(left_speed + turn_diff); // Back Left
+    target_speed[RR] = right_speed - turn_diff;   // Back Right
 
     return true;
 }
