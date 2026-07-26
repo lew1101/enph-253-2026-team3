@@ -10,8 +10,8 @@ extern control::ElevatorClaw elevator_claw;
 extern control::WormSpear worm_spear;
 extern FastAccelStepperEngine stepper_engine;
 
-constexpr gpio_num_t SPEAR_SERVO_PIN = GPIO_NUM_6;
-constexpr gpio_num_t CLAW_SERVO_PIN = GPIO_NUM_5;
+constexpr gpio_num_t SPEAR_SERVO_PIN = GPIO_NUM_7;
+constexpr gpio_num_t CLAW_SERVO_PIN = GPIO_NUM_6;
 constexpr gpio_num_t WORM_STEP_PIN = GPIO_NUM_15;
 constexpr gpio_num_t WORM_DIR_PIN = GPIO_NUM_16;
 constexpr gpio_num_t WORM_CALIBRATION_SWITCH_PIN = GPIO_NUM_12;
@@ -24,12 +24,12 @@ constexpr driver::ServoDriver::Config spear_servo_config{
     .channel = 1,
     .freq_hz = 50,
     .duty_res_bits = 14,
-    .min_pulse_us = 500,
-    .max_pulse_us = 2400,
+    .min_pulse_us = 1000,
+    .max_pulse_us = 2000,
     .min_pulse_deg = 0.0f,
-    .max_pulse_deg = 180.0f,
+    .max_pulse_deg = 90.0f,
     .min_clamp_deg = 0.0f,
-    .max_clamp_deg = 180.0f};
+    .max_clamp_deg = 90.0f};
 
 constexpr driver::ServoDriver::Config claw_servo_config{.gpio =
                                                             CLAW_SERVO_PIN, // Specify your pin here

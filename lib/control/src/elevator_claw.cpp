@@ -27,7 +27,9 @@ esp_err_t ElevatorClaw::init()
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
     _stepper->setCurrentPosition(0);
     pinMode(_config.elevator_calibration_switch_pin, INPUT_PULLUP);
-    _claw_servo.init();
+    if (!_claw_servo.init()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     return ESP_OK;
 }
 

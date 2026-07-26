@@ -25,7 +25,10 @@ esp_err_t WormSpear::init()
 
     _stepper->setSpeedInHz(_config.speed_hz);
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
-    _spear_servo.init();
+    pinMode(_config.worm_calibration_switch_pin, INPUT_PULLUP);
+    if (!_spear_servo.init()) {
+        return ESP_ERR_INVALID_STATE;
+    }
     return ESP_OK;
 }
 
