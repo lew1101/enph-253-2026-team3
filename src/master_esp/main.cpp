@@ -1,3 +1,4 @@
+#include "drive.pb.h"
 #include "freertos/idf_additions.h"
 
 #include "esp_err.h"
@@ -5,6 +6,9 @@
 
 #include "actuators/limit.hpp"
 
+#include "portmacro.h"
+#include "projdefs.h"
+#include "shared/robot_flags.hpp"
 #include "supervisor.hpp"
 
 #include "tasks/uart.hpp"
@@ -13,7 +17,6 @@
 
 #include "front_chassis.hpp"
 
-DebouncedLimitSwitch elev_limit{GPIO_NUM_8};
 DebouncedLimitSwitch worm_limit{GPIO_NUM_10};
 
 void setup()
@@ -26,7 +29,7 @@ void setup()
 
     ESP_ERROR_CHECK(start_master_uart_tasks());
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(front_chassis_init());
+    ESP_ERROR_CHECK(front_chassis_init());
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_metal_detector_task());
 
     const esp_err_t camera_uart_err = start_camera_uart_task();
@@ -37,18 +40,35 @@ void setup()
     elevator_claw.calibrate();
 }
 
+void rock_and_teletubbies() {
+
+}
+
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
     ELEV_TOWER_1 = 1,
-    ELEV_TOWER_2 = 2,
-    ELEV_TOWER_3 = 3,
-    ELEV_BACK = 4,
+    ELEV_TOWER_2_MINUS = 2,
+    ELEV_TOWER_2 = 3,
+    ELEV_TOWER_2_PLUS = 4,
+    ELEV_TOWER_3 = 6,
+    ELEV_TOWER_3_PLUS = 7,
+    ELEV_BACK = 8,
 };
 
-enum SpearPos : int32_t { SPEAR_LEFT = 50'000, SPEAR_CENTRE = 25'000, SPEAR_RIGHT = 0 };
+enum SpearPos : int32_t { //
+    SPEAR_LEFT = 50'000,
+    SPEAR_CENTRE = 25'000,
+    SPEAR_RIGHT = 0,
+    SPEAR_CENTERING = 35'000
+};
 
-constexpr float SPEAR_UP = 90.0f;
-constexpr float SPEAR_DOWN = 45.0f;
+constexpr float SPEAR_UP_DEG = 90.0f;
+constexpr float SPEAR_45_DEG = 45.0f;
+constexpr float SPEAR_DOWN_DEG = 0.0f;
+
+constexpr float CLAW_OPEN_DEG = 0.0f;
+constexpr float CLAW_CLOSE_TOWER_DEG = 20.0f;
+constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
 
 void assemble_tower()
 {
@@ -67,17 +87,94 @@ void assemble_tower()
     -> Boss tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors -> Drive forward slowly (cresent moon will auto
     align the robot with the boss) -> Elevator down -> Claw open */
+    constexpr float Y_OFFSET = 0.2f; // m
 
-    // move forward
-    worm_spear.spear_angle(SPEAR_UP);
-    delay(200);
+    robot_DriveCommand forward = robot_DriveCommand_init_zero;
+    forward.which_command = robot_DriveCommand_pose_tag;
+    forward.command.pose.relative = true;
+    forward.command.pose.x_m = 0.0f;
+    forward.command.pose.y_m = Y_OFFSET;
+    forward.command.pose.theta_rad = 0.0f;
 
-    // move backward
+    robot_DriveCommand backward = robot_DriveCommand_init_zero;
+    backward.which_command = robot_DriveCommand_pose_tag;
+    backward.command.pose.relative = true;
+    backward.command.pose.x_m = 0.0f;
+    backward.command.pose.y_m = -Y_OFFSET;
+    backward.command.pose.theta_rad = 0.0f;
+
+    xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_ACTUATORS);
+    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+
+    // PIECE 1
+    worm_spear.spear_angle(SPEAR_DOWN_DEG);
+    delay(1000);
+
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+    worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+    send_drive_command(forward);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+
+    worm_spear.spear_angle(SPEAR_UP_DEG);
+    delay(1500);
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    delay(1200);
+    send_drive_command(backward);
+    delay(500);
+    worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_PLUS);
+    delay(1000);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+
+    // PIECE 2
+    send_drive_command(forward);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+
+    worm_spear.spear_angle(SPEAR_UP_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2);
+    delay(1000);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+    delay(1500);
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_PLUS);
+    send_drive_command(backward);
+    delay(1000);
+    worm_spear.spear_angle(SPEAR_DOWN_DEG);
+    worm_spear.move_to_position(SpearPos::SPEAR_RIGHT);
+    delay(1000);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+
+    // PIECE 3
+    send_drive_command(forward);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+
+    worm_spear.spear_angle(SPEAR_UP_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3);
+    delay(1000);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+    delay(1500);
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    delay(1500);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_PLUS);
+    delay(1000);
+    worm_spear.move_to_position(SpearPos::SPEAR_CENTERING);
+    send_drive_command(backward);
+    supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
 }
 
 void loop()
 {
     // PHASE 1: ROCKS and TELETUBBY
+
+
 
     // PHASE 2: TOWER
     //===============
@@ -91,5 +188,3 @@ void loop()
 
     vTaskDelay(portMAX_DELAY);
 }
-
-

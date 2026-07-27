@@ -1,5 +1,6 @@
 #pragma once
 
+#include "portmacro.h"
 #include "shared/robot_flags.hpp"
 #include "comms/uart_link.hpp"
 #include "drive_message.pb.h"
@@ -39,7 +40,7 @@ constexpr comms::UartLink::Config UART_LINK_CFG{
 esp_err_t start_master_uart_tasks(TaskHandle_t *tx_handle_out = nullptr,
                                   TaskHandle_t *rx_handle_out = nullptr);
 esp_err_t send_robot_message(const robot_RobotUartMessage &message, TickType_t timeout = 0);
-esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeout = 0);
+esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeout = portMAX_DELAY);
 
 esp_err_t get_drive_status(drive_DriveUartMessage *out, TickType_t timeout = 0);
 

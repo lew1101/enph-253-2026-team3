@@ -14,6 +14,15 @@ constexpr BaseType_t TASK_RX_CORE_ID = 0;
 constexpr TickType_t RX_TIMEOUT = pdMS_TO_TICKS(20);
 constexpr TickType_t UART_LINK_TIMEOUT = pdMS_TO_TICKS(500);
 
+constexpr float MIN_BOX_WIDTH_RATIO = 0.05f;
+constexpr float MIN_BOX_HEIGHT_RATIO = 0.08f;
+constexpr float MIN_BOX_AREA_RATIO = 0.01f;
+constexpr float MAX_BOX_AREA_RATIO = 0.80f;
+
+constexpr gpio_num_t TELETUBBY_LED_PIN = GPIO_NUM_12;
+constexpr uint8_t REQUIRED_CONSECUTIVE_DETECTIONS = 3;
+constexpr TickType_t TELETUBBY_LED_HOLD_TIME = pdMS_TO_TICKS(500);
+
 constexpr comms::UartLink::Config UART_LINK_CFG{
     .port = UART_NUM_2,
     .tx_pin = TX_PIN,
