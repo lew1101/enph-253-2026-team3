@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "FastAccelStepper.h"
+#include "actuators/limit.hpp"
 #include "actuators/servo.hpp"
 
 namespace control {
@@ -15,6 +16,7 @@ class WormSpear {
         gpio_num_t worm_calibration_switch_pin = GPIO_NUM_NC;
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
+        TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
         int direction = 1; //1 for forward, -1 for backward
 
         driver::ServoDriver ::Config spear_servo_config = {
@@ -32,8 +34,6 @@ class WormSpear {
 ;
     };
 
-    WormSpear() = default;
-
     explicit WormSpear(const Config &config);
 
     esp_err_t init();
@@ -41,6 +41,8 @@ class WormSpear {
     void calibrate();
     void move_to_position(float step);
     void spear_angle(float deg);
+
+    inline void stop_worm() { _stepper->forceStop(); }
 
     bool worm_done() const;
 
@@ -52,7 +54,8 @@ class WormSpear {
   private:
     Config _config;
     FastAccelStepper *_stepper = nullptr;
-    driver::ServoDriver _spear_servo{_config.spear_servo_config};
-    int switch_presed = 0; //active LOW
+    driver::ServoDriver _spear_servo;
+
+    DebouncedLimitSwitch _limit_switch;
 };
 }

@@ -2,12 +2,16 @@
 #include "control/elevator_claw.hpp"
 #include "actuators/servo.hpp"
 #include "FastAccelStepper.h"
+#include "portmacro.h"
 
 using control::ElevatorClaw;
 
+static constexpr char TAG[] = "elevator_claw";
+
 ElevatorClaw::ElevatorClaw(const Config &config)
-    : _config{config},
-    _claw_servo{_config.claw_servo_config}
+    : _config{config}
+    , _claw_servo{_config.claw_servo_config}
+    , _limit_switch{_config.elevator_calibration_switch_pin}
 {
 }
 
@@ -27,15 +31,24 @@ esp_err_t ElevatorClaw::init()
     _stepper->setSpeedInHz(_config.speed_hz);
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
     _stepper->setCurrentPosition(0);
-    pinMode(_config.elevator_calibration_switch_pin, INPUT_PULLUP);
+
     if (!_claw_servo.init()) {
         return ESP_ERR_INVALID_STATE;
     }
+
+    _limit_switch.register_pressed_callback(
+        [](void *ctx) {
+            auto *elevator = static_cast<control::ElevatorClaw *>(ctx);
+            elevator->stop_elevator();
+        },
+        this);
+    _limit_switch.begin("elevator_claw_limit");
+
     return ESP_OK;
 }
 
-void ElevatorClaw::calibrate() {
-
+void ElevatorClaw::calibrate()
+{
     // move quickly to switch
     _stepper->setSpeedInHz(2000);
     if (_config.direction == 1) {
@@ -44,24 +57,19 @@ void ElevatorClaw::calibrate() {
         _stepper->runBackward();
     }
 
-    // debounce
-    int stableCount = 0;
-    while (stableCount < 5) {
-        if (digitalRead(_config.elevator_calibration_switch_pin) == switch_presed) { 
-            stableCount++;
-        } else {
-            stableCount = 0; // Reset if it was just a noise spike
-        }
-        vTaskDelay(1);
+    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+        _stepper->forceStop();
+        ESP_LOGE(TAG, "timed out during fast calibration approach");
+        return;
     }
-    
+
     // back up
     _stepper->forceStopAndNewPosition(0);
-    vTaskDelay(pdMS_TO_TICKS(10)); 
-    _stepper->move(-200 * _config.direction); 
-    
+    vTaskDelay(pdMS_TO_TICKS(10));
+    _stepper->move(-200 * _config.direction);
+
     while (_stepper->isRunning()) {
-        vTaskDelay(1); 
+        vTaskDelay(1);
     }
 
     // move slowly to switch
@@ -72,47 +80,24 @@ void ElevatorClaw::calibrate() {
         _stepper->runBackward();
     }
 
-    stableCount = 0;
-    while (stableCount < 5) {
-        if (digitalRead(_config.elevator_calibration_switch_pin) == switch_presed) {
-            stableCount++;
-        } else {
-            stableCount = 0;
-        }
-        vTaskDelay(1);
+    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+        _stepper->forceStop();
+        ESP_LOGE(TAG, "timed out during slow calibration approach");
+        return;
     }
-    
+
     _stepper->forceStopAndNewPosition(0);
     _stepper->setSpeedInHz(_config.speed_hz);
     return;
 }
 
-void ElevatorClaw::move_to_position(int32_t step) {
-    _stepper->moveTo(step);
-}
-
-void ElevatorClaw::set_claw(float deg) {
-    _claw_servo.set_deg(deg);
-}
-
-void ElevatorClaw::stop_elevator() {
-    _stepper->forceStop();
-}
-
-bool ElevatorClaw::elevator_done() const {
-    return !_stepper->isRunning();
-}
-
 // ONLY FOR TUNING PURPOSES
-void ElevatorClaw::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s) {
+void ElevatorClaw::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s)
+{
     _stepper->setSpeedInHz(speed_hz);
     _stepper->setAcceleration(acceleration_hz_per_s);
 }
 
-void ElevatorClaw::set_home_position() {
-    _stepper->setCurrentPosition(0);
-}
+void ElevatorClaw::set_home_position() { _stepper->setCurrentPosition(0); }
 
-int32_t ElevatorClaw::get_current_position() {
-    return _stepper->getCurrentPosition();
-}
+int32_t ElevatorClaw::get_current_position() { return _stepper->getCurrentPosition(); }
