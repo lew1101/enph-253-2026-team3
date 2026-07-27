@@ -49,7 +49,7 @@ constexpr control::WormSpear::Config worm_config{
     .engine = &stepper_engine, // Set this to your FastAccelStepperEngine instance
     .worm_step_pin = WORM_STEP_PIN,
     .worm_dir_pin = WORM_DIR_PIN,
-    .worm_calibration_switch_pin = WORM_CALIBRATION_SWITCH_PIN,
+    .worm_calibration_switch_pin = WORM_LIMIT_SWITCH_PIN,
     .speed_hz = 9000,
     .acceleration_hz_per_s = 1600,
     .spear_servo_config = spear_servo_config};
@@ -58,7 +58,7 @@ constexpr control::ElevatorClaw::Config elevator_config{
     .engine = &stepper_engine, // Set this to your FastAccelStepperEngine instance
     .elevator_step_pin = ELEVATOR_STEP_PIN,
     .elevator_dir_pin = ELEVATOR_DIR_PIN,
-    .elevator_calibration_switch_pin = ELEVATOR_CALIBRATION_SWITCH_PIN,
+    .elevator_calibration_switch_pin = ELEVATOR_LIMIT_SWITCH_PIN,
     .speed_hz = 9000,
     .acceleration_hz_per_s = 1600,
     .claw_servo_config = claw_servo_config};

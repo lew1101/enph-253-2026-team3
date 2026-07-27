@@ -7,8 +7,7 @@ using control::ElevatorClaw;
 
 ElevatorClaw::ElevatorClaw(const Config &config)
     : _config{config},
-    _claw_servo{_config.claw_servo_config},
-
+    _claw_servo{_config.claw_servo_config}
 {
 }
 

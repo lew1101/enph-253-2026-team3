@@ -53,7 +53,7 @@ class ElevatorClaw {
     Config _config;
 
     FastAccelStepper *_stepper = nullptr;
-    driver::ServoDriver _claw_servo{_config.claw_servo_config};
+    driver::ServoDriver _claw_servo;
     int switch_presed = 0; //active LOW
 };
 } // namespace control
