@@ -38,7 +38,7 @@ void ElevatorClaw::calibrate() {
 
     // move quickly to switch
     _stepper->setSpeedInHz(2000);
-    if (_config.direction == 1) {
+    if (!_config.reversed) {
         _stepper->runForward();
     } else {
         _stepper->runBackward();
@@ -58,7 +58,7 @@ void ElevatorClaw::calibrate() {
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10)); 
-    _stepper->move(-200 * _config.direction); 
+    _stepper->move(_config.reversed ? 200 : -200); 
     
     while (_stepper->isRunning()) {
         vTaskDelay(1); 
@@ -66,7 +66,7 @@ void ElevatorClaw::calibrate() {
 
     // move slowly to switch
     _stepper->setSpeedInHz(500);
-    if (_config.direction == 1) {
+    if (!_config.reversed) {
         _stepper->runForward();
     } else {
         _stepper->runBackward();
@@ -88,6 +88,7 @@ void ElevatorClaw::calibrate() {
 }
 
 void ElevatorClaw::move_to_position(int32_t step) {
+    step = _config.reversed ? -step : step;
     _stepper->moveTo(step);
 }
 
@@ -114,5 +115,6 @@ void ElevatorClaw::set_home_position() {
 }
 
 int32_t ElevatorClaw::get_current_position() {
-    return _stepper->getCurrentPosition();
+    int32_t pos = _stepper->getCurrentPosition();
+    return _config.reversed ? -pos : pos;
 }
