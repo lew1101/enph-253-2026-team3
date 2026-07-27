@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <esp_err.h>
 
+#include "actuators/limit.hpp"
 #include "actuators/servo.hpp"
 
 namespace control {
@@ -32,8 +33,6 @@ class ElevatorClaw {
                                                           .max_clamp_deg = 180.0f};
     };
 
-    ElevatorClaw() = default;
-
     explicit ElevatorClaw(const Config &config);
 
     esp_err_t init();
@@ -51,7 +50,8 @@ class ElevatorClaw {
     int32_t get_current_position();
 ;
   private:
-  Config _config;
+    Config _config;
+
     FastAccelStepper *_stepper = nullptr;
     driver::ServoDriver _claw_servo{_config.claw_servo_config};
     int switch_presed = 0; //active LOW

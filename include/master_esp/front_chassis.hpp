@@ -12,12 +12,14 @@ extern FastAccelStepperEngine stepper_engine;
 
 constexpr gpio_num_t SPEAR_SERVO_PIN = GPIO_NUM_7;
 constexpr gpio_num_t CLAW_SERVO_PIN = GPIO_NUM_6;
+
 constexpr gpio_num_t WORM_STEP_PIN = GPIO_NUM_15;
 constexpr gpio_num_t WORM_DIR_PIN = GPIO_NUM_16;
-constexpr gpio_num_t WORM_CALIBRATION_SWITCH_PIN = GPIO_NUM_12;
+constexpr gpio_num_t WORM_LIMIT_SWITCH_PIN = GPIO_NUM_10;
+
 constexpr gpio_num_t ELEVATOR_STEP_PIN = GPIO_NUM_42;
 constexpr gpio_num_t ELEVATOR_DIR_PIN = GPIO_NUM_41;
-constexpr gpio_num_t ELEVATOR_CALIBRATION_SWITCH_PIN = GPIO_NUM_10;
+constexpr gpio_num_t ELEVATOR_LIMIT_SWITCH_PIN = GPIO_NUM_8;
 
 constexpr driver::ServoDriver::Config spear_servo_config{
     .gpio = SPEAR_SERVO_PIN, // Specify your pin here
@@ -62,4 +64,3 @@ constexpr control::ElevatorClaw::Config elevator_config{
     .claw_servo_config = claw_servo_config};
 
 esp_err_t front_chassis_init();
-

@@ -8,6 +8,8 @@
 
 #include "comms/pb_codec.hpp"
 #include "esp_check.h"
+#include "shared/robot_flags.hpp"
+#include "supervisor.hpp"
 
 namespace {
 static constexpr char TAG[] = "camera_uart";
@@ -40,7 +42,14 @@ bool _is_valid_detection(const vision_TeletubbyDetection &detection)
     if (box.width > detection.image_width - box.x) return false;
     if (box.height > detection.image_height - box.y) return false;
 
-    return true;
+    const float width_ratio =
+        static_cast<float>(box.width) / static_cast<float>(detection.image_width);
+    const float height_ratio =
+        static_cast<float>(box.height) / static_cast<float>(detection.image_height);
+    const float area_ratio = width_ratio * height_ratio;
+
+    return width_ratio >= MIN_BOX_WIDTH_RATIO && height_ratio >= MIN_BOX_HEIGHT_RATIO &&
+           area_ratio >= MIN_BOX_AREA_RATIO && area_ratio <= MAX_BOX_AREA_RATIO;
 }
 
 void _set_link_connected(bool connected)
@@ -54,9 +63,15 @@ void _rx_task(void *)
 {
     log_i("%s: starting camera task", TAG);
 
+    pinMode(TELETUBBY_LED_PIN, OUTPUT);
+    digitalWrite(TELETUBBY_LED_PIN, LOW);
+
     std::array<uint8_t, vision_TeletubbyDetection_size> payload{};
     TickType_t last_valid_receive = xTaskGetTickCount();
+    TickType_t last_positive_detection = 0;
     uint32_t consecutive_timeouts = 0;
+    uint8_t consecutive_detections = 0;
+    bool teletubby_seen = false;
 
     while (true) {
         uint16_t payload_size = 0;
@@ -71,17 +86,28 @@ void _rx_task(void *)
             //       static_cast<unsigned>(packet_sequence),
             //       static_cast<unsigned>(payload_size));
 
-            vision_TeletubbyDetection detection = vision_TeletubbyDetection_init_zero;
+            vision_TeletubbyDetection msg = vision_TeletubbyDetection_init_zero;
             const esp_err_t decode_err =
                 comms::pbcodec::decode<vision_TeletubbyDetection, vision_TeletubbyDetection_fields>(
-                    payload.data(), payload_size, &detection);
+                    payload.data(), payload_size, &msg);
 
-            if (decode_err == ESP_OK && _is_valid_detection(detection)) {
-                xQueueOverwrite(s_detection_queue, &detection);
+            if (decode_err == ESP_OK && _is_valid_detection(msg)) {
+                xQueueOverwrite(s_detection_queue, &msg);
                 last_valid_receive = xTaskGetTickCount();
                 _set_link_connected(true);
 
-                switch (detection.teletubby_type) {
+                if (msg.detected) {
+                    if (consecutive_detections < REQUIRED_CONSECUTIVE_DETECTIONS)
+                        ++consecutive_detections;
+
+                    last_positive_detection = last_valid_receive;
+                    if (consecutive_detections >= REQUIRED_CONSECUTIVE_DETECTIONS)
+                        teletubby_seen = true;
+                } else {
+                    consecutive_detections = 0;
+                }
+
+                switch (msg.teletubby_type) {
                     case vision_TeletubbyType_TELETUBBY_TYPE_YELLOW:
                         log_v("%s: teletubby: yellow", TAG);
                         break;
@@ -100,14 +126,15 @@ void _rx_task(void *)
                 }
 
             } else {
+                consecutive_detections = 0;
                 log_w("%s: invalid detection: decode=%s detected=%d type=%d image=%ux%u box=%d",
                       TAG,
                       esp_err_to_name(decode_err),
-                      detection.detected,
-                      static_cast<int>(detection.teletubby_type),
-                      static_cast<unsigned>(detection.image_width),
-                      static_cast<unsigned>(detection.image_height),
-                      detection.has_bounding_box);
+                      msg.detected,
+                      static_cast<int>(msg.teletubby_type),
+                      static_cast<unsigned>(msg.image_width),
+                      static_cast<unsigned>(msg.image_height),
+                      msg.has_bounding_box);
             }
         } else if (receive_err == ESP_ERR_TIMEOUT) {
             ++consecutive_timeouts;
@@ -123,6 +150,20 @@ void _rx_task(void *)
         if (s_link_connected.load(std::memory_order_acquire) &&
             xTaskGetTickCount() - last_valid_receive >= UART_LINK_TIMEOUT)
             _set_link_connected(false);
+
+        const TickType_t now = xTaskGetTickCount();
+        if (!s_link_connected.load(std::memory_order_acquire) ||
+            (teletubby_seen && now - last_positive_detection >= TELETUBBY_LED_HOLD_TIME))
+            teletubby_seen = false;
+
+        digitalWrite(TELETUBBY_LED_PIN, teletubby_seen ? HIGH : LOW);
+        if (teletubby_seen) {
+            xEventGroupSetBits(supervisor::g_robot_status_flags,
+                               robot_flags::STATUS_TELETUBBY_SEEN);
+        } else {
+            xEventGroupClearBits(supervisor::g_robot_status_flags,
+                                 robot_flags::STATUS_TELETUBBY_SEEN);
+        }
     }
 }
 } // namespace
