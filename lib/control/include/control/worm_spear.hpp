@@ -15,7 +15,7 @@ class WormSpear {
         gpio_num_t worm_calibration_switch_pin = GPIO_NUM_NC;
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
-        int direction = 1; //1 for forward, -1 for backward
+        bool reversed = false; //1 for forward, -1 for backward
 
         driver::ServoDriver ::Config spear_servo_config = {
             .gpio = GPIO_NUM_NC,
