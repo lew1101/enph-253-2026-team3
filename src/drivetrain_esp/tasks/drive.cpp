@@ -283,10 +283,26 @@ void _drive_task(void *arg)
                         break;
                     }
 
-                    float correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    bool is_reversed = m.forward_speed_percent < 0.0f;
+
+                    float correction = 0.0f;
+                    
+                    if (is_reversed) {
+                        correction = -tape_pid.update(0.0f, tape_snapshot.back_err, DT_S);
+                    }
+                    else {
+                        correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
+                    }
+                    
                     float left_speed = m.forward_speed_percent + correction;
                     float right_speed = m.forward_speed_percent - correction;
-                    drivetrain.move_rear(left_speed, right_speed);
+
+                    if (is_reversed) {
+                        drivetrain.move_front(left_speed, right_speed);
+                    }
+                    else {
+                        drivetrain.move_rear(left_speed, right_speed);
+                    }
 
                     break;
                 }

@@ -26,12 +26,12 @@ constexpr driver::ServoDriver::Config spear_servo_config{
     .channel = 1,
     .freq_hz = 50,
     .duty_res_bits = 14,
-    .min_pulse_us = 500,
-    .max_pulse_us = 2400,
+    .min_pulse_us = 1000,
+    .max_pulse_us = 2000,
     .min_pulse_deg = 0.0f,
-    .max_pulse_deg = 180.0f,
+    .max_pulse_deg = 90.0f,
     .min_clamp_deg = 0.0f,
-    .max_clamp_deg = 180.0f};
+    .max_clamp_deg = 90.0f};
 
 constexpr driver::ServoDriver::Config claw_servo_config{.gpio =
                                                             CLAW_SERVO_PIN, // Specify your pin here

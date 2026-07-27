@@ -49,6 +49,7 @@ class Drivetrain {
     bool move_vector(float vx, float vy, float omega, float max_clamp);
     bool move_vector(float vx, float vy, float omega);
     bool move_rear(float left_speed, float right_speed);
+    bool move_front(float left_speed, float right_speed);
     bool stop();
 
     bool update();

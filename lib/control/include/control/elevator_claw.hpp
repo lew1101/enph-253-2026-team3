@@ -19,6 +19,7 @@ class ElevatorClaw {
         gpio_num_t elevator_calibration_switch_pin = GPIO_NUM_NC;
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
+        int direction = 1; //1 for forward, -1 for backward
 
         driver::ServoDriver ::Config claw_servo_config = {.gpio = GPIO_NUM_NC,
                                                           .channel = 1,
@@ -43,10 +44,16 @@ class ElevatorClaw {
 
     bool elevator_done() const;
 
+    // ONLY FOR TUNING PURPOSES
+    void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);
+    void set_home_position();
+    int32_t get_current_position();
+;
   private:
     Config _config;
 
     FastAccelStepper *_stepper = nullptr;
-    driver::ServoDriver _claw_servo;
+    driver::ServoDriver _claw_servo{_config.claw_servo_config};
+    int switch_presed = 0; //active LOW
 };
 } // namespace control
