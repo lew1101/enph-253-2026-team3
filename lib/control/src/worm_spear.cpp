@@ -5,8 +5,12 @@
 
 using control::WormSpear;
 
+static constexpr char TAG[] = "worm_spear";
+
 WormSpear::WormSpear(const Config &config)
-    : _config(config)
+    : _config(config),
+    _spear_servo{_config.spear_servo_config},
+    _limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP}
 {
 }
 
@@ -29,6 +33,17 @@ esp_err_t WormSpear::init()
     if (!_spear_servo.init()) {
         return ESP_ERR_INVALID_STATE;
     }
+
+    _limit_switch.register_pressed_callback(
+        [](void *ctx) {
+            auto *worm = static_cast<control::WormSpear *>(ctx);
+            worm->stop_worm();
+        },
+        this);
+    if (!_limit_switch.begin("worm_spear_limit")) {
+        return ESP_ERR_NO_MEM;
+    }
+
     return ESP_OK;
 }
 
@@ -41,24 +56,19 @@ void WormSpear::calibrate() {
         _stepper->runBackward();
     }
 
-    // debounce
-    int stableCount = 0;
-    while (stableCount < 5) {
-        if (digitalRead(_config.worm_calibration_switch_pin) == switch_presed) { 
-            stableCount++;
-        } else {
-            stableCount = 0; // Reset if it was just a noise spike
-        }
-        vTaskDelay(1);
+    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+        _stepper->forceStop();
+        ESP_LOGE(TAG, "timed out during fast calibration approach");
+        return;
     }
-    
+
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10)); 
     _stepper->move(_config.reversed ? 200 : -200); 
     
     while (_stepper->isRunning()) {
-        vTaskDelay(1); 
+        vTaskDelay(1);
     }
 
     // move slowly to switch
@@ -69,16 +79,12 @@ void WormSpear::calibrate() {
         _stepper->runBackward();
     }
 
-    stableCount = 0;
-    while (stableCount < 5) {
-        if (digitalRead(_config.worm_calibration_switch_pin) == switch_presed) {
-            stableCount++;
-        } else {
-            stableCount = 0;
-        }
-        vTaskDelay(1);
+    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+        _stepper->forceStop();
+        ESP_LOGE(TAG, "timed out during slow calibration approach");
+        return;
     }
-    
+
     _stepper->forceStopAndNewPosition(0);
     _stepper->setSpeedInHz(_config.speed_hz);
     return;

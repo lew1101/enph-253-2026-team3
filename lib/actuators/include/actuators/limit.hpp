@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp32-hal-gpio.h"
+#include "freertos/event_groups.h"
 #include "projdefs.h"
 
 #include <atomic>
@@ -26,13 +27,13 @@ class DebouncedLimitSwitch {
                UBaseType_t priority = 4,
                BaseType_t core = tskNO_AFFINITY);
 
-    inline void on_pressed(Callback callback, void *context = nullptr)
+    inline void register_pressed_callback(Callback callback, void *context = nullptr)
     {
         _pressed_callback = callback;
         _pressed_context = context;
     }
 
-    inline void on_released(Callback callback, void *context = nullptr)
+    inline void register_released_callback(Callback callback, void *context = nullptr)
     {
         _released_callback = callback;
         _released_context = context;
@@ -43,7 +44,13 @@ class DebouncedLimitSwitch {
         return _stable_pressed.load(std::memory_order_acquire);
     }
 
+    [[nodiscard]] bool wait_until_pressed(TickType_t timeout = portMAX_DELAY) const;
+    [[nodiscard]] bool wait_until_released(TickType_t timeout = portMAX_DELAY) const;
+
   private:
+    static constexpr EventBits_t PRESSED_BIT = 1U << 0;
+    static constexpr EventBits_t RELEASED_BIT = 1U << 1;
+
     [[nodiscard]] inline bool _read_pressed() const { return digitalRead(_pin) == _active_level; }
 
     static void ARDUINO_ISR_ATTR _isr_entry(void *argument)
@@ -67,6 +74,7 @@ class DebouncedLimitSwitch {
     const TickType_t _debounce_ticks;
 
     TaskHandle_t _task_handle = nullptr;
+    EventGroupHandle_t _state_events = nullptr;
     std::atomic_bool _stable_pressed{false};
 
     Callback _pressed_callback = nullptr;
