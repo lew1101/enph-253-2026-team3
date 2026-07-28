@@ -40,7 +40,7 @@ class ElevatorClaw {
 
     void calibrate();
 
-    inline void move_to_position(int32_t step) { _stepper->moveTo(step); }
+    inline void move_to_position(int32_t step) { _stepper->moveTo(_config.reversed? -step:step); }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
 

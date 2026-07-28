@@ -39,12 +39,14 @@ class WormSpear {
     esp_err_t init();
 
     void calibrate();
-    void move_to_position(float step);
-    void spear_angle(float deg);
+    
+    inline void move_to_position(int32_t step) { _stepper->moveTo(_config.reversed? -step:step);};
+    
+    inline void set_spear(float deg, uint32_t time) { _spear_servo.sweep_to_deg(deg, time);};
 
     inline void stop_worm() { _stepper->forceStop(); }
 
-    bool worm_done() const;
+    inline bool worm_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES
     void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);

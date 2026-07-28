@@ -90,19 +90,6 @@ void WormSpear::calibrate() {
     return;
 }
 
-void WormSpear::move_to_position(float step) {
-    step = _config.reversed ? -step : step;
-    _stepper->moveTo(step);
-}
-
-void WormSpear::spear_angle(float deg) {
-    _spear_servo.set_deg(deg);
-}
-
-bool WormSpear::worm_done() const {
-    return !_stepper->isRunning();
-}
-
 // ONLY FOR TUNING PURPOSES
 void WormSpear::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s) {
     _stepper->setSpeedInHz(speed_hz);
