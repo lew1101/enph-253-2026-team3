@@ -17,7 +17,16 @@ uint32_t s_reset_count = 0;
 
 BNO08x s_imu;
 
-inline bool _enable_rot_vec() { return s_imu.enableRotationVector(REPORT_PERIOD_MS); }
+inline bool _enable_rot_vec() { return s_imu.enableGameRotationVector(REPORT_PERIOD_MS); }
+
+void ARDUINO_ISR_ATTR _imu_int_isr(void *)
+{
+    if (s_task_handle == nullptr) return;
+
+    BaseType_t higher_priority_task_woken = pdFALSE;
+    vTaskNotifyGiveFromISR(s_task_handle, &higher_priority_task_woken);
+    portYIELD_FROM_ISR(higher_priority_task_woken);
+}
 
 void _imu_task(void *arg)
 {
@@ -25,49 +34,66 @@ void _imu_task(void *arg)
     Wire.begin(SDA_PIN, SCL_PIN);
     Wire.setClock(IMU_I2C_FREQ_HZ);
 
-    if (!s_imu.begin(IMU_I2C_ADDRESS, Wire, INT_PIN, RST_PIN)) {
+    pinMode(INT_PIN, INPUT_PULLUP);
+    attachInterruptArg(INT_PIN, _imu_int_isr, nullptr, FALLING);
+
+    // This task owns INT, so the library must not poll it internally.
+    if (!s_imu.begin(IMU_I2C_ADDRESS, Wire, -1, RST_PIN)) {
         ESP_LOGE(TAG, "BNO086 not detected");
+        detachInterrupt(INT_PIN);
         s_task_handle = nullptr;
         vTaskDelete(nullptr);
+        return;
     }
 
     if (!_enable_rot_vec()) {
-        ESP_LOGE(TAG, "failed to enable rotation vector");
+        ESP_LOGE(TAG, "failed to enable game rotation vector");
+        detachInterrupt(INT_PIN);
         s_task_handle = nullptr;
         vTaskDelete(nullptr);
+        return;
     }
+
+    s_imu.tareNow();
 
     ESP_LOGI(TAG, "BNO086 initialized");
 
     while (true) {
-        if (s_imu.wasReset()) {
-            ESP_LOGW(TAG, "IMU reset; re-enabling reports");
-            ++s_reset_count;
-            if (!_enable_rot_vec()) {
-                ESP_LOGE(TAG, "failed to re-enable rotation vector");
+        const uint32_t notif = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(20));
+
+        // Recover if an edge is missed while the active-low INT line remains asserted.
+        if (notif == 0 && digitalRead(INT_PIN) != LOW) continue;
+
+        while (s_imu.getSensorEvent()) {
+            if (s_imu.wasReset()) {
+                ESP_LOGW(TAG, "IMU reset; re-enabling reports");
+                ++s_reset_count;
+                if (!_enable_rot_vec()) {
+                    ESP_LOGE(TAG, "failed to re-enable game rotation vector");
+                }
+            }
+
+            if (s_imu.getSensorEventID() == SENSOR_REPORTID_GAME_ROTATION_VECTOR) {
+                float yaw = s_imu.getYaw();
+                float pitch = s_imu.getPitch();
+                float roll = s_imu.getRoll();
+
+                // log_d(
+                //     "yaw=%.2f deg, pitch=%.2f deg, roll=%.2f deg", degrees(yaw), degrees(pitch),
+                //     degrees(roll));
+
+                ImuSnapshot snapshot{
+                    .yaw = yaw,
+                    .pitch = pitch,
+                    .roll = roll,
+                    .tick = xTaskGetTickCount(),
+                    .reset_count = s_reset_count,
+                    .valid = true,
+                };
+
+                xQueueOverwrite(s_snapshot_queue, &snapshot);
             }
         }
-
-        if (s_imu.getSensorEvent() && s_imu.getSensorEventID() == SENSOR_REPORTID_ROTATION_VECTOR) {
-            float yaw = s_imu.getYaw();
-            float pitch = s_imu.getPitch();
-            float roll = s_imu.getRoll();
-
-            ESP_LOGV(TAG, "yaw=%.2f, pitch=%.2f, roll=%.2f", yaw, pitch, roll);
-
-            ImuSnapshot snapshot{
-                .yaw = yaw,
-                .pitch = pitch,
-                .roll = roll,
-                .tick = xTaskGetTickCount(),
-                .reset_count = s_reset_count,
-                .valid = true,
-            };
-
-            xQueueOverwrite(s_snapshot_queue, &snapshot);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 } // namespace

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "control/drivetrain.hpp"
+#include "control/slew_limit.hpp"
 #include "esp_err.h"
 
 static constexpr char TAG[] = "drivetrain";
@@ -186,54 +187,13 @@ bool Drivetrain::update()
     previous_time = current_time;
 
     for (int i = 0; i < 4; i++) {
-        if (current_speed[i] < target_speed[i]) {
-            current_speed[i] += _config.acceleration_rate * time_elapsed;
-            if (current_speed[i] > target_speed[i]) {
-                current_speed[i] = target_speed[i];
-            }
-        } else if (current_speed[i] > target_speed[i]) {
-            current_speed[i] -= _config.acceleration_rate * time_elapsed;
-            if (current_speed[i] < target_speed[i]) {
-                current_speed[i] = target_speed[i];
-            }
-        }
+        current_speed[i] = control::slew_limit(target_speed[i], current_speed[i], _config.acceleration_rate, time_elapsed);
     }
 
-    if (current_speed[FR] > 0.0) {
-        front_right_motor.turn_clockwise();
-    } else if (current_speed[FR] < 0.0) {
-        front_right_motor.turn_c_clockwise();
-    } else {
-        front_right_motor.stop();
-    }
-    front_right_motor.set_speed(std::fabs(current_speed[FR]));
-
-    if (current_speed[RR] > 0.0) {
-        back_right_motor.turn_clockwise();
-    } else if (current_speed[RR] < 0.0) {
-        back_right_motor.turn_c_clockwise();
-    } else {
-        back_right_motor.stop();
-    }
-    back_right_motor.set_speed(std::fabs(current_speed[RR]));
-
-    if (current_speed[FL] > 0.0) {
-        front_left_motor.turn_clockwise();
-    } else if (current_speed[FL] < 0.0) {
-        front_left_motor.turn_c_clockwise();
-    } else {
-        front_left_motor.stop();
-    }
-    front_left_motor.set_speed(std::fabs(current_speed[FL]));
-
-    if (current_speed[RL] > 0.0) {
-        back_left_motor.turn_clockwise();
-    } else if (current_speed[RL] < 0.0) {
-        back_left_motor.turn_c_clockwise();
-    } else {
-        back_left_motor.stop();
-    }
-    back_left_motor.set_speed(std::fabs(current_speed[RL]));
+    front_right_motor.set_output(current_speed[FR]);
+    front_left_motor.set_output(current_speed[FL]);
+    back_right_motor.set_output(current_speed[RR]);
+    back_left_motor.set_output(current_speed[RL]);
 
     return true;
 }

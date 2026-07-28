@@ -15,7 +15,7 @@ namespace ImuTaskConfig {
     constexpr int RST_PIN = GPIO_NUM_12;
 
     constexpr uint8_t IMU_I2C_ADDRESS = 0x4B;
-    constexpr uint32_t IMU_I2C_FREQ_HZ = 400'000ul;
+    constexpr uint32_t IMU_I2C_FREQ_HZ = 100'000ul;
 
     constexpr uint16_t REPORT_PERIOD_MS = 10; // 100 Hz
 };

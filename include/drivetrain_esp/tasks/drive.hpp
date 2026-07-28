@@ -1,13 +1,20 @@
 #pragma once
 #include "Arduino.h"
-#include "control/drivetrain.hpp"
 #include "drive.pb.h"
 #include "portmacro.h"
 #include "projdefs.h"
 
 #include "sensors/pcnt_encoder.hpp"
 
+#include "control/drivetrain.hpp"
+#include "control/tape_pid.hpp"
+#include "control/pid.hpp"
 #include "control/pose_estimator.hpp"
+
+extern control::TapePID tape_pid;
+extern control::PID x_pid;
+extern control::PID y_pid;
+extern control::PID heading_pid;
 
 namespace DriveTaskConfig {
 
@@ -30,16 +37,23 @@ constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
     .timer_1 = nullptr,
     .front_right_motor_config{.clockwise_pwm_output = FR_MOTOR_CW_PIN,
                               .c_clockwise_pwm_output = FR_MOTOR_CCW_PIN,
-                              .min_percentage = 11.5f},
+                              .min_percentage = 11.5f,
+                              .bias_percentage = 0.0f},
+
     .back_right_motor_config{.clockwise_pwm_output = BR_MOTOR_CW_PIN,
                              .c_clockwise_pwm_output = BR_MOTOR_CCW_PIN,
-                             .min_percentage = 11.0f},
+                             .min_percentage = 11.0f,
+                             .bias_percentage = 0.0f},
+
     .front_left_motor_config{.clockwise_pwm_output = FL_MOTOR_CW_PIN,
                              .c_clockwise_pwm_output = FL_MOTOR_CCW_PIN,
-                             .min_percentage = 11.0f},
+                             .min_percentage = 11.0f,
+                             .bias_percentage = 0.0f},
+
     .back_left_motor_config{.clockwise_pwm_output = BL_MOTOR_CW_PIN,
                             .c_clockwise_pwm_output = BL_MOTOR_CCW_PIN,
-                            .min_percentage = 10.25f}};
+                            .min_percentage = 10.25f,
+                            .bias_percentage = 0.0f}};
 
 constexpr sensors::PcntEncoder::Config DEADWHL_X_CFG{
     .gpio_a = GPIO_NUM_21,
@@ -49,24 +63,26 @@ constexpr sensors::PcntEncoder::Config DEADWHL_X_CFG{
 };
 
 constexpr sensors::PcntEncoder::Config DEADWHL_Y_CFG{
-    .gpio_a = GPIO_NUM_39,
-    .gpio_b = GPIO_NUM_38,
+    .gpio_a = GPIO_NUM_38,
+    .gpio_b = GPIO_NUM_47,
     .glitch_filter_ns = 1000,
-    .invert_direction = false,
+    .invert_direction = true,
 };
 
-constexpr float DEADWHEEL_DIAMETER_M = 0.0508f;
+constexpr float DEADWHEEL_DIAMETER_M = 0.0505f;
 constexpr int32_t COUNTS_PER_REV = 4096;
 
 constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
     .deadwheel_x_count_to_m_scale = PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
     .deadwheel_y_count_to_m_scale = PI * DEADWHEEL_DIAMETER_M / static_cast<float>(COUNTS_PER_REV),
-    .deadwheel_x_y_offset_m = 0.0f,
-    .deadwheel_y_x_offset_m = 0.0f,
+    .deadwheel_x_y_offset_m = 0.2444f / 1000.0f,
+    .deadwheel_y_x_offset_m = 42.62525f / 1000.0f,
 };
 
 constexpr float POS_TOLERANCE_M = 0.02f;
+constexpr float POS_TOLERANCE_EXIT_M = 0.03f;
 constexpr float HEADING_TOLERANCE_RAD = 0.05f;
+constexpr float HEADING_TOLERANCE_EXIT_RAD = 0.075f;
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 }; // namespace DriveTaskConfig
@@ -76,5 +92,5 @@ constexpr uint32_t IMU_TIMEOUT_MS = 100;
 //
 esp_err_t send_drive_cmd(const robot_DriveCommand &cmd);
 esp_err_t start_drive_task(TaskHandle_t *out_handle);
-esp_err_t get_pose(control::PoseSnapshot* out);
+esp_err_t get_pose(control::PoseSnapshot *out);
 bool reached_pose();

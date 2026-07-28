@@ -20,7 +20,7 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
         _prev_x_count = x_count;
         _prev_y_count = y_count;
 
-        _pose.heading_rad = wrap_angle_2pi(_pose.heading_rad);
+        _pose.heading_rad = wrap_angle_pi(_pose.heading_rad);
         _heading_offset_rad = wrap_angle_pi(imu_heading_rad - _pose.heading_rad);
         _prev_heading_rad = _pose.heading_rad;
 
@@ -32,7 +32,7 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
         return _pose;
     }
 
-    const float heading_rad = wrap_angle_2pi(imu_heading_rad - _heading_offset_rad);
+    const float heading_rad = wrap_angle_pi(imu_heading_rad - _heading_offset_rad);
     const float delta_heading_rad = wrap_angle_pi(heading_rad - _prev_heading_rad);
 
     const int64_t delta_x_count =
@@ -79,7 +79,7 @@ void PoseEstimator::reset(float x_m, float y_m, float heading_rad)
 {
     _pose.x_m = x_m;
     _pose.y_m = y_m;
-    _pose.heading_rad = wrap_angle_2pi(heading_rad);
+    _pose.heading_rad = wrap_angle_pi(heading_rad);
     _pose.valid = false;
     _initialized = false;
 }
