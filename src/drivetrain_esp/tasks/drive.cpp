@@ -28,7 +28,12 @@ using sensors::PcntEncoder;
 
 static constexpr char TAG[] = "drive_task";
 
-control::TapePID tape_pid(16.0f, 0.0f, 450.0f);
+control::TapePID tape_pid(5.0f, 0.0f, 0.05f);
+
+// right strafe is +x, forward is +y, CCW rotation is +\theta
+PID x_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
+PID y_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
+PID heading_pid(18.0f, 0.0f, 4.5f, 15.0f, -70.0f, 70.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
@@ -38,12 +43,6 @@ QueueHandle_t s_pose_queue = nullptr;
 
 PcntEncoder s_encoder_x;
 PcntEncoder s_encoder_y;
-
-// right strafe is +x, forward is +y, CCW rotation is +\theta
-PID s_tape_pid(15.0f, 0.0f, 1.2f);
-PID s_x_pid(15.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID s_y_pid(15.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID s_heading_pid(15.0f, 0.0f, 1.2f, 0.4f, -0.5f, 0.5f);
 
 std::atomic_bool s_reached_pose{false};
 
@@ -98,6 +97,8 @@ esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSna
     last_imu_reset_count = imu_snapshot.reset_count;
     have_imu_reset_count = true;
 
+    // log_d("x_cnt=%d, ycnt=%d", x_count, y_count);
+
     *out = pose_estimator.update(x_count, y_count, imu_snapshot.yaw, now);
 
     return ESP_OK;
@@ -126,6 +127,8 @@ void _drive_task(void *arg)
         vTaskDelete(nullptr);
     }
 
+    ESP_LOGI(TAG, "sucessfully initialized deadwheels");
+
     PoseEstimator pose_estimator{POSE_ESTIMATION_CFG};
 
     const float DT_S = static_cast<float>(TASK_PERIOD_MS) / 1000;
@@ -137,6 +140,8 @@ void _drive_task(void *arg)
     float target_y_m = 0.0f;
     float target_heading_rad = 0.0f;
     bool pose_target_valid = false;
+    bool position_reached = false;
+    bool heading_reached = false;
 
     pb_size_t s_command_tag = robot_DriveCommand_stop_tag;
 
@@ -145,15 +150,27 @@ void _drive_task(void *arg)
 
     TickType_t last_wake_tick = xTaskGetTickCount();
 
+    unsigned int log_cnt = 0;
+
     while (true) {
-        // esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
-        // if (err != ESP_OK) {
-        //     pose_snapshot.valid = false;
-        //     pose_snapshot.tick = xTaskGetTickCount();
-        //     s_reached_pose.store(false, std::memory_order_release);
-        // }
+        esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
+        if (err != ESP_OK) {
+            pose_snapshot.valid = false;
+            pose_snapshot.tick = xTaskGetTickCount();
+            s_reached_pose.store(false, std::memory_order_release);
+        }
 
         xQueueOverwrite(s_pose_queue, &pose_snapshot);
+        // if (++log_cnt % 25 == 0) {
+        Serial.printf(">trajectory:%.2f:%.2f|xy\n"
+                      ">heading:%.2f\n"
+                      ">valid:%s|t\n",
+                      pose_snapshot.x_m,
+                      pose_snapshot.y_m,
+                      degrees(pose_snapshot.heading_rad),
+                      pose_snapshot.valid ? "true" : "false");
+        //     log_cnt = 0;
+        // }
 
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
@@ -170,7 +187,7 @@ void _drive_task(void *arg)
                     case robot_DriveCommand_velocity_tag:
                         break;
                     case robot_DriveCommand_tape_follow_tag:
-                        s_tape_pid.reset();
+                        tape_pid.reset();
                         break;
                     case robot_DriveCommand_pose_tag:
                         break;
@@ -187,14 +204,15 @@ void _drive_task(void *arg)
                     target_y_m = pose_command.relative ? pose_snapshot.y_m + pose_command.y_m
                                                        : pose_command.y_m;
                     target_heading_rad = control::wrap_angle_pi(
-                        pose_command.relative
-                            ? pose_snapshot.heading_rad + pose_command.theta_rad
-                            : pose_command.theta_rad);
+                        pose_command.relative ? pose_snapshot.heading_rad + pose_command.theta_rad
+                                              : pose_command.theta_rad);
                     pose_target_valid = true;
 
-                    s_x_pid.reset();
-                    s_y_pid.reset();
-                    s_heading_pid.reset();
+                    x_pid.reset();
+                    y_pid.reset();
+                    heading_pid.reset();
+                    position_reached = false;
+                    heading_reached = false;
                     previous_pose_sequence = cmd.sequence;
                     s_reached_pose.store(false, std::memory_order_release);
                 } else {
@@ -235,10 +253,14 @@ void _drive_task(void *arg)
                     const float heading_error =
                         control::wrap_angle_pi(target_heading_rad - pose_snapshot.heading_rad);
 
-                    // allow for small tolerance in pos/heading error
-                    // to avoid jitter near setpoint.
-                    const bool position_reached = position_error <= POS_TOLERANCE_M;
-                    const bool heading_reached = fabsf(heading_error) <= HEADING_TOLERANCE_RAD;
+                    // Enter the reached state at the normal tolerance, but only leave it
+                    // after crossing the larger exit tolerance to avoid setpoint chatter.
+                    position_reached =
+                        position_error <=
+                        (position_reached ? POS_TOLERANCE_EXIT_M : POS_TOLERANCE_M);
+                    heading_reached =
+                        fabsf(heading_error) <=
+                        (heading_reached ? HEADING_TOLERANCE_EXIT_RAD : HEADING_TOLERANCE_RAD);
 
                     if (position_reached && heading_reached) {
                         drivetrain.stop();
@@ -261,19 +283,19 @@ void _drive_task(void *arg)
                     // update position pid
                     // negative sign on error necessary for robot to move in the right direction
                     const float x_cmd =
-                        position_reached ? 0.0f : s_x_pid.update(0.0f, -error_x_robot, DT_S);
+                        position_reached ? 0.0f : x_pid.update(0.0f, -error_x_robot, DT_S);
                     const float y_cmd =
-                        position_reached ? 0.0f : s_y_pid.update(0.0f, -error_y_robot, DT_S);
+                        position_reached ? 0.0f : y_pid.update(0.0f, -error_y_robot, DT_S);
                     const float rot_cmd = heading_reached //
                                               ? 0.0f
-                                              : s_heading_pid.update(0.0f, -heading_error, DT_S);
+                                              : heading_pid.update(0.0f, -heading_error, DT_S);
 
                     drivetrain.move_vector(x_cmd, y_cmd, rot_cmd);
                     break;
                 }
 
                 case robot_DriveCommand_tape_follow_tag: {
-                    auto& m = cmd.command.tape_follow;
+                    auto &m = cmd.command.tape_follow;
 
                     // ESP_LOGD(TAG, "tape following");
                     bool success = get_tape_snapshot(&tape_snapshot, 0);
@@ -286,28 +308,26 @@ void _drive_task(void *arg)
                     bool is_reversed = m.forward_speed_percent < 0.0f;
 
                     float correction = 0.0f;
-                    
+
                     if (is_reversed) {
                         correction = -tape_pid.update(0.0f, tape_snapshot.back_err, DT_S);
-                    }
-                    else {
+                    } else {
                         correction = tape_pid.update(0.0f, tape_snapshot.front_err, DT_S);
                     }
-                    
+
                     float left_speed = m.forward_speed_percent + correction;
                     float right_speed = m.forward_speed_percent - correction;
 
                     if (is_reversed) {
                         drivetrain.move_front(left_speed, right_speed);
-                    }
-                    else {
+                    } else {
                         drivetrain.move_rear(left_speed, right_speed);
                     }
 
                     break;
                 }
-              default:
-                break;
+                default:
+                    break;
             }
         }
 
