@@ -33,6 +33,7 @@ class ServoDriver {
     bool init();
 
     bool set_deg(float deg);
+    bool sweep_to_deg(float target_deg, uint32_t duration_ms);
     bool set_us(uint32_t us);
 
     bool center();
@@ -40,6 +41,7 @@ class ServoDriver {
   private:
     Config _config;
     bool _initialized = false;
+    float _current_deg = 0.0f;
 
     uint32_t deg_to_us(float deg) const;
     uint32_t us_to_duty(uint32_t us) const;
