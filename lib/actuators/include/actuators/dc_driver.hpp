@@ -9,9 +9,10 @@
 
 namespace driver {
 class DCDriver {
-  public:
+  private:
     enum MotorState { MOTOR_STOPPED, MOTOR_CLOCKWISE, MOTOR_COUNTER_CLOCKWISE };
 
+  public:
     struct Config {
         gpio_num_t clockwise_pwm_output = GPIO_NUM_NC;
         gpio_num_t c_clockwise_pwm_output = GPIO_NUM_NC;
@@ -20,7 +21,7 @@ class DCDriver {
         int group_id = 0;
         mcpwm_timer_handle_t timer = nullptr;
         uint32_t period_ticks = 0;
-        uint32_t dead_time_ticks = 10;
+        uint32_t dead_time_ticks = 100;
 
         // Maximum physical duty.
         float max_duty_percentage = 100.0f;
@@ -29,6 +30,12 @@ class DCDriver {
         float min_percentage;
         float bias_percentage;
     };
+
+    static constexpr inline uint32_t us_to_mcpwm_ticks(uint32_t us, uint32_t resolution_hz)
+    {
+        return static_cast<uint32_t>((static_cast<uint64_t>(us) * resolution_hz + 999'999ULL) /
+                                     1'000'000ULL);
+    }
 
     DCDriver() = default;
 
@@ -42,12 +49,6 @@ class DCDriver {
     bool _set_pwm(float magnitude_percentage);
     bool _set_direction(MotorState direction);
     bool _force_all_off();
-
-    constexpr inline uint32_t _us_to_mcpwm_ticks(uint32_t us, uint32_t resolution_hz)
-    {
-        return static_cast<uint32_t>((static_cast<uint64_t>(us) * resolution_hz + 999'999ULL) /
-                                     1'000'000ULL);
-    }
 
   private:
     Config _config;
