@@ -3,8 +3,8 @@
 #include "actuators/dc_driver.hpp"
 #include "esp_check.h"
 
-#include <cmath>
 #include <esp32-hal-log.h>
+#include <cmath>
 
 static constexpr char TAG[] = "dc_driver";
 
@@ -203,11 +203,11 @@ bool DCDriver::set_output(float signed_percentage)
 {
     signed_percentage = std::clamp(signed_percentage, -100.0f, 100.0f);
 
-    constexpr float stop_threshold = 0.001f;
+    const float deadband = std::clamp(_config.deadband_percentage, 0.0f, 100.0f);
+    if (std::fabs(signed_percentage) <= deadband) return stop();
 
-    if (std::fabs(signed_percentage) <= stop_threshold) {
-        return stop();
-    }
+    constexpr float stop_threshold = 0.001f;
+    if (std::fabs(signed_percentage) <= stop_threshold) return stop();
 
     const MotorState requested_direction =
         signed_percentage > 0.0f ? MOTOR_CLOCKWISE : MOTOR_COUNTER_CLOCKWISE;
@@ -221,17 +221,9 @@ bool DCDriver::set_output(float signed_percentage)
      * the MCPWM dead-time hardware. There is no blocking vTaskDelay().
      */
     if (requested_direction != motor_state) {
-        if (!_force_all_off()) {
-            return false;
-        }
-
-        if (!_set_pwm(magnitude)) {
-            return false;
-        }
-
-        if (!_set_direction(requested_direction)) {
-            return false;
-        }
+        if (!_force_all_off()) return false;
+        if (!_set_pwm(magnitude)) return false;
+        if (!_set_direction(requested_direction)) return false;
 
         motor_state = requested_direction;
         return true;
@@ -244,15 +236,31 @@ bool DCDriver::_set_pwm(float magnitude_percentage)
 {
     magnitude_percentage = std::clamp(magnitude_percentage, 0.0f, 100.0f);
 
+    // Zero command must produce zero PWM, not the minimum drive duty.
+    if (magnitude_percentage <= 0.0f) {
+        return mcpwm_comparator_set_compare_value(motor_comparator, 0U) == ESP_OK;
+    }
+
+    // Per-motor calibration/scaling.
     const float output_scale = std::max(_config.output_scale, 0.0f);
-    const float calibrated_percentage =
-        std::clamp(magnitude_percentage * output_scale, 0.0f, 100.0f);
 
-    const float max_duty_percentage = std::clamp(_config.max_duty_percentage, 0.0f, 100.0f);
-    const float duty_fraction = (calibrated_percentage / 100.0f) * (max_duty_percentage / 100.0f);
+    float calibrated_percentage = magnitude_percentage * output_scale;
+    calibrated_percentage = std::clamp(calibrated_percentage, 0.0f, 100.0f);
 
+    // Map command range [0%, 100%] to useful duty range
+    // [min_duty_percentage, max_duty_percentage].
+    const float min_duty_percentage = std::clamp(_config.bias_percentage, 0.0f, 100.0f);
+    const float max_duty_percentage =
+        std::clamp(_config.max_duty_percentage, min_duty_percentage, 100.0f);
+
+    const float mapped_duty_percentage =
+        min_duty_percentage +
+        (max_duty_percentage - min_duty_percentage) * (calibrated_percentage / 100.0f);
+
+    const float duty_fraction = mapped_duty_percentage / 100.0f;
+
+    // For center-aligned/up-down counting, the peak is period_ticks / 2.
     const uint32_t peak_ticks = _config.period_ticks / 2U;
-
     const uint32_t compare_value =
         static_cast<uint32_t>(std::lround(duty_fraction * static_cast<float>(peak_ticks)));
 
@@ -261,14 +269,9 @@ bool DCDriver::_set_pwm(float magnitude_percentage)
 
 bool DCDriver::_force_all_off()
 {
-    /*
-     * Physical output A LOW:
-     *     force internal A LOW.
-     *
-     * Physical output B LOW:
-     *     force internal B HIGH because B's GPIO is inverted.
-     */
+    // force generator A low
     const esp_err_t result_a = mcpwm_generator_set_force_level(motor_generator_a, 0, true);
+    // force generator B high because of gpio inversion
     const esp_err_t result_b = mcpwm_generator_set_force_level(motor_generator_b, 1, true);
 
     return result_a == ESP_OK && result_b == ESP_OK;
@@ -276,27 +279,16 @@ bool DCDriver::_force_all_off()
 
 bool DCDriver::_set_direction(MotorState direction)
 {
-    /*
-     * Start from the safe state before enabling either direction.
-     */
+    // reset all generators level to low
     if (!_force_all_off()) {
         return false;
     }
 
     switch (direction) {
         case MOTOR_CLOCKWISE:
-            /*
-             * Keep B physically LOW, then release A.
-             * A's physical rising edge receives hardware dead-time.
-             */
             return mcpwm_generator_set_force_level(motor_generator_a, -1, true) == ESP_OK;
 
         case MOTOR_COUNTER_CLOCKWISE:
-            /*
-             * Keep A physically LOW, then release B.
-             * B's internal falling edge is delayed, which becomes a delayed
-             * physical rising edge after GPIO inversion.
-             */
             return mcpwm_generator_set_force_level(motor_generator_b, -1, true) == ESP_OK;
 
         default:

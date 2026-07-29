@@ -32,28 +32,51 @@ constexpr gpio_num_t FL_MOTOR_CCW_PIN = GPIO_NUM_18;
 constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_15;
 constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_16;
 
+constexpr uint32_t DEAD_TIME_TICKS = 10ul; // ~10us
+constexpr float DEAD_BAND_PERCENTAGE = 1.2f;
+
 constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
-    .timer_0 = nullptr,
-    .timer_1 = nullptr,
-    .front_right_motor_config{.clockwise_pwm_output = FR_MOTOR_CW_PIN,
-                              .c_clockwise_pwm_output = FR_MOTOR_CCW_PIN,
-                              .min_percentage = 11.5f,
-                              .bias_percentage = 0.0f},
+    .front_right_motor_config{
+        .clockwise_pwm_output = FR_MOTOR_CW_PIN,
+        .c_clockwise_pwm_output = FR_MOTOR_CCW_PIN,
+        .dead_time_ticks = DEAD_TIME_TICKS,
+        .bias_percentage = 12.0f,
+        .output_scale = 1.06f,
+        .deadband_percentage = DEAD_BAND_PERCENTAGE,
+        .max_duty_percentage = 100.0f,
+    },
 
-    .back_right_motor_config{.clockwise_pwm_output = BR_MOTOR_CW_PIN,
-                             .c_clockwise_pwm_output = BR_MOTOR_CCW_PIN,
-                             .min_percentage = 11.0f,
-                             .bias_percentage = 0.0f},
+    .back_right_motor_config{
+        .clockwise_pwm_output = BR_MOTOR_CW_PIN,
+        .c_clockwise_pwm_output = BR_MOTOR_CCW_PIN,
+        .dead_time_ticks = DEAD_TIME_TICKS,
+        .bias_percentage = 12.5f,
+        .output_scale = 1.08f,
+        .deadband_percentage = DEAD_BAND_PERCENTAGE,
+        .max_duty_percentage = 100.0f,
+    },
 
-    .front_left_motor_config{.clockwise_pwm_output = FL_MOTOR_CW_PIN,
-                             .c_clockwise_pwm_output = FL_MOTOR_CCW_PIN,
-                             .min_percentage = 11.0f,
-                             .bias_percentage = 0.0f},
+    .front_left_motor_config{
+        .clockwise_pwm_output = FL_MOTOR_CW_PIN,
+        .c_clockwise_pwm_output = FL_MOTOR_CCW_PIN,
+        .dead_time_ticks = DEAD_TIME_TICKS,
+        .bias_percentage = 10.0f,
+        .output_scale = 1.15f,
+        .deadband_percentage = DEAD_BAND_PERCENTAGE,
+        .max_duty_percentage = 100.0f,
 
-    .back_left_motor_config{.clockwise_pwm_output = BL_MOTOR_CW_PIN,
-                            .c_clockwise_pwm_output = BL_MOTOR_CCW_PIN,
-                            .min_percentage = 10.25f,
-                            .bias_percentage = 0.0f}};
+    },
+
+    .back_left_motor_config{
+        .clockwise_pwm_output = BL_MOTOR_CW_PIN,
+        .c_clockwise_pwm_output = BL_MOTOR_CCW_PIN,
+        .dead_time_ticks = DEAD_TIME_TICKS,
+        .bias_percentage = 10.5f,
+        .output_scale = 1.0f,
+        .deadband_percentage = DEAD_BAND_PERCENTAGE,
+        .max_duty_percentage = 100.0f,
+    },
+};
 
 constexpr sensors::PcntEncoder::Config DEADWHL_X_CFG{
     .gpio_a = GPIO_NUM_21,
@@ -79,10 +102,13 @@ constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
     .deadwheel_y_x_offset_m = 42.62525f / 1000.0f,
 };
 
-constexpr float POS_TOLERANCE_M = 0.02f;
-constexpr float POS_TOLERANCE_EXIT_M = 0.03f;
-constexpr float HEADING_TOLERANCE_RAD = 0.05f;
-constexpr float HEADING_TOLERANCE_EXIT_RAD = 0.075f;
+constexpr float X_TOLERANCE_M = 0.008f;
+constexpr float X_TOLERANCE_EXIT_M = 0.011f;
+constexpr float Y_TOLERANCE_M = 0.008f;
+constexpr float Y_TOLERANCE_EXIT_M = 0.011f;
+
+constexpr float HEADING_TOLERANCE_RAD = radians(0.4f);
+constexpr float HEADING_TOLERANCE_EXIT_RAD = radians(0.7f);
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 }; // namespace DriveTaskConfig

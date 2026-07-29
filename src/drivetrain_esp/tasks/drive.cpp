@@ -31,9 +31,9 @@ static constexpr char TAG[] = "drive_task";
 control::TapePID tape_pid(5.0f, 0.0f, 0.05f);
 
 // right strafe is +x, forward is +y, CCW rotation is +\theta
-PID x_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID y_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID heading_pid(18.0f, 0.0f, 4.5f, 15.0f, -70.0f, 70.0f);
+PID x_pid(55.0f, 0.0f, 0.0f, 30.0f, -80.0f, 80.0f);
+PID y_pid(37.0f, 0.0f, 0.0f, 30.0f, -80.0f, 80.0f);
+PID heading_pid(28.5f, 0.0f, 2.0f, 40.0f, -70.0f, 70.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
@@ -97,7 +97,10 @@ esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSna
     last_imu_reset_count = imu_snapshot.reset_count;
     have_imu_reset_count = true;
 
-    // log_d("x_cnt=%d, ycnt=%d", x_count, y_count);
+    Serial.printf(">x_cnt:%d\n"
+                  ">ycnt:%d\n",
+                  x_count,
+                  y_count);
 
     *out = pose_estimator.update(x_count, y_count, imu_snapshot.yaw, now);
 
@@ -172,6 +175,7 @@ void _drive_task(void *arg)
         //     log_cnt = 0;
         // }
 
+        // read latest command
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
             const bool mode_changed = s_command_tag != cmd.which_command;
@@ -199,10 +203,19 @@ void _drive_task(void *arg)
 
                 // Resolve relative commands once, against the measured pose at receipt.
                 if (!pose_command.relative || pose_snapshot.valid) {
-                    target_x_m = pose_command.relative ? pose_snapshot.x_m + pose_command.x_m
-                                                       : pose_command.x_m;
-                    target_y_m = pose_command.relative ? pose_snapshot.y_m + pose_command.y_m
-                                                       : pose_command.y_m;
+                    if (pose_command.relative) {
+                        float sin_h, cos_h;
+                        sincosf(pose_snapshot.heading_rad, &sin_h, &cos_h);
+
+                        // Rotate the requested robot-frame offset into the field frame.
+                        target_x_m =
+                            pose_snapshot.x_m + pose_command.x_m * cos_h - pose_command.y_m * sin_h;
+                        target_y_m =
+                            pose_snapshot.y_m + pose_command.x_m * sin_h + pose_command.y_m * cos_h;
+                    } else {
+                        target_x_m = pose_command.x_m;
+                        target_y_m = pose_command.y_m;
+                    }
                     target_heading_rad = control::wrap_angle_pi(
                         pose_command.relative ? pose_snapshot.heading_rad + pose_command.theta_rad
                                               : pose_command.theta_rad);
@@ -247,17 +260,26 @@ void _drive_task(void *arg)
                     // calculate pos error in field coords
                     const float error_x_field = target_x_m - pose_snapshot.x_m;
                     const float error_y_field = target_y_m - pose_snapshot.y_m;
-                    const float position_error = hypotf(error_x_field, error_y_field);
 
                     // calculate heading error
                     const float heading_error =
                         control::wrap_angle_pi(target_heading_rad - pose_snapshot.heading_rad);
 
+                    // Transform the position error into the robot frame used by the
+                    // independent strafe and forward controllers.
+                    float sin_h, cos_h;
+                    sincosf(pose_snapshot.heading_rad, &sin_h, &cos_h);
+                    const float error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
+                    const float error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
+
                     // Enter the reached state at the normal tolerance, but only leave it
                     // after crossing the larger exit tolerance to avoid setpoint chatter.
-                    position_reached =
-                        position_error <=
-                        (position_reached ? POS_TOLERANCE_EXIT_M : POS_TOLERANCE_M);
+                    const float x_tolerance =
+                        position_reached ? X_TOLERANCE_EXIT_M : X_TOLERANCE_M;
+                    const float y_tolerance =
+                        position_reached ? Y_TOLERANCE_EXIT_M : Y_TOLERANCE_M;
+                    position_reached = fabsf(error_x_robot) <= x_tolerance &&
+                                       fabsf(error_y_robot) <= y_tolerance;
                     heading_reached =
                         fabsf(heading_error) <=
                         (heading_reached ? HEADING_TOLERANCE_EXIT_RAD : HEADING_TOLERANCE_RAD);
@@ -271,15 +293,6 @@ void _drive_task(void *arg)
 
                     s_reached_pose.store(false, std::memory_order_relaxed);
 
-                    // get both sin and cos at the same time
-                    float sin_h, cos_h;
-                    sincosf(pose_snapshot.heading_rad, &sin_h, &cos_h);
-
-                    float error_x_robot = 0.0f, error_y_robot = 0.0f;
-                    if (!position_reached) {
-                        error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
-                        error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
-                    }
                     // update position pid
                     // negative sign on error necessary for robot to move in the right direction
                     const float x_cmd =
@@ -287,8 +300,9 @@ void _drive_task(void *arg)
                     const float y_cmd =
                         position_reached ? 0.0f : y_pid.update(0.0f, -error_y_robot, DT_S);
                     const float rot_cmd = heading_reached //
-                                              ? 0.0f
-                                              : heading_pid.update(0.0f, -heading_error, DT_S);
+                                        ? 0.0f
+                                        : heading_pid.update(0.0f, -heading_error, DT_S);
+
 
                     drivetrain.move_vector(x_cmd, y_cmd, rot_cmd);
                     break;
