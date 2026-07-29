@@ -28,7 +28,10 @@ class WormSpear {
                                                            .min_pulse_deg = 0.0f,
                                                            .max_pulse_deg = 180.0f,
                                                            .min_clamp_deg = 0.0f,
-                                                           .max_clamp_deg = 180.0f};
+                                                           .max_clamp_deg = 180.0f,
+                                                           .bias_deg = -145.0f,
+                                                        
+                                                        };
         ;
     };
 
@@ -40,11 +43,10 @@ class WormSpear {
 
     inline void move_to_position(int32_t step)
     {
-        step = _config.reversed ? -step : step;
         if (_limit_switch.is_pressed() && step < 0) return;
+        _stepper->moveTo(_config.reversed ? -step : step);
+    }
 
-        _stepper->moveTo(step);
-    };
 
     inline void set_spear(float deg, uint32_t time) { _spear_servo.sweep_to_deg(deg, time); };
 
@@ -56,6 +58,7 @@ class WormSpear {
     void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);
     void set_home_position();
     int32_t get_current_position();
+    inline bool limit_is_pressed() const { return _limit_switch.is_pressed(); }
 
   private:
     Config _config;

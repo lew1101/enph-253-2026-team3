@@ -42,10 +42,8 @@ class ElevatorClaw {
 
     inline void move_to_position(int32_t step)
     {
-        step = _config.reversed ? -step : step;
         if (_limit_switch.is_pressed() && step < 0) return;
-
-        _stepper->moveTo(step);
+        _stepper->moveTo(_config.reversed ? -step : step);
     }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
@@ -58,7 +56,7 @@ class ElevatorClaw {
     void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);
     void set_home_position();
     int32_t get_current_position();
-    ;
+    inline bool limit_is_pressed() const { return _limit_switch.is_pressed(); }
 
   private:
     Config _config;

@@ -11,7 +11,7 @@ static constexpr char TAG[] = "elevator_claw";
 ElevatorClaw::ElevatorClaw(const Config &config)
     : _config{config}
     , _claw_servo{_config.claw_servo_config}
-    , _limit_switch{_config.elevator_calibration_switch_pin}
+    , _limit_switch{_config.elevator_calibration_switch_pin, INPUT_PULLUP, HIGH}
 {
 }
 
@@ -52,7 +52,7 @@ void ElevatorClaw::calibrate()
 {
     // move quickly to switch
     _stepper->setSpeedInHz(2000);
-    if (!_config.reversed) {
+    if (_config.reversed) {
         _stepper->runForward();
     } else {
         _stepper->runBackward();
