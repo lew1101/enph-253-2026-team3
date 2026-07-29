@@ -26,12 +26,12 @@ constexpr driver::ServoDriver::Config spear_servo_config{
     .channel = 1,
     .freq_hz = 50,
     .duty_res_bits = 14,
-    .min_pulse_us = 1000,
-    .max_pulse_us = 2000,
+    .min_pulse_us = 500,
+    .max_pulse_us = 2500,
     .min_pulse_deg = 0.0f,
-    .max_pulse_deg = 90.0f,
+    .max_pulse_deg = 180.0f,
     .min_clamp_deg = 0.0f,
-    .max_clamp_deg = 90.0f};
+    .max_clamp_deg = 180.0f};
 
 constexpr driver::ServoDriver::Config claw_servo_config{.gpio =
                                                             CLAW_SERVO_PIN, // Specify your pin here
@@ -50,8 +50,9 @@ constexpr control::WormSpear::Config worm_config{
     .worm_step_pin = WORM_STEP_PIN,
     .worm_dir_pin = WORM_DIR_PIN,
     .worm_calibration_switch_pin = WORM_LIMIT_SWITCH_PIN,
-    .speed_hz = 9000,
-    .acceleration_hz_per_s = 1600,
+    .speed_hz = 18000,
+    .acceleration_hz_per_s = 3200,
+    .reversed = true,
     .spear_servo_config = spear_servo_config};
 
 constexpr control::ElevatorClaw::Config elevator_config{
@@ -61,6 +62,7 @@ constexpr control::ElevatorClaw::Config elevator_config{
     .elevator_calibration_switch_pin = ELEVATOR_LIMIT_SWITCH_PIN,
     .speed_hz = 9000,
     .acceleration_hz_per_s = 1600,
+    .reversed = true,
     .claw_servo_config = claw_servo_config};
 
 esp_err_t front_chassis_init();
