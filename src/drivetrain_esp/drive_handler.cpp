@@ -166,8 +166,8 @@ esp_err_t DriveMessageHandler::handle(const robot_RobotUartMessage &message)
 
 drive_DriveUartMessage DriveMessageHandler::make_status(bool connected, uint32_t uptime) const
 {
-    control::PoseSnapshot pose{};
-    const bool have_pose = get_pose(&pose) == ESP_OK;
+    control::PoseSnapshot pose_snapshot{};
+    const bool have_pose = get_pose(&pose_snapshot) == ESP_OK;
 
     xSemaphoreTake(_mutex, portMAX_DELAY);
     auto last_sequence = _last_sequence;
@@ -183,20 +183,20 @@ drive_DriveUartMessage DriveMessageHandler::make_status(bool connected, uint32_t
     if (connected) {
         status.flags |= robot_flags::DRIVE_STATUS_LINK_CONNECTED;
     }
-    if (have_pose && pose.valid) {
+    if (have_pose && pose_snapshot.valid) {
         status.flags |= robot_flags::DRIVE_STATUS_POSE_VALID;
     }
-    if (have_pose && pose.valid && reached_pose()) {
+    if (have_pose && pose_snapshot.valid && reached_pose()) {
         status.flags |= robot_flags::DRIVE_STATUS_TARGET_REACHED;
     }
     if (estop) {
         status.flags |= robot_flags::DRIVE_STATUS_ESTOP_LATCHED;
     }
     if (have_pose) {
-        status.pose.x_m = pose.x_m;
-        status.pose.y_m = pose.y_m;
-        status.pose.heading_rad = pose.heading_rad;
-        status.pose.tick = static_cast<uint32_t>(pose.tick);
+        status.pose.x_m = pose_snapshot.pose.x_m;
+        status.pose.y_m = pose_snapshot.pose.y_m;
+        status.pose.heading_rad = pose_snapshot.pose.heading_rad;
+        status.pose.tick = static_cast<uint32_t>(pose_snapshot.tick);
     }
 
     return status;

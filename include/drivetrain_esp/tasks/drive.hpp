@@ -33,15 +33,15 @@ constexpr gpio_num_t BL_MOTOR_CW_PIN = GPIO_NUM_15;
 constexpr gpio_num_t BL_MOTOR_CCW_PIN = GPIO_NUM_16;
 
 constexpr uint32_t DEAD_TIME_TICKS = 10ul; // ~10us
-constexpr float DEAD_BAND_PERCENTAGE = 1.2f;
+constexpr float DEAD_BAND_PERCENTAGE = 0.8f;
 
 constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
     .front_right_motor_config{
         .clockwise_pwm_output = FR_MOTOR_CW_PIN,
         .c_clockwise_pwm_output = FR_MOTOR_CCW_PIN,
         .dead_time_ticks = DEAD_TIME_TICKS,
-        .bias_percentage = 12.0f,
-        .output_scale = 1.06f,
+        .bias_percentage = 13.0f,
+        .output_scale = 1.08f,
         .deadband_percentage = DEAD_BAND_PERCENTAGE,
         .max_duty_percentage = 100.0f,
     },
@@ -50,8 +50,8 @@ constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
         .clockwise_pwm_output = BR_MOTOR_CW_PIN,
         .c_clockwise_pwm_output = BR_MOTOR_CCW_PIN,
         .dead_time_ticks = DEAD_TIME_TICKS,
-        .bias_percentage = 12.5f,
-        .output_scale = 1.08f,
+        .bias_percentage = 13.5f,
+        .output_scale = 1.1f,
         .deadband_percentage = DEAD_BAND_PERCENTAGE,
         .max_duty_percentage = 100.0f,
     },
@@ -60,7 +60,7 @@ constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
         .clockwise_pwm_output = FL_MOTOR_CW_PIN,
         .c_clockwise_pwm_output = FL_MOTOR_CCW_PIN,
         .dead_time_ticks = DEAD_TIME_TICKS,
-        .bias_percentage = 10.0f,
+        .bias_percentage = 11.0f,
         .output_scale = 1.15f,
         .deadband_percentage = DEAD_BAND_PERCENTAGE,
         .max_duty_percentage = 100.0f,
@@ -71,8 +71,8 @@ constexpr control::Drivetrain::Config DRIVETRAIN_CFG = {
         .clockwise_pwm_output = BL_MOTOR_CW_PIN,
         .c_clockwise_pwm_output = BL_MOTOR_CCW_PIN,
         .dead_time_ticks = DEAD_TIME_TICKS,
-        .bias_percentage = 10.5f,
-        .output_scale = 1.0f,
+        .bias_percentage = 11.5f,
+        .output_scale = 1.1f,
         .deadband_percentage = DEAD_BAND_PERCENTAGE,
         .max_duty_percentage = 100.0f,
     },
@@ -107,8 +107,11 @@ constexpr float X_TOLERANCE_EXIT_M = 0.011f;
 constexpr float Y_TOLERANCE_M = 0.008f;
 constexpr float Y_TOLERANCE_EXIT_M = 0.011f;
 
-constexpr float HEADING_TOLERANCE_RAD = radians(0.4f);
-constexpr float HEADING_TOLERANCE_EXIT_RAD = radians(0.7f);
+constexpr float HEADING_TOLERANCE_RAD = radians(1.0f);
+constexpr float HEADING_TOLERANCE_EXIT_RAD = radians(1.5f);
+
+constexpr float POSE_PATH_WAYPOINT_SPACING_M = 0.15f;
+constexpr float POSE_PATH_LOOKAHEAD_TOLERANCE_M = 0.7f * POSE_PATH_WAYPOINT_SPACING_M;
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 }; // namespace DriveTaskConfig

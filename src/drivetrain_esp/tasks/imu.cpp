@@ -46,6 +46,8 @@ void _imu_task(void *arg)
         return;
     }
 
+    delay(500);
+
     if (!_enable_rot_vec()) {
         ESP_LOGE(TAG, "failed to enable game rotation vector");
         detachInterrupt(INT_PIN);
