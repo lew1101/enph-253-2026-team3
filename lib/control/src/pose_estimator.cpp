@@ -6,30 +6,31 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
                                           float imu_heading_rad,
                                           TickType_t tick)
 {
-    if (!std::isfinite(imu_heading_rad) || !std::isfinite(_pose.x_m) || !std::isfinite(_pose.y_m) ||
-        !std::isfinite(_pose.heading_rad) || !std::isfinite(_cfg.deadwheel_x_count_to_m_scale) ||
+    if (!std::isfinite(imu_heading_rad) || !std::isfinite(_snapshot.pose.x_m) ||
+        !std::isfinite(_snapshot.pose.y_m) || !std::isfinite(_snapshot.pose.heading_rad) ||
+        !std::isfinite(_cfg.deadwheel_x_count_to_m_scale) ||
         !std::isfinite(_cfg.deadwheel_y_count_to_m_scale) ||
         !std::isfinite(_cfg.deadwheel_x_y_offset_m) ||
         !std::isfinite(_cfg.deadwheel_y_x_offset_m)) {
-        _pose.tick = tick;
-        _pose.valid = false;
-        return _pose;
+        _snapshot.tick = tick;
+        _snapshot.valid = false;
+        return _snapshot;
     }
 
     if (!_initialized) {
         _prev_x_count = x_count;
         _prev_y_count = y_count;
 
-        _pose.heading_rad = wrap_angle_pi(_pose.heading_rad);
-        _heading_offset_rad = wrap_angle_pi(imu_heading_rad - _pose.heading_rad);
-        _prev_heading_rad = _pose.heading_rad;
+        _snapshot.pose.heading_rad = wrap_angle_pi(_snapshot.pose.heading_rad);
+        _heading_offset_rad = wrap_angle_pi(imu_heading_rad - _snapshot.pose.heading_rad);
+        _prev_heading_rad = _snapshot.pose.heading_rad;
 
-        _pose.tick = tick;
-        _pose.valid = true;
+        _snapshot.tick = tick;
+        _snapshot.valid = true;
 
         _initialized = true;
 
-        return _pose;
+        return _snapshot;
     }
 
     const float heading_rad = wrap_angle_pi(imu_heading_rad - _heading_offset_rad);
@@ -64,23 +65,23 @@ const PoseSnapshot &PoseEstimator::update(int32_t x_count,
     const float delta_x_field_m = cos_h * delta_x_robot_m - sin_h * delta_y_robot_m;
     const float delta_y_field_m = sin_h * delta_x_robot_m + cos_h * delta_y_robot_m;
 
-    _pose.x_m += delta_x_field_m;
-    _pose.y_m += delta_y_field_m;
-    _pose.heading_rad = heading_rad;
-    _pose.tick = tick;
-    _pose.valid = true;
+    _snapshot.pose.x_m += delta_x_field_m;
+    _snapshot.pose.y_m += delta_y_field_m;
+    _snapshot.pose.heading_rad = heading_rad;
+    _snapshot.tick = tick;
+    _snapshot.valid = true;
 
     _prev_heading_rad = heading_rad;
 
-    return _pose;
+    return _snapshot;
 }
 
 void PoseEstimator::reset(float x_m, float y_m, float heading_rad)
 {
-    _pose.x_m = x_m;
-    _pose.y_m = y_m;
-    _pose.heading_rad = wrap_angle_pi(heading_rad);
-    _pose.valid = false;
+    _snapshot.pose.x_m = x_m;
+    _snapshot.pose.y_m = y_m;
+    _snapshot.pose.heading_rad = wrap_angle_pi(heading_rad);
+    _snapshot.valid = false;
     _initialized = false;
 }
 

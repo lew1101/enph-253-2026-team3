@@ -16,15 +16,17 @@ inline constexpr float wrap_angle_2pi(float angle)
 inline constexpr float wrap_angle_pi(float angle)
 {
     constexpr float pi = static_cast<float>(M_PI);
-
     return wrap_angle_2pi(angle + pi) - pi;
 }
 
-struct PoseSnapshot {
+struct Pose {
     float x_m = 0.0f;
     float y_m = 0.0f;
     float heading_rad = 0.0f;
+};
 
+struct PoseSnapshot {
+    Pose pose{};
     TickType_t tick = 0;
     bool valid = false;
 };
@@ -53,12 +55,12 @@ class PoseEstimator {
      */
     void reset(float x_m = 0.0f, float y_m = 0.0f, float heading_rad = 0.0f);
 
-    inline const PoseSnapshot &pose() const { return _pose; }
+    inline const PoseSnapshot &pose() const { return _snapshot; }
     inline bool initialized() const { return _initialized; }
 
   private:
     Config _cfg;
-    PoseSnapshot _pose{};
+    PoseSnapshot _snapshot{};
 
     int32_t _prev_x_count = 0;
     int32_t _prev_y_count = 0;

@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "control/pose_estimator.hpp"
+#include "control/path.hpp"
 
 #include "esp_check.h"
 #include "esp_err.h"
@@ -31,9 +32,9 @@ static constexpr char TAG[] = "drive_task";
 control::TapePID tape_pid(5.0f, 0.0f, 0.05f);
 
 // right strafe is +x, forward is +y, CCW rotation is +\theta
-PID x_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID y_pid(0.0f, 0.0f, 0.0f, 15.0f, -70.0f, 70.0f);
-PID heading_pid(18.0f, 0.0f, 4.5f, 15.0f, -70.0f, 70.0f);
+PID x_pid(62.0f, 0.0f, 0.0f, 30.0f, -80.0f, 80.0f);
+PID y_pid(42.0f, 0.0f, 0.0f, 30.0f, -80.0f, 80.0f);
+PID heading_pid(29.0f, 0.0f, 2.3f, 40.0f, -70.0f, 70.0f);
 
 namespace {
 TaskHandle_t s_task_handle = nullptr;
@@ -90,14 +91,18 @@ esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSna
     ESP_RETURN_ON_ERROR(s_encoder_y.get_count(&y_count), TAG, "failed to get y encoder count;");
 
     if (have_imu_reset_count && imu_snapshot.reset_count != last_imu_reset_count) {
-        const PoseSnapshot &pose = pose_estimator.pose();
-        pose_estimator.reset(pose.x_m, pose.y_m, pose.heading_rad);
+        const PoseSnapshot &snapshot = pose_estimator.pose();
+        pose_estimator.reset(
+            snapshot.pose.x_m, snapshot.pose.y_m, snapshot.pose.heading_rad);
     }
 
     last_imu_reset_count = imu_snapshot.reset_count;
     have_imu_reset_count = true;
 
-    // log_d("x_cnt=%d, ycnt=%d", x_count, y_count);
+    Serial.printf(">x_cnt:%d\n"
+                  ">ycnt:%d\n",
+                  x_count,
+                  y_count);
 
     *out = pose_estimator.update(x_count, y_count, imu_snapshot.yaw, now);
 
@@ -129,6 +134,8 @@ void _drive_task(void *arg)
 
     ESP_LOGI(TAG, "sucessfully initialized deadwheels");
 
+    delay(1000);
+
     PoseEstimator pose_estimator{POSE_ESTIMATION_CFG};
 
     const float DT_S = static_cast<float>(TASK_PERIOD_MS) / 1000;
@@ -139,6 +146,13 @@ void _drive_task(void *arg)
     float target_x_m = 0.0f;
     float target_y_m = 0.0f;
     float target_heading_rad = 0.0f;
+
+    control::Pose path_start_pose{};
+    control::Pose path_end_pose{};
+
+    uint32_t path_waypoint_count = 0;
+    bool path_endpoint_active = false;
+
     bool pose_target_valid = false;
     bool position_reached = false;
     bool heading_reached = false;
@@ -154,9 +168,11 @@ void _drive_task(void *arg)
 
     while (true) {
         esp_err_t err = _update_and_get_pose_estimation(pose_estimator, &pose_snapshot);
+
         if (err != ESP_OK) {
             pose_snapshot.valid = false;
             pose_snapshot.tick = xTaskGetTickCount();
+
             s_reached_pose.store(false, std::memory_order_release);
         }
 
@@ -165,13 +181,14 @@ void _drive_task(void *arg)
         Serial.printf(">trajectory:%.2f:%.2f|xy\n"
                       ">heading:%.2f\n"
                       ">valid:%s|t\n",
-                      pose_snapshot.x_m,
-                      pose_snapshot.y_m,
-                      degrees(pose_snapshot.heading_rad),
+                      pose_snapshot.pose.x_m,
+                      pose_snapshot.pose.y_m,
+                      degrees(pose_snapshot.pose.heading_rad),
                       pose_snapshot.valid ? "true" : "false");
         //     log_cnt = 0;
         // }
 
+        // read latest command
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
             // run drivetrain command
             const bool mode_changed = s_command_tag != cmd.which_command;
@@ -197,23 +214,56 @@ void _drive_task(void *arg)
             if (new_pose_command) {
                 const auto &pose_command = cmd.command.pose;
 
-                // Resolve relative commands once, against the measured pose at receipt.
-                if (!pose_command.relative || pose_snapshot.valid) {
-                    target_x_m = pose_command.relative ? pose_snapshot.x_m + pose_command.x_m
-                                                       : pose_command.x_m;
-                    target_y_m = pose_command.relative ? pose_snapshot.y_m + pose_command.y_m
-                                                       : pose_command.y_m;
-                    target_heading_rad = control::wrap_angle_pi(
-                        pose_command.relative ? pose_snapshot.heading_rad + pose_command.theta_rad
+                // A valid measured pose is point A for both absolute and relative paths.
+                if (pose_snapshot.valid) {
+                    if (pose_command.relative) {
+                        float sin_h, cos_h;
+                        sincosf(pose_snapshot.pose.heading_rad, &sin_h, &cos_h);
+
+                        // Rotate the requested robot-frame offset into the field frame.
+                        path_end_pose.x_m =
+                            pose_snapshot.pose.x_m + pose_command.x_m * cos_h -
+                            pose_command.y_m * sin_h;
+                        path_end_pose.y_m =
+                            pose_snapshot.pose.y_m + pose_command.x_m * sin_h +
+                            pose_command.y_m * cos_h;
+                    } else {
+                        path_end_pose.x_m = pose_command.x_m;
+                        path_end_pose.y_m = pose_command.y_m;
+                    }
+
+                    path_end_pose.heading_rad = control::wrap_angle_pi(
+                        pose_command.relative
+                            ? pose_snapshot.pose.heading_rad + pose_command.theta_rad
                                               : pose_command.theta_rad);
-                    pose_target_valid = true;
+
+                    path_start_pose = pose_snapshot.pose;
+
+                    path_waypoint_count = 1;
+                    path_endpoint_active = false;
+
+                    const auto first_waypoint =
+                        control::get_next_lerp_pose(path_start_pose,
+                                                    path_end_pose,
+                                                    POSE_PATH_WAYPOINT_SPACING_M,
+                                                    path_waypoint_count);
+
+                    pose_target_valid = first_waypoint.has_value();
+
+                    if (first_waypoint) {
+                        target_x_m = first_waypoint->x_m;
+                        target_y_m = first_waypoint->y_m;
+                        target_heading_rad = first_waypoint->heading_rad;
+                    }
 
                     x_pid.reset();
                     y_pid.reset();
                     heading_pid.reset();
+
                     position_reached = false;
                     heading_reached = false;
                     previous_pose_sequence = cmd.sequence;
+
                     s_reached_pose.store(false, std::memory_order_release);
                 } else {
                     pose_target_valid = false;
@@ -245,41 +295,73 @@ void _drive_task(void *arg)
                     }
 
                     // calculate pos error in field coords
-                    const float error_x_field = target_x_m - pose_snapshot.x_m;
-                    const float error_y_field = target_y_m - pose_snapshot.y_m;
-                    const float position_error = hypotf(error_x_field, error_y_field);
+                    const float error_x_field = target_x_m - pose_snapshot.pose.x_m;
+                    const float error_y_field = target_y_m - pose_snapshot.pose.y_m;
 
                     // calculate heading error
                     const float heading_error =
-                        control::wrap_angle_pi(target_heading_rad - pose_snapshot.heading_rad);
+                        control::wrap_angle_pi(target_heading_rad -
+                                               pose_snapshot.pose.heading_rad);
 
-                    // Enter the reached state at the normal tolerance, but only leave it
-                    // after crossing the larger exit tolerance to avoid setpoint chatter.
-                    position_reached =
-                        position_error <=
-                        (position_reached ? POS_TOLERANCE_EXIT_M : POS_TOLERANCE_M);
-                    heading_reached =
-                        fabsf(heading_error) <=
-                        (heading_reached ? HEADING_TOLERANCE_EXIT_RAD : HEADING_TOLERANCE_RAD);
+                    // Transform the position error into the robot frame used by the
+                    // independent strafe and forward controllers.
+                    float sin_h, cos_h;
+                    sincosf(pose_snapshot.pose.heading_rad, &sin_h, &cos_h);
 
-                    if (position_reached && heading_reached) {
-                        drivetrain.stop();
-                        s_reached_pose.store(true, std::memory_order_relaxed);
-                        break;
-                        // position reached... break
+                    const float error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
+                    const float error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
+
+                    const bool within_path_lookahead =
+                        std::hypot(error_x_field, error_y_field) <=
+                        POSE_PATH_LOOKAHEAD_TOLERANCE_M;
+
+                    if (!path_endpoint_active && within_path_lookahead) {
+                        const auto next_waypoint =
+                            control::get_next_lerp_pose(path_start_pose,
+                                                        path_end_pose,
+                                                        POSE_PATH_WAYPOINT_SPACING_M,
+                                                        path_waypoint_count + 1);
+
+                        if (next_waypoint) {
+                            ++path_waypoint_count;
+
+                            target_x_m = next_waypoint->x_m;
+                            target_y_m = next_waypoint->y_m;
+                            target_heading_rad = next_waypoint->heading_rad;
+
+                            s_reached_pose.store(false, std::memory_order_relaxed);
+                            break;
+                        }
+
+                        path_endpoint_active = true;
+                    }
+
+                    if (path_endpoint_active) {
+                        // Only the endpoint uses axis and heading hysteresis.
+                        const float x_tolerance =
+                            position_reached ? X_TOLERANCE_EXIT_M : X_TOLERANCE_M;
+                        const float y_tolerance =
+                            position_reached ? Y_TOLERANCE_EXIT_M : Y_TOLERANCE_M;
+
+                        position_reached = fabsf(error_x_robot) <= x_tolerance &&
+                                           fabsf(error_y_robot) <= y_tolerance;
+                        heading_reached =
+                            fabsf(heading_error) <=
+                            (heading_reached ? HEADING_TOLERANCE_EXIT_RAD : HEADING_TOLERANCE_RAD);
+
+                        if (position_reached && heading_reached) {
+                            drivetrain.stop();
+                            s_reached_pose.store(true, std::memory_order_relaxed);
+                            break;
+                        }
+                    } else {
+                        // Intermediate waypoints do not latch or wait for heading.
+                        position_reached = false;
+                        heading_reached = false;
                     }
 
                     s_reached_pose.store(false, std::memory_order_relaxed);
 
-                    // get both sin and cos at the same time
-                    float sin_h, cos_h;
-                    sincosf(pose_snapshot.heading_rad, &sin_h, &cos_h);
-
-                    float error_x_robot = 0.0f, error_y_robot = 0.0f;
-                    if (!position_reached) {
-                        error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
-                        error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
-                    }
                     // update position pid
                     // negative sign on error necessary for robot to move in the right direction
                     const float x_cmd =

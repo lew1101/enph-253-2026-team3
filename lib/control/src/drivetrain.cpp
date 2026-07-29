@@ -39,6 +39,7 @@ esp_err_t Drivetrain::init()
     _config.front_right_motor_config.group_id = 0;
     _config.front_right_motor_config.timer = _config.timer_0;
     _config.front_right_motor_config.period_ticks = period_tick;
+
     _config.back_right_motor_config.group_id = 0;
     _config.back_right_motor_config.timer = _config.timer_0;
     _config.back_right_motor_config.period_ticks = period_tick;
@@ -46,6 +47,7 @@ esp_err_t Drivetrain::init()
     _config.front_left_motor_config.group_id = 1;
     _config.front_left_motor_config.timer = _config.timer_1;
     _config.front_left_motor_config.period_ticks = period_tick;
+
     _config.back_left_motor_config.group_id = 1;
     _config.back_left_motor_config.timer = _config.timer_1;
     _config.back_left_motor_config.period_ticks = period_tick;
@@ -109,7 +111,6 @@ bool Drivetrain::turn(float speed_percentage)
     return true;
 }
 
-
 bool Drivetrain::move_rear(float left_speed, float right_speed)
 {
     float sweep_ratio = _config.wheelbase / _config.trackwidth;
@@ -138,7 +139,6 @@ bool Drivetrain::move_front(float left_speed, float right_speed)
     return true;
 }
 
-
 bool Drivetrain::move_vector(float vx, float vy, float omega, float max_mag_clamp)
 {
     // Translation uses the robot frame: +vx is right and +vy is forward.
@@ -146,19 +146,21 @@ bool Drivetrain::move_vector(float vx, float vy, float omega, float max_mag_clam
     const float rotation = omega * _config.rot_scalar;
     target_speed[FR] = vy - vx + rotation;
     target_speed[RR] = vy + vx + rotation;
-    target_speed[FL] = -(vy + vx) + rotation;
-    target_speed[RL] = -(vy - vx) + rotation;
+    target_speed[FL] = -(vy + vx - rotation);
+    target_speed[RL] = -(vy - vx - rotation);
 
     float max_mag = std::max({std::fabs(target_speed[FR]),
                               std::fabs(target_speed[RR]),
                               std::fabs(target_speed[FL]),
                               std::fabs(target_speed[RL])});
 
-    if (max_mag > max_mag_clamp) {
-        target_speed[FR] = (target_speed[FR] / max_mag) * 100.0f;
-        target_speed[RR] = (target_speed[RR] / max_mag) * 100.0f;
-        target_speed[FL] = (target_speed[FL] / max_mag) * 100.0f;
-        target_speed[RL] = (target_speed[RL] / max_mag) * 100.0f;
+    if (max_mag > max_mag_clamp && max_mag > 0.0f) {
+        const float scale = max_mag_clamp / max_mag;
+
+        target_speed[FR] *= scale;
+        target_speed[RR] *= scale;
+        target_speed[FL] *= scale;
+        target_speed[RL] *= scale;
     }
 
     return true;
@@ -187,7 +189,8 @@ bool Drivetrain::update()
     previous_time = current_time;
 
     for (int i = 0; i < 4; i++) {
-        current_speed[i] = control::slew_limit(target_speed[i], current_speed[i], _config.acceleration_rate, time_elapsed);
+        current_speed[i] = control::slew_limit(
+            target_speed[i], current_speed[i], _config.acceleration_rate, time_elapsed);
     }
 
     front_right_motor.set_output(current_speed[FR]);

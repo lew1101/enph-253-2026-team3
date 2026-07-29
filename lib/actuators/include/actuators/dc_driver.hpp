@@ -20,15 +20,14 @@ class DCDriver {
         // MCPWM Setup
         int group_id = 0;
         mcpwm_timer_handle_t timer = nullptr;
-        uint32_t period_ticks = 0;
-        uint32_t dead_time_ticks = 100;
+        uint32_t period_ticks = 0ul;
+        uint32_t dead_time_ticks = 10ul;
 
         // Maximum physical duty.
-        float max_duty_percentage = 100.0f;
+        float bias_percentage = 0.0f;
         float output_scale = 1.0f;
-
-        float min_percentage;
-        float bias_percentage;
+        float deadband_percentage = 2.0f;
+        float max_duty_percentage = 100.0f;
     };
 
     static constexpr inline uint32_t us_to_mcpwm_ticks(uint32_t us, uint32_t resolution_hz)
