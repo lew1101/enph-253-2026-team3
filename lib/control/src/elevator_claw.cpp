@@ -38,10 +38,11 @@ esp_err_t ElevatorClaw::init()
 
     _limit_switch.register_pressed_callback(
         [](void *ctx) {
-            auto *elevator = static_cast<control::ElevatorClaw *>(ctx);
+            auto *elevator = static_cast<ElevatorClaw *>(ctx);
             elevator->stop_elevator();
         },
         this);
+
     _limit_switch.begin("elevator_claw_limit");
 
     return ESP_OK;
@@ -65,9 +66,9 @@ void ElevatorClaw::calibrate()
 
     // back up
     _stepper->forceStopAndNewPosition(0);
-    vTaskDelay(pdMS_TO_TICKS(10)); 
-    _stepper->move(_config.reversed ? 200 : -200); 
-    
+    vTaskDelay(pdMS_TO_TICKS(10));
+    _stepper->move(_config.reversed ? 200 : -200);
+
     while (_stepper->isRunning()) {
         vTaskDelay(1);
     }
@@ -100,7 +101,8 @@ void ElevatorClaw::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_
 
 void ElevatorClaw::set_home_position() { _stepper->setCurrentPosition(0); }
 
-int32_t ElevatorClaw::get_current_position() {
+int32_t ElevatorClaw::get_current_position()
+{
     int32_t pos = _stepper->getCurrentPosition();
     return _config.reversed ? -pos : pos;
 }

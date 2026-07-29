@@ -3,12 +3,12 @@
 #include "FastAccelStepper.h"
 #include "actuators/limit.hpp"
 #include "actuators/servo.hpp"
+#include <atomic>
 
 namespace control {
 
 class WormSpear {
   public:
-
     struct Config {
         FastAccelStepperEngine *engine = nullptr;
         gpio_num_t worm_step_pin = GPIO_NUM_NC;
@@ -19,19 +19,17 @@ class WormSpear {
         bool reversed = false;
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
 
-        driver::ServoDriver ::Config spear_servo_config = {
-            .gpio = GPIO_NUM_NC,
-            .channel = 1,
-            .freq_hz = 50,
-            .duty_res_bits = 14,
-            .min_pulse_us = 500,
-            .max_pulse_us = 2400,
-            .min_pulse_deg = 0.0f,
-            .max_pulse_deg = 180.0f,
-            .min_clamp_deg = 0.0f,
-            .max_clamp_deg = 180.0f
-        };
-;
+        driver::ServoDriver ::Config spear_servo_config = {.gpio = GPIO_NUM_NC,
+                                                           .channel = 1,
+                                                           .freq_hz = 50,
+                                                           .duty_res_bits = 14,
+                                                           .min_pulse_us = 500,
+                                                           .max_pulse_us = 2400,
+                                                           .min_pulse_deg = 0.0f,
+                                                           .max_pulse_deg = 180.0f,
+                                                           .min_clamp_deg = 0.0f,
+                                                           .max_clamp_deg = 180.0f};
+        ;
     };
 
     explicit WormSpear(const Config &config);
@@ -39,10 +37,16 @@ class WormSpear {
     esp_err_t init();
 
     void calibrate();
-    
-    inline void move_to_position(int32_t step) { _stepper->moveTo(_config.reversed? -step:step);};
-    
-    inline void set_spear(float deg, uint32_t time) { _spear_servo.sweep_to_deg(deg, time);};
+
+    inline void move_to_position(int32_t step)
+    {
+        step = _config.reversed ? -step : step;
+        if (_limit_switch.is_pressed() && step < 0) return;
+
+        _stepper->moveTo(step);
+    };
+
+    inline void set_spear(float deg, uint32_t time) { _spear_servo.sweep_to_deg(deg, time); };
 
     inline void stop_worm() { _stepper->forceStop(); }
 
@@ -60,4 +64,4 @@ class WormSpear {
 
     DebouncedLimitSwitch _limit_switch;
 };
-}
+} // namespace control

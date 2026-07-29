@@ -258,9 +258,26 @@ void loop()
             worm_spear.spear_angle(spear_deg);
             ESP_LOGI("Main", "Setting Spear to: %.2f degrees", spear_deg);
         }
-    }
+                else if (command.startsWith("assemble")) {
+                    ESP_LOGI("Main", "Starting tower assembly sequence...");
+                    assemble_tower();
+                    ESP_LOGI("Main", "Tower assembly sequence completed.");
+                }
+                else {
+                    ESP_LOGW("Main", "Unknown command: %s", command.c_str());
+                }
+                // ==========================================
+            }
 
-    // Keep the RTOS watchdog happy
+            input_buffer = "";
+            prompt_printed = false; // Trigger a new "> " prompt
+        }
+
+        else {
+            input_buffer += c;
+            Serial.print(c); // Echo the character back so you can see it!
+        }
+    }
     vTaskDelay(pdMS_TO_TICKS(10));
 
     // PHASE 3: SOLAR PANEL

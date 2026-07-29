@@ -40,7 +40,13 @@ class ElevatorClaw {
 
     void calibrate();
 
-    inline void move_to_position(int32_t step) { _stepper->moveTo(_config.reversed? -step:step); }
+    inline void move_to_position(int32_t step)
+    {
+        step = _config.reversed ? -step : step;
+        if (_limit_switch.is_pressed() && step < 0) return;
+
+        _stepper->moveTo(step);
+    }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
 
@@ -59,8 +65,7 @@ class ElevatorClaw {
 
     FastAccelStepper *_stepper = nullptr;
     driver::ServoDriver _claw_servo;
-    DebouncedLimitSwitch _limit_switch;
 
-    int switch_presed = 0; // active LOW
+    DebouncedLimitSwitch _limit_switch;
 };
 } // namespace control

@@ -8,9 +8,9 @@ using control::WormSpear;
 static constexpr char TAG[] = "worm_spear";
 
 WormSpear::WormSpear(const Config &config)
-    : _config(config),
-    _spear_servo{_config.spear_servo_config},
-    _limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP}
+    : _config(config)
+    , _spear_servo{_config.spear_servo_config}
+    , _limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP, HIGH}
 {
 }
 
@@ -40,6 +40,7 @@ esp_err_t WormSpear::init()
             worm->stop_worm();
         },
         this);
+
     if (!_limit_switch.begin("worm_spear_limit")) {
         return ESP_ERR_NO_MEM;
     }
@@ -47,7 +48,8 @@ esp_err_t WormSpear::init()
     return ESP_OK;
 }
 
-void WormSpear::calibrate() {
+void WormSpear::calibrate()
+{
     // move quickly to switch
     _stepper->setSpeedInHz(2000);
     if (!_config.reversed) {
@@ -64,9 +66,9 @@ void WormSpear::calibrate() {
 
     // back up
     _stepper->forceStopAndNewPosition(0);
-    vTaskDelay(pdMS_TO_TICKS(10)); 
-    _stepper->move(_config.reversed ? 200 : -200); 
-    
+    vTaskDelay(pdMS_TO_TICKS(10));
+    _stepper->move(_config.reversed ? 200 : -200);
+
     while (_stepper->isRunning()) {
         vTaskDelay(1);
     }
@@ -91,16 +93,16 @@ void WormSpear::calibrate() {
 }
 
 // ONLY FOR TUNING PURPOSES
-void WormSpear::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s) {
+void WormSpear::set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s)
+{
     _stepper->setSpeedInHz(speed_hz);
     _stepper->setAcceleration(acceleration_hz_per_s);
 }
 
-void WormSpear::set_home_position() {
-    _stepper->setCurrentPosition(0);
-}
+void WormSpear::set_home_position() { _stepper->setCurrentPosition(0); }
 
-int32_t WormSpear::get_current_position() {
+int32_t WormSpear::get_current_position()
+{
     int32_t pos = _stepper->getCurrentPosition();
     return _config.reversed ? -pos : pos;
 }
