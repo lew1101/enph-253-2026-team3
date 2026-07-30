@@ -47,10 +47,10 @@ void rock_and_teletubbies() {
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
     ELEV_TOWER_1 = 500,
-    ELEV_TOWER_2_PLUS = 4200,
+    ELEV_TOWER_2_PLUS = 4000,
     ELEV_TOWER_2_MINUS = 3400,
     ELEV_TOWER_2 = 500,
-    ELEV_TOWER_3_PLUS = 4200,
+    ELEV_TOWER_3_PLUS = 4000,
     ELEV_TOWER_3_MINUS = 3400,
     ELEV_TOWER_3 = 500,
     ELEV_BACK = 5000,
@@ -64,7 +64,7 @@ enum SpearPos : int32_t { //
     SPEAR_CENTERING = 0
 };
 
-constexpr float SPEAR_UP_DEG = 60.0f;
+constexpr float SPEAR_UP_DEG = 55.0f;
 constexpr float SPEAR_UP_SLIGHTLY = 135.0f;
 constexpr float SPEAR_DOWN_DEG = 145.0f;
 constexpr float spear_move_time = 600;
@@ -229,6 +229,10 @@ void loop()
                     bool limit_pressed = elevator_claw.limit_is_pressed();
                     ESP_LOGI("Main", "Elevator limit switch pressed: %s", limit_pressed ? "true" : "false");
                 }
+                else if (command.startsWith("ecal")) {
+                    ESP_LOGI("Main", "Calibrating Elevator Claw...");
+                    elevator_claw.calibrate();
+                }
                 else if (command.startsWith("e")) {
                     int elevator_pos = command.substring(1).toInt(); 
                     ESP_LOGI("Main", "Moving Elevator to: %d", elevator_pos);
@@ -259,11 +263,16 @@ void loop()
                 }
                 else if (command.startsWith("wcal")) {
                     ESP_LOGI("Main", "Calibrating Worm Spear...");
+                    elevator_claw.enable_elevator();
                     worm_spear.calibrate();
                 }
-                else if (command.startsWith("ecal")) {
-                    ESP_LOGI("Main", "Calibrating Elevator Claw...");
-                    elevator_claw.calibrate();
+                else if (command.startsWith("wx")) {
+                    worm_spear.disable_worm();
+                    ESP_LOGI("Main", "Worm Spear disabled.");
+                }
+                else if (command.startsWith("we")) {
+                    worm_spear.enable_worm();
+                    ESP_LOGI("Main", "Worm Spear enabled.");
                 }
                 else if (command.startsWith("w")) {
                     int spear_pos = command.substring(1).toInt();
@@ -288,11 +297,10 @@ void loop()
                 else if (command.startsWith("assemble")) {
                     ESP_LOGI("Main", "Starting tower assembly sequence...");
                     elevator_claw.set_claw(CLAW_OPEN_DEG);
-                    worm_spear.set_spear(SPEAR_DOWN_DEG, 100);
-                    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_PLUS);
+                    worm_spear.set_spear(SPEAR_DOWN_DEG, 100);;
                     worm_spear.calibrate();
                     elevator_claw.calibrate();
-                    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
+                    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
                     worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
                     while(!worm_spear.worm_done()) {vTaskDelay(10);}
                     assemble_tower();

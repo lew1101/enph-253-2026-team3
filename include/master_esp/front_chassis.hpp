@@ -53,6 +53,7 @@ constexpr control::WormSpear::Config worm_config{
     .speed_hz = 18000,
     .acceleration_hz_per_s = 3200,
     .reversed = true,
+    .calibration_max_delay = pdMS_TO_TICKS(10000),
     .spear_servo_config = spear_servo_config};
 
 constexpr control::ElevatorClaw::Config elevator_config{
