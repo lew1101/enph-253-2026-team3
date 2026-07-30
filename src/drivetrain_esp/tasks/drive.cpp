@@ -92,8 +92,7 @@ esp_err_t _update_and_get_pose_estimation(PoseEstimator &pose_estimator, PoseSna
 
     if (have_imu_reset_count && imu_snapshot.reset_count != last_imu_reset_count) {
         const PoseSnapshot &snapshot = pose_estimator.pose();
-        pose_estimator.reset(
-            snapshot.pose.x_m, snapshot.pose.y_m, snapshot.pose.heading_rad);
+        pose_estimator.reset(snapshot.pose.x_m, snapshot.pose.y_m, snapshot.pose.heading_rad);
     }
 
     last_imu_reset_count = imu_snapshot.reset_count;
@@ -154,8 +153,13 @@ void _drive_task(void *arg)
     bool path_endpoint_active = false;
 
     bool pose_target_valid = false;
-    bool position_reached = false;
-    bool heading_reached = false;
+    bool position_pid_stopped = false;
+    bool heading_pid_stopped = false;
+    bool target_reached_latched = false;
+
+    control::Pose endpoint_motion_reference{};
+    TickType_t endpoint_last_motion_tick = 0;
+    bool endpoint_motion_tracking = false;
 
     pb_size_t s_command_tag = robot_DriveCommand_stop_tag;
 
@@ -221,12 +225,10 @@ void _drive_task(void *arg)
                         sincosf(pose_snapshot.pose.heading_rad, &sin_h, &cos_h);
 
                         // Rotate the requested robot-frame offset into the field frame.
-                        path_end_pose.x_m =
-                            pose_snapshot.pose.x_m + pose_command.x_m * cos_h -
-                            pose_command.y_m * sin_h;
-                        path_end_pose.y_m =
-                            pose_snapshot.pose.y_m + pose_command.x_m * sin_h +
-                            pose_command.y_m * cos_h;
+                        path_end_pose.x_m = pose_snapshot.pose.x_m + pose_command.x_m * cos_h -
+                                            pose_command.y_m * sin_h;
+                        path_end_pose.y_m = pose_snapshot.pose.y_m + pose_command.x_m * sin_h +
+                                            pose_command.y_m * cos_h;
                     } else {
                         path_end_pose.x_m = pose_command.x_m;
                         path_end_pose.y_m = pose_command.y_m;
@@ -235,7 +237,7 @@ void _drive_task(void *arg)
                     path_end_pose.heading_rad = control::wrap_angle_pi(
                         pose_command.relative
                             ? pose_snapshot.pose.heading_rad + pose_command.theta_rad
-                                              : pose_command.theta_rad);
+                            : pose_command.theta_rad);
 
                     path_start_pose = pose_snapshot.pose;
 
@@ -260,8 +262,10 @@ void _drive_task(void *arg)
                     y_pid.reset();
                     heading_pid.reset();
 
-                    position_reached = false;
-                    heading_reached = false;
+                    position_pid_stopped = false;
+                    heading_pid_stopped = false;
+                    target_reached_latched = false;
+                    endpoint_motion_tracking = false;
                     previous_pose_sequence = cmd.sequence;
 
                     s_reached_pose.store(false, std::memory_order_release);
@@ -300,8 +304,7 @@ void _drive_task(void *arg)
 
                     // calculate heading error
                     const float heading_error =
-                        control::wrap_angle_pi(target_heading_rad -
-                                               pose_snapshot.pose.heading_rad);
+                        control::wrap_angle_pi(target_heading_rad - pose_snapshot.pose.heading_rad);
 
                     // Transform the position error into the robot frame used by the
                     // independent strafe and forward controllers.
@@ -312,8 +315,7 @@ void _drive_task(void *arg)
                     const float error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
 
                     const bool within_path_lookahead =
-                        std::hypot(error_x_field, error_y_field) <=
-                        POSE_PATH_LOOKAHEAD_TOLERANCE_M;
+                        std::hypot(error_x_field, error_y_field) <= POSE_PATH_LOOKAHEAD_TOLERANCE_M;
 
                     if (!path_endpoint_active && within_path_lookahead) {
                         const auto next_waypoint =
@@ -328,6 +330,7 @@ void _drive_task(void *arg)
                             target_x_m = next_waypoint->x_m;
                             target_y_m = next_waypoint->y_m;
                             target_heading_rad = next_waypoint->heading_rad;
+                            endpoint_motion_tracking = false;
 
                             s_reached_pose.store(false, std::memory_order_relaxed);
                             break;
@@ -337,40 +340,77 @@ void _drive_task(void *arg)
                     }
 
                     if (path_endpoint_active) {
-                        // Only the endpoint uses axis and heading hysteresis.
-                        const float x_tolerance =
-                            position_reached ? X_TOLERANCE_EXIT_M : X_TOLERANCE_M;
-                        const float y_tolerance =
-                            position_reached ? Y_TOLERANCE_EXIT_M : Y_TOLERANCE_M;
+                        // Tight hysteresis only controls when the PID outputs stop.
+                        const float x_tolerance = position_pid_stopped ? X_PID_STOP_TOLERANCE_EXIT_M
+                                                                       : X_PID_STOP_TOLERANCE_M;
+                        const float y_tolerance = position_pid_stopped ? Y_PID_STOP_TOLERANCE_EXIT_M
+                                                                       : Y_PID_STOP_TOLERANCE_M;
 
-                        position_reached = fabsf(error_x_robot) <= x_tolerance &&
-                                           fabsf(error_y_robot) <= y_tolerance;
-                        heading_reached =
-                            fabsf(heading_error) <=
-                            (heading_reached ? HEADING_TOLERANCE_EXIT_RAD : HEADING_TOLERANCE_RAD);
+                        position_pid_stopped = fabsf(error_x_robot) <= x_tolerance &&
+                                               fabsf(error_y_robot) <= y_tolerance;
+                        heading_pid_stopped =
+                            fabsf(heading_error) <= (heading_pid_stopped
+                                                         ? HEADING_PID_STOP_TOLERANCE_EXIT_RAD
+                                                         : HEADING_PID_STOP_TOLERANCE_RAD);
 
-                        if (position_reached && heading_reached) {
+                        const bool within_reached_bounds =
+                            fabsf(error_x_robot) <= TARGET_REACHED_X_TOLERANCE_M &&
+                            fabsf(error_y_robot) <= TARGET_REACHED_Y_TOLERANCE_M &&
+                            fabsf(heading_error) <= TARGET_REACHED_HEADING_TOLERANCE_RAD;
+
+                        const TickType_t now = pose_snapshot.tick;
+                        if (!endpoint_motion_tracking) {
+                            endpoint_motion_reference = pose_snapshot.pose;
+                            endpoint_last_motion_tick = now;
+                            endpoint_motion_tracking = true;
+                        } else {
+                            const float translation_delta =
+                                std::hypot(pose_snapshot.pose.x_m - endpoint_motion_reference.x_m,
+                                           pose_snapshot.pose.y_m - endpoint_motion_reference.y_m);
+                            const float heading_delta = fabsf(
+                                control::wrap_angle_pi(pose_snapshot.pose.heading_rad -
+                                                       endpoint_motion_reference.heading_rad));
+
+                            if (translation_delta >= TARGET_SETTLED_TRANSLATION_DELTA_M ||
+                                heading_delta >= TARGET_SETTLED_HEADING_DELTA_RAD) {
+                                endpoint_motion_reference = pose_snapshot.pose;
+                                endpoint_last_motion_tick = now;
+                            }
+                        }
+
+                        const bool within_settle_bounds =
+                            std::hypot(error_x_field, error_y_field) <=
+                                TARGET_SETTLED_MAX_POSITION_ERROR_M &&
+                            fabsf(heading_error) <= TARGET_SETTLED_MAX_HEADING_ERROR_RAD;
+
+                        const bool stopped_long_enough =
+                            endpoint_motion_tracking && (now - endpoint_last_motion_tick) >=
+                                                            pdMS_TO_TICKS(TARGET_SETTLED_TIME_MS);
+
+                        target_reached_latched = target_reached_latched || within_reached_bounds ||
+                                                 (within_settle_bounds && stopped_long_enough);
+                        s_reached_pose.store(target_reached_latched, std::memory_order_relaxed);
+
+                        if (position_pid_stopped && heading_pid_stopped) {
                             drivetrain.stop();
-                            s_reached_pose.store(true, std::memory_order_relaxed);
                             break;
                         }
                     } else {
                         // Intermediate waypoints do not latch or wait for heading.
-                        position_reached = false;
-                        heading_reached = false;
+                        position_pid_stopped = false;
+                        heading_pid_stopped = false;
+                        endpoint_motion_tracking = false;
+                        s_reached_pose.store(false, std::memory_order_relaxed);
                     }
-
-                    s_reached_pose.store(false, std::memory_order_relaxed);
 
                     // update position pid
                     // negative sign on error necessary for robot to move in the right direction
                     const float x_cmd =
-                        position_reached ? 0.0f : x_pid.update(0.0f, -error_x_robot, DT_S);
+                        position_pid_stopped ? 0.0f : x_pid.update(0.0f, -error_x_robot, DT_S);
                     const float y_cmd =
-                        position_reached ? 0.0f : y_pid.update(0.0f, -error_y_robot, DT_S);
-                    const float rot_cmd = heading_reached //
-                                              ? 0.0f
-                                              : heading_pid.update(0.0f, -heading_error, DT_S);
+                        position_pid_stopped ? 0.0f : y_pid.update(0.0f, -error_y_robot, DT_S);
+                    const float rot_cmd =
+                        heading_pid_stopped ? 0.0f : heading_pid.update(0.0f, -heading_error, DT_S);
 
                     drivetrain.move_vector(x_cmd, y_cmd, rot_cmd);
                     break;
