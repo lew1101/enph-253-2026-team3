@@ -52,6 +52,10 @@ class WormSpear {
 
     inline void stop_worm() { _stepper->forceStop(); }
 
+    inline void disable_worm() { _stepper->disableOutputs(); }
+
+    inline void enable_worm() { _stepper->enableOutputs(); }
+
     inline bool worm_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES
