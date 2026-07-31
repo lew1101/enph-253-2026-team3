@@ -29,6 +29,7 @@ esp_err_t WormSpear::init()
 
     _stepper->setSpeedInHz(_config.speed_hz);
     _stepper->setAcceleration(_config.acceleration_hz_per_s);
+
     pinMode(_config.worm_calibration_switch_pin, INPUT_PULLUP);
     if (!_spear_servo.init()) {
         return ESP_ERR_INVALID_STATE;
@@ -67,11 +68,7 @@ void WormSpear::calibrate()
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-    _stepper->move(_config.reversed ? 200 : -200);
-
-    while (_stepper->isRunning()) {
-        vTaskDelay(1);
-    }
+    _stepper->move(_config.reversed ? 200 : -200, true);
 
     // move slowly to switch
     _stepper->setSpeedInHz(500);

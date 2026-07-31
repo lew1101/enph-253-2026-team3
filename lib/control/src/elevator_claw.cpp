@@ -2,7 +2,6 @@
 #include "control/elevator_claw.hpp"
 #include "actuators/servo.hpp"
 #include "FastAccelStepper.h"
-#include "portmacro.h"
 
 using control::ElevatorClaw;
 
@@ -67,11 +66,7 @@ void ElevatorClaw::calibrate()
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-    _stepper->move(_config.reversed ? 200 : -200);
-
-    while (_stepper->isRunning()) {
-        vTaskDelay(1);
-    }
+    _stepper->move(_config.reversed ? 200 : -200, true);
 
     // move slowly to switch
     _stepper->setSpeedInHz(500);

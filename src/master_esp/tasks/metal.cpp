@@ -14,7 +14,6 @@
 static constexpr char TAG[] = "metal_task";
 
 using namespace MetalTaskConfig;
-
 using namespace metal_detector;
 
 namespace {
@@ -23,7 +22,14 @@ TaskHandle_t s_task_handle = nullptr;
 hw_timer_t *s_md_timer = nullptr;
 
 QueueHandle_t s_metal_snapshot_queue = nullptr;
-MetalDetector s_md{METAL_CFG};
+
+void sync_status_bits(EventBits_t mask, EventBits_t active_bits)
+{
+    xEventGroupClearBits(supervisor::g_robot_status_flags, mask);
+    if (active_bits != 0) {
+        xEventGroupSetBits(supervisor::g_robot_status_flags, active_bits);
+    }
+}
 
 inline void IRAM_ATTR arm_timer_us(uint32_t delay_us)
 {
@@ -38,13 +44,10 @@ void IRAM_ATTR on_metal_timer()
 {
     BaseType_t higher_priority_task_woken = pdFALSE;
 
-    if (s_task_handle != nullptr) {
+    if (s_task_handle != nullptr)
         vTaskNotifyGiveFromISR(s_task_handle, &higher_priority_task_woken);
-    }
 
-    if (higher_priority_task_woken == pdTRUE) {
-        portYIELD_FROM_ISR();
-    }
+    if (higher_priority_task_woken == pdTRUE) portYIELD_FROM_ISR();
 }
 
 esp_err_t timer_setup()
@@ -69,10 +72,22 @@ void metal_task(void *arg)
 {
     (void)arg;
 
-    xEventGroupClearBits(supervisor::g_robot_status_flags, robot_flags::STATUS_METAL_CALIBRATED);
+    xEventGroupClearBits(supervisor::g_robot_status_flags,
+                         robot_flags::STATUS_METAL_CALIBRATED_MASK |
+                             robot_flags::STATUS_METAL_SEEN_MASK);
 
-    MetalDetector::Snapshot snapshot;
-    bool finish_calibration = false;
+    MetalDetector md_1{METAL_1_CFG};
+    MetalDetector md_2{METAL_2_CFG};
+
+    if (timer_setup() != ESP_OK) {
+        ESP_LOGE(TAG, "timer setup failed, deleting metal task");
+        return vTaskDelete(nullptr);
+    }
+
+    if ((MD_1_ENABLE && md_1.init() != ESP_OK) || (MD_2_ENABLE && md_2.init() != ESP_OK)) {
+        ESP_LOGE(TAG, "metal detectors failed to enable, deleting metal task");
+        return vTaskDelete(nullptr);
+    }
 
     while (true) {
         xEventGroupWaitBits(supervisor::g_robot_control_flags,
@@ -83,68 +98,107 @@ void metal_task(void *arg)
 
         // Remove any notification left from a previous enabled period.
         ulTaskNotifyTake(pdTRUE, 0);
-        s_md.reset();
+
+        // reset the metal detector. this will cause them to recalibrate.
+        if (MD_1_ENABLE) md_1.reset();
+        if (MD_2_ENABLE) md_2.reset();
+
+        xEventGroupClearBits(supervisor::g_robot_status_flags,
+                             robot_flags::STATUS_METAL_CALIBRATED_MASK |
+                                 robot_flags::STATUS_METAL_SEEN_MASK);
 
         arm_timer_us(MD_START_DELAY_US);
-        bool was_metal_seen = false;
+
+        MetalDetectorSnapshots snapshots;
+
+        bool was_all_calibrated = false;
+        bool was_any_metal_seen = false;
+        bool sample_detector_1 = true; // if true, sample detector 1. else sample detector 2
 
         while (true) {
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-            const EventBits_t status_flags = xEventGroupGetBits(supervisor::g_robot_status_flags);
+            if (MD_1_ENABLE && sample_detector_1) {
+                md_1.pulse_and_sample();
+            } else if (MD_2_ENABLE) {
+                md_2.pulse_and_sample();
+            }
+            arm_timer_us(MD_STAGGER_US);
 
-            s_md.pulse_and_sample();
-            arm_timer_us(MD_DEADTIME_US);
-            s_md.update(); // update during the deadtime to give more consistent timing.
+            if (MD_1_ENABLE && sample_detector_1) {
+                md_1.update();
+                md_1.get_snapshot(&snapshots.detector_1);
+            } else if (MD_2_ENABLE) {
+                md_2.update();
+                md_2.get_snapshot(&snapshots.detector_2);
+            }
 
-            s_md.get_snapshot(&snapshot);
-            xQueueOverwrite(s_metal_snapshot_queue, &snapshot);
+            sample_detector_1 = !sample_detector_1;
 
-            if (finish_calibration == false && s_md.is_calibration_complete()) {
-                finish_calibration = true;
-                xEventGroupSetBits(supervisor::g_robot_status_flags,
-                                   robot_flags::STATUS_METAL_CALIBRATED);
+            xQueueOverwrite(s_metal_snapshot_queue, &snapshots);
+
+            EventBits_t calibrated_bits = 0;
+            if (MD_1_ENABLE && md_1.is_calibration_complete()) {
+                calibrated_bits |= robot_flags::STATUS_METAL_1_CALIBRATED;
+            }
+            if (MD_2_ENABLE && md_2.is_calibration_complete()) {
+                calibrated_bits |= robot_flags::STATUS_METAL_2_CALIBRATED;
+            }
+            sync_status_bits(robot_flags::STATUS_METAL_CALIBRATED_MASK, calibrated_bits);
+
+            const bool all_calibrated = robot_flags::has_all_flags(
+                calibrated_bits, robot_flags::STATUS_METAL_CALIBRATED_MASK);
+            if (all_calibrated && !was_all_calibrated) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                     supervisor::notify_main(robot_flags::NOTIFY_METAL_CALIBRATED));
             }
+            was_all_calibrated = all_calibrated;
 
-            const bool metal_seen = snapshot.state == MetalState::METAL_DETECTED;
-            if (metal_seen) {
-                // metal seen!
-                xEventGroupSetBits(supervisor::g_robot_status_flags,
-                                   robot_flags::STATUS_METAL_SEEN);
-
-            } else {
-                // no metal :(
-                xEventGroupClearBits(supervisor::g_robot_status_flags,
-                                     robot_flags::STATUS_METAL_SEEN);
+            EventBits_t seen_bits = 0;
+            if (snapshots.detector_1.state == MetalState::METAL_DETECTED) {
+                seen_bits |= robot_flags::STATUS_METAL_1_SEEN;
+            }
+            if (snapshots.detector_2.state == MetalState::METAL_DETECTED) {
+                seen_bits |= robot_flags::STATUS_METAL_2_SEEN;
             }
 
-            if (metal_seen && !was_metal_seen) {
+            sync_status_bits(robot_flags::STATUS_METAL_SEEN_MASK, seen_bits);
+
+            const bool any_metal_seen = seen_bits != 0;
+            if (any_metal_seen && !was_any_metal_seen) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(
                     supervisor::notify_main(robot_flags::NOTIFY_METAL_FOUND));
             }
-
-            was_metal_seen = metal_seen;
+            was_any_metal_seen = any_metal_seen;
 
             const EventBits_t control_flags = xEventGroupGetBits(supervisor::g_robot_control_flags);
             if (!robot_flags::has_flag(control_flags, robot_flags::CONTROL_METAL_ENABLED)) {
                 break;
             }
         }
+
+        xEventGroupClearBits(supervisor::g_robot_status_flags,
+                             robot_flags::STATUS_METAL_CALIBRATED_MASK |
+                                 robot_flags::STATUS_METAL_SEEN_MASK);
     }
 }
 } // namespace
 
-bool get_metal_detector_snapshot(MetalDetector::Snapshot &snapshot)
+bool get_metal_detector_snapshots(MetalDetectorSnapshots *snapshots)
 {
     configASSERT(s_metal_snapshot_queue != nullptr);
-    return xQueuePeek(s_metal_snapshot_queue, &snapshot, 0) == pdTRUE;
+    configASSERT(snapshots != nullptr);
+    return xQueuePeek(s_metal_snapshot_queue, snapshots, 0) == pdTRUE;
 }
 
 esp_err_t start_metal_detector_task(TaskHandle_t *out_handle)
 {
-    ESP_RETURN_ON_FALSE(MD_DEADTIME_US > 0 && MD_START_DELAY_US > 0,
+    if (!MD_1_ENABLE || !MD_2_ENABLE) return ESP_FAIL;
+
+    ESP_RETURN_ON_FALSE(MD_SAMPLE_PERIOD_US > 0 && MD_SAMPLE_PERIOD_US % 2 == 0 &&
+                            MD_STAGGER_US > METAL_1_CFG.md_pulse_us + METAL_1_CFG.md_blank_us &&
+                            MD_STAGGER_US > METAL_2_CFG.md_pulse_us + METAL_2_CFG.md_blank_us &&
+                            MD_START_DELAY_US > 0,
                         ESP_ERR_INVALID_ARG,
                         TAG,
                         "invalid metal detector timing");
@@ -157,14 +211,10 @@ esp_err_t start_metal_detector_task(TaskHandle_t *out_handle)
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_metal_snapshot_queue = xQueueCreate(1, sizeof(MetalDetector::Snapshot));
+    s_metal_snapshot_queue = xQueueCreate(1, sizeof(MetalDetectorSnapshots));
     configASSERT(s_metal_snapshot_queue != nullptr);
 
-    // set up metal_detector
-    ESP_RETURN_ON_ERROR(s_md.init(), TAG, "metal detector setup failed");
     // setup timer
-    ESP_RETURN_ON_ERROR(timer_setup(), TAG, "timer setup failed");
-
     BaseType_t ok = xTaskCreatePinnedToCore(&metal_task,
                                             "metal_task",
                                             TASK_STACK_DEPTH,
