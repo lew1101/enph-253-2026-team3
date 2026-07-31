@@ -49,7 +49,7 @@ esp_err_t WormSpear::init()
     return ESP_OK;
 }
 
-void WormSpear::calibrate()
+esp_err_t WormSpear::calibrate()
 {
     // move quickly to switch
     _stepper->setSpeedInHz(10000);
@@ -62,13 +62,13 @@ void WormSpear::calibrate()
     if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during fast calibration approach");
-        return;
+        return ESP_FAIL;
     }
 
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-  
+
     _stepper->move(!_config.reversed ? 2000 : -2000);
 
     // move slowly to switch
@@ -82,12 +82,12 @@ void WormSpear::calibrate()
     if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during slow calibration approach");
-        return;
+        return ESP_FAIL;
     }
 
     _stepper->forceStopAndNewPosition(0);
     _stepper->setSpeedInHz(_config.speed_hz);
-    return;
+    return ESP_OK;
 }
 
 // ONLY FOR TUNING PURPOSES

@@ -35,10 +35,8 @@ class ElevatorClaw {
     };
 
     explicit ElevatorClaw(const Config &config);
-
     esp_err_t init();
-
-    void calibrate();
+    esp_err_t calibrate();
 
     inline void move_to_position(int32_t step, bool blocking = true)
     {
@@ -52,13 +50,9 @@ class ElevatorClaw {
     }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
-
     inline void stop_elevator() { _stepper->forceStop(); }
-
     inline void disable_elevator() { _stepper->disableOutputs(); }
-
     inline void enable_elevator() { _stepper->enableOutputs(); }
-
     inline bool elevator_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES
