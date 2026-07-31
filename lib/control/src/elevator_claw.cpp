@@ -47,7 +47,7 @@ esp_err_t ElevatorClaw::init()
     return ESP_OK;
 }
 
-void ElevatorClaw::calibrate()
+esp_err_t ElevatorClaw::calibrate()
 {
     // move quickly to switch
     _stepper->setSpeedInHz(2000);
@@ -60,15 +60,15 @@ void ElevatorClaw::calibrate()
     if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during fast calibration approach");
-        return;
+        return ESP_FAIL;
     }
 
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-  
+
     _stepper->move(!_config.reversed ? 500 : -500);
-  
+
     // move slowly to switch
     _stepper->setSpeedInHz(500);
     if (_config.reversed) {
@@ -80,12 +80,12 @@ void ElevatorClaw::calibrate()
     if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during slow calibration approach");
-        return;
+        return ESP_FAIL;
     }
 
     _stepper->forceStopAndNewPosition(0);
     _stepper->setSpeedInHz(_config.speed_hz);
-    return;
+    return ESP_OK;
 }
 
 // ONLY FOR TUNING PURPOSES

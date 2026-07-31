@@ -40,10 +40,8 @@ class WormSpear {
     };
 
     explicit WormSpear(const Config &config);
-
     esp_err_t init();
-
-    void calibrate();
+    esp_err_t calibrate();
 
     inline void move_to_position(int32_t step, bool blocking = true)
     {
@@ -52,13 +50,9 @@ class WormSpear {
     }
 
     inline void set_spear(float deg, uint32_t time = DEFAULT_SPEAR_SWEEP_TIME) { _spear_servo.sweep_to_deg(deg, time); };
-
     inline void stop_worm() { _stepper->forceStop(); }
-
     inline void disable_worm() { _stepper->disableOutputs(); }
-
     inline void enable_worm() { _stepper->enableOutputs(); }
-
     inline bool worm_done() const { return !_stepper->isRunning(); }
 
     inline bool crescent_moon_limit_is_pressed() const { return _crescent_moon_limit_switch.is_pressed(); }

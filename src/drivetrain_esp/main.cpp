@@ -9,13 +9,13 @@
 #include "tasks/imu.hpp"
 #include "tasks/uart.hpp"
 
-static constexpr char TAG[]{"drivetrain_main"}
+static constexpr char TAG[]{"drivetrain_main"};
 
-TaskHandle_t uart_tx_handle;
-TaskHandle_t uart_rx_handle;
-TaskHandle_t drive_handle;
-TaskHandle_t imu_sensor_handle;
-TaskHandle_t tape_handle;
+static TaskHandle_t uart_tx_handle;
+static TaskHandle_t uart_rx_handle;
+static TaskHandle_t drive_handle;
+static TaskHandle_t imu_sensor_handle;
+static TaskHandle_t tape_handle;
 
 void setup()
 {
@@ -24,7 +24,7 @@ void setup()
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_uart_tasks(&uart_tx_handle, &uart_rx_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_imu_task(&imu_sensor_handle));
     ESP_ERROR_CHECK_WITHOUT_ABORT(start_drive_task(&drive_handle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(start_tape_sense_task(&tape_handle));
+    // ESP_ERROR_CHECK_WITHOUT_ABORT(start_tape_sense_task(&tape_handle));
 
     vTaskDelete(nullptr);
 }

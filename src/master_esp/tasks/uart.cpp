@@ -107,7 +107,10 @@ void _rx_task(void *)
 {
     std::array<uint8_t, drive_DriveUartMessage_size> payload{};
     TickType_t last_valid_receive = xTaskGetTickCount();
+    uint32_t consecutive_timeouts = 0;
     uint32_t previous_fault = 0;
+
+    ESP_LOGI(TAG, "rx uart started");
 
     while (true) {
         uint16_t payload_size = 0;
@@ -118,6 +121,7 @@ void _rx_task(void *)
             payload.data(), payload.size(), &payload_size, &packet_sequence, RX_TIMEOUT);
 
         if (receive_err == ESP_OK) {
+            consecutive_timeouts = 0;
             drive_DriveUartMessage drivetrain_status = drive_DriveUartMessage_init_zero;
 
             // decode message
@@ -177,7 +181,14 @@ void _rx_task(void *)
             } else {
                 ESP_LOGW(TAG, "status protobuf decode failed");
             }
-        } else if (receive_err != ESP_ERR_TIMEOUT) {
+        } else if (receive_err == ESP_ERR_TIMEOUT) {
+            ++consecutive_timeouts;
+            if (consecutive_timeouts % 50 == 0)
+                ESP_LOGI(TAG,
+                         "waiting for UART frames (%u consecutive timeouts)",
+                         static_cast<unsigned>(consecutive_timeouts));
+        } else {
+            consecutive_timeouts = 0;
             // some uart error... not timeout
             ESP_LOGW(TAG, "UART receive failed: %s", esp_err_to_name(receive_err));
         }
