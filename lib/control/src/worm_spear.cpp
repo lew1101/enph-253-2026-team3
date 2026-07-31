@@ -10,7 +10,8 @@ static constexpr char TAG[] = "worm_spear";
 WormSpear::WormSpear(const Config &config)
     : _config(config)
     , _spear_servo{_config.spear_servo_config}
-    , _limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP, HIGH}
+    , _worm_limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP, HIGH}
+    , _crescent_moon_limit_switch{_config.crescent_moon_limit_switch_pin, INPUT_PULLUP, HIGH}
 {
 }
 
@@ -35,14 +36,17 @@ esp_err_t WormSpear::init()
         return ESP_ERR_INVALID_STATE;
     }
 
-    _limit_switch.register_pressed_callback(
+    _worm_limit_switch.register_pressed_callback(
         [](void *ctx) {
             auto *worm = static_cast<control::WormSpear *>(ctx);
             worm->stop_worm();
         },
         this);
 
-    if (!_limit_switch.begin("worm_spear_limit")) {
+    if (!_worm_limit_switch.begin("worm_spear_limit")) {
+        return ESP_ERR_NO_MEM;
+    }
+    if (!_crescent_moon_limit_switch.begin("worm_spear_crescent_moon_limit")) {
         return ESP_ERR_NO_MEM;
     }
 
@@ -59,7 +63,7 @@ void WormSpear::calibrate()
         _stepper->runBackward();
     }
 
-    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+    if (!_worm_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during fast calibration approach");
         return;
@@ -79,7 +83,7 @@ void WormSpear::calibrate()
         _stepper->runBackward();
     }
 
-    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+    if (!_worm_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
         _stepper->forceStop();
         ESP_LOGE(TAG, "timed out during slow calibration approach");
         return;
