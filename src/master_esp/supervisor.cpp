@@ -29,15 +29,27 @@ esp_err_t notify_main(uint32_t notification)
     return xTaskNotify(g_task_handle, notification, eSetBits) == pdPASS ? ESP_OK : ESP_FAIL;
 }
 
-void wait_for_notification(uint32_t mask, TickType_t timeout)
+bool wait_for_notification(uint32_t mask, TickType_t timeout)
 {
-    uint32_t notif_val = 0;
-    do {
-        xTaskNotifyWait(0,    // Clear nothing on entry
-                        mask, // Clear target bit on exit
-                        &notif_val,
-                        timeout);
-    } while ((notif_val & mask) == 0);
+    TimeOut_t timeout_state;
+    TickType_t remaining = timeout;
+
+    vTaskSetTimeOutState(&timeout_state);
+
+    while (true) {
+        uint32_t notification_value = 0;
+
+        const BaseType_t notified = xTaskNotifyWait(0,    // Clear nothing on entry
+                                                    mask, // Clear requested bits on exit
+                                                    &notification_value,
+                                                    remaining);
+
+        if (notified == pdFALSE) return false; // Timed out without receiving a notification
+        if ((notification_value & mask) != 0) return true; // Requested notification bit received
+
+        // A different notification woke the task. Update the remaining time.
+        if (xTaskCheckForTimeOut(&timeout_state, &remaining) == pdTRUE) return false;
+    }
 }
 
 } // namespace supervisor
