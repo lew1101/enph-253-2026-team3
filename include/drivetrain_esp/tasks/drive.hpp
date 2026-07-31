@@ -102,13 +102,23 @@ constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
     .deadwheel_y_x_offset_m = 42.62525f / 1000.0f,
 };
 
-constexpr float X_TOLERANCE_M = 0.008f;
-constexpr float X_TOLERANCE_EXIT_M = 0.011f;
-constexpr float Y_TOLERANCE_M = 0.008f;
-constexpr float Y_TOLERANCE_EXIT_M = 0.011f;
+constexpr float X_PID_STOP_TOLERANCE_M = 0.008f;
+constexpr float X_PID_STOP_TOLERANCE_EXIT_M = 0.011f;
+constexpr float Y_PID_STOP_TOLERANCE_M = 0.008f;
+constexpr float Y_PID_STOP_TOLERANCE_EXIT_M = 0.011f;
 
-constexpr float HEADING_TOLERANCE_RAD = radians(1.0f);
-constexpr float HEADING_TOLERANCE_EXIT_RAD = radians(1.5f);
+constexpr float HEADING_PID_STOP_TOLERANCE_RAD = radians(1.0f);
+constexpr float HEADING_PID_STOP_TOLERANCE_EXIT_RAD = radians(1.5f);
+
+constexpr float TARGET_REACHED_X_TOLERANCE_M = 0.04f;
+constexpr float TARGET_REACHED_Y_TOLERANCE_M = 0.04f;
+constexpr float TARGET_REACHED_HEADING_TOLERANCE_RAD = radians(6.0f);
+
+constexpr float TARGET_SETTLED_MAX_POSITION_ERROR_M = 0.05f;
+constexpr float TARGET_SETTLED_MAX_HEADING_ERROR_RAD = radians(5.0f);
+constexpr float TARGET_SETTLED_TRANSLATION_DELTA_M = 0.002f;
+constexpr float TARGET_SETTLED_HEADING_DELTA_RAD = radians(0.5f);
+constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
 constexpr float POSE_PATH_WAYPOINT_SPACING_M = 0.15f;
 constexpr float POSE_PATH_LOOKAHEAD_TOLERANCE_M = 0.7f * POSE_PATH_WAYPOINT_SPACING_M;

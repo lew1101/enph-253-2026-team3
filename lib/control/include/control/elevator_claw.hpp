@@ -40,10 +40,15 @@ class ElevatorClaw {
 
     void calibrate();
 
-    inline void move_to_position(int32_t step)
+    inline void move_to_position(int32_t step, bool blocking = true)
     {
         if (_limit_switch.is_pressed() && step < 0) return;
-        _stepper->moveTo(_config.reversed ? -step : step);
+        _stepper->moveTo(_config.reversed ? -step : step, blocking);
+    }
+
+    inline void move(int32_t step, bool blocking = true) {
+        if (_limit_switch.is_pressed() && step < 0) return;
+        _stepper->move(_config.reversed ? -step : step, blocking);
     }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
