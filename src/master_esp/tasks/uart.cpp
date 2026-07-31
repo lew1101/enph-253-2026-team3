@@ -25,6 +25,7 @@ UartLink s_uart_link{};
 
 std::atomic_bool s_link_connected{false};
 std::atomic_uint32_t s_next_sequence{1};
+std::atomic_uint32_t s_last_completed_sequence{0};
 uint32_t s_session_id = 0;
 
 DriveCommandHandler s_drive_command_handler{COMMAND_ACK_TIMEOUT, COMMAND_MAX_RETRIES};
@@ -106,7 +107,6 @@ void _rx_task(void *)
 {
     std::array<uint8_t, drive_DriveUartMessage_size> payload{};
     TickType_t last_valid_receive = xTaskGetTickCount();
-    uint32_t previous_drive_flags = 0;
     uint32_t previous_fault = 0;
 
     while (true) {
@@ -163,13 +163,15 @@ void _rx_task(void *)
 
                 const bool target_reached =
                     (flags & robot_flags::DRIVE_STATUS_TARGET_REACHED) != 0;
-                const bool target_was_reached =
-                    (previous_drive_flags & robot_flags::DRIVE_STATUS_TARGET_REACHED) != 0;
-                if (target_reached && !target_was_reached)
-                    supervisor::notify_main(
-                        robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+                const uint32_t completed_sequence = drivetrain_status.last_command_sequence;
+                const uint32_t previously_completed =
+                    s_last_completed_sequence.load(std::memory_order_acquire);
+                if (target_reached && completed_sequence != 0 &&
+                    completed_sequence != previously_completed) {
+                    s_last_completed_sequence.store(completed_sequence, std::memory_order_release);
+                    supervisor::notify_main(robot_flags::NOTIFY_DRIVE_TARGET_REACHED);
+                }
 
-                previous_drive_flags = flags;
                 previous_fault = drivetrain_status.fault;
 
             } else {
@@ -187,7 +189,6 @@ void _rx_task(void *)
 
         if (is_connected && is_link_timedout) {
             s_link_connected.store(false, std::memory_order_release);
-            previous_drive_flags = 0;
             previous_fault = 0;
             xEventGroupClearBits(supervisor::g_robot_status_flags,
                                  robot_flags::STATUS_DRIVE_CONNECTED);
@@ -209,7 +210,9 @@ esp_err_t send_robot_message(const robot_RobotUartMessage &message, TickType_t t
     return xQueueSend(s_tx_queue, &message, timeout) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeout)
+esp_err_t send_drive_command(const robot_DriveCommand &command,
+                             TickType_t timeout,
+                             uint32_t *out_sequence)
 {
     if (supervisor::g_robot_control_flags == nullptr) return ESP_ERR_INVALID_STATE;
 
@@ -228,7 +231,11 @@ esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeo
             s_next_sequence.fetch_add(1, std::memory_order_relaxed);
     }
 
-    return send_robot_message(message, timeout);
+    const esp_err_t err = send_robot_message(message, timeout);
+    if (err == ESP_OK && out_sequence != nullptr) {
+        *out_sequence = message.payload.drive_command.sequence;
+    }
+    return err;
 }
 
 esp_err_t get_drive_status(drive_DriveUartMessage *out, TickType_t timeout)
@@ -243,6 +250,12 @@ bool drive_uart_link_connected() { return s_link_connected.load(std::memory_orde
 bool drive_command_pending() { return s_drive_command_handler.pending(); }
 
 bool drive_command_retry_failed() { return s_drive_command_handler.failed(); }
+
+bool drive_command_completed(uint32_t sequence)
+{
+    return sequence != 0 &&
+           s_last_completed_sequence.load(std::memory_order_acquire) == sequence;
+}
 
 esp_err_t start_master_uart_tasks(TaskHandle_t *tx_out, TaskHandle_t *rx_out)
 {

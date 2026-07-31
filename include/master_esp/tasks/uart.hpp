@@ -1,10 +1,9 @@
 #pragma once
 
-#include "portmacro.h"
-#include "shared/robot_flags.hpp"
-#include "comms/uart_link.hpp"
 #include "drive_message.pb.h"
 #include "robot_message.pb.h"
+
+#include "comms/uart_link.hpp"
 
 namespace MasterUartTaskConfig {
 constexpr gpio_num_t RX_PIN = GPIO_NUM_48;
@@ -40,10 +39,13 @@ constexpr comms::UartLink::Config UART_LINK_CFG{
 esp_err_t start_master_uart_tasks(TaskHandle_t *tx_handle_out = nullptr,
                                   TaskHandle_t *rx_handle_out = nullptr);
 esp_err_t send_robot_message(const robot_RobotUartMessage &message, TickType_t timeout = 0);
-esp_err_t send_drive_command(const robot_DriveCommand &command, TickType_t timeout = portMAX_DELAY);
+esp_err_t send_drive_command(const robot_DriveCommand &command,
+                             TickType_t timeout = portMAX_DELAY,
+                             uint32_t *out_sequence = nullptr);
 
 esp_err_t get_drive_status(drive_DriveUartMessage *out, TickType_t timeout = 0);
 
 bool drive_uart_link_connected();
 bool drive_command_pending();
 bool drive_command_retry_failed();
+bool drive_command_completed(uint32_t sequence);

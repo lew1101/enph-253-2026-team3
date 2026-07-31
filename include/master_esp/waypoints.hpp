@@ -7,25 +7,36 @@
 
 using control::Pose;
 
+
 // IN METERS
 #define WAYPOINT_LIST(X)                                                                           \
     X(POSE_HOME, 0.0f, 0.0f, 0.0f)                                                                 \
     X(POSE_ROCK_SCAN_1, 0.1172f, 0.84156f, 0.0f)                                                   \
-    X(POSE_ROCK_PICKUP_1, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_1_1, 0.05291f, 0.8179f, -18.5f)                                                                 \
+    X(POSE_ROCK_PICKUP_1_2, 0.03494f, 1.0198f, -90.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_1_3, 0.1609f, 1.0255f, -90.0f)                                                                 \
     X(POSE_ROCK_SCAN_2, 0.1948f, 1.3323f, 0.0f)                                                    \
-    X(POSE_ROCK_PICKUP_2, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_2_1, 0.1896f, 1.2715f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_2_2, 0.1480f, 1.3046f, 30.9f)                                                                 \
+    X(POSE_ROCK_PICKUP_2_3, 0.0735f, 1.4404f, 30.9f)                                                                 \
     X(POSE_ROCK_INTER_23, 0.2378f, 1.6306f, 0.0f)                                                  \
     X(POSE_ROCK_SCAN_3, 0.1869f, 1.7180f, 45.0f)                                                   \
-    X(POSE_ROCK_PICKUP_3, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_3_1, 0.2353f, 1.6468f, -4.4f)                                                                 \
+    X(POSE_ROCK_PICKUP_3_2, 0.2082f, 1.855f, -4.4f)                                                            \
     X(POSE_ROCK_INTER_34_1, -0.1411f, 1.9427f, 65.0f)                                              \
     X(POSE_ROCK_SCAN_4, -0.2526f, 1.9280f, 100.0f)                                                 \
-    X(POSE_ROCK_PICKUP_4, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_4_1, -0.1523f, 1.9811f, 79.4f)                                                                 \
+    X(POSE_ROCK_PICKUP_4_2, -0.3469f, 2.036f, 79.4f)                                                                  \
     X(POSE_ROCK_INTER_45_1, -0.4305f, 1.5521f, 180.0f)                                             \
     X(POSE_ROCK_INTER_45_2, -0.4305f, 0.6295, 180.0f)                                              \
     X(POSE_ROCK_SCAN_5, -0.5664f, 0.2476f, 180.0f)                                                 \
-    X(POSE_ROCK_PICKUP_5, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_5_1, -0.641f, 0.2968f, 209.4f)                                                                 \
+    X(POSE_ROCK_PICKUP_5_2, -0.5646f, 0.3116f, 209.4f)                                                                 \
+    X(POSE_ROCK_PICKUP_5_3, -0.4613f, 0.1755f, 209.4f)                                                                 \
     X(POSE_ROCK_SCAN_6, -0.7105f, 0.1723f, 90.0f)                                                  \
-    X(POSE_ROCK_PICKUP_6, 0.0f, 0.0f, 0.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_6_1, -0.557f, 0.1792f, 90.0f)                                                                 \
+    X(POSE_ROCK_PICKUP_6_2, -0.5986f, 0.1822f, 59.9f)                                                                 \
+    X(POSE_ROCK_PICKUP_6_3, -0.7320f, 0.2652f, 59.9f)                                                           \
     X(POSE_INTER_ROCK_TOWER, -1.0153f, 0.1675f, 92.0f)                                             \
     X(POSE_TOWER_BUILD, -1.4137f, 0.4173f, 123.5f)                                                 \
     X(POSE_TOWER_STACK, -1.5310f, 0.5400f, 62.1f)                                                  \
