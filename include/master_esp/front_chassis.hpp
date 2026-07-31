@@ -16,6 +16,7 @@ constexpr gpio_num_t CLAW_SERVO_PIN = GPIO_NUM_6;
 constexpr gpio_num_t WORM_STEP_PIN = GPIO_NUM_15;
 constexpr gpio_num_t WORM_DIR_PIN = GPIO_NUM_16;
 constexpr gpio_num_t WORM_LIMIT_SWITCH_PIN = GPIO_NUM_10;
+constexpr gpio_num_t CRESCENT_MOON_LIMIT_SWITCH_PIN = GPIO_NUM_11;
 
 constexpr gpio_num_t ELEVATOR_STEP_PIN = GPIO_NUM_42;
 constexpr gpio_num_t ELEVATOR_DIR_PIN = GPIO_NUM_41;
@@ -54,6 +55,7 @@ constexpr control::WormSpear::Config worm_config{
     .worm_step_pin = WORM_STEP_PIN,
     .worm_dir_pin = WORM_DIR_PIN,
     .worm_calibration_switch_pin = WORM_LIMIT_SWITCH_PIN,
+    .crescent_moon_limit_switch_pin = CRESCENT_MOON_LIMIT_SWITCH_PIN,
     .speed_hz = 18000,
     .acceleration_hz_per_s = 3200,
     .calibration_max_delay = pdMS_TO_TICKS(10000),
