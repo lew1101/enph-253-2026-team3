@@ -55,6 +55,10 @@ class ElevatorClaw {
 
     inline void stop_elevator() { _stepper->forceStop(); }
 
+    inline void disable_elevator() { _stepper->disableOutputs(); }
+
+    inline void enable_elevator() { _stepper->enableOutputs(); }
+
     inline bool elevator_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES

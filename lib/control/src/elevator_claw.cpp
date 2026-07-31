@@ -66,11 +66,12 @@ void ElevatorClaw::calibrate()
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-    _stepper->move(_config.reversed ? 200 : -200, true);
-
+  
+    _stepper->move(!_config.reversed ? 500 : -500);
+  
     // move slowly to switch
     _stepper->setSpeedInHz(500);
-    if (!_config.reversed) {
+    if (_config.reversed) {
         _stepper->runForward();
     } else {
         _stepper->runBackward();

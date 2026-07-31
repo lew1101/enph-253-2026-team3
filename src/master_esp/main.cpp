@@ -28,10 +28,10 @@ static DebouncedLimitSwitch guide_limit_switch{GPIO_NUM_9};
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
     ELEV_TOWER_1 = 500,
-    ELEV_TOWER_2_PLUS = 4200,
+    ELEV_TOWER_2_PLUS = 4000,
     ELEV_TOWER_2_MINUS = 3400,
     ELEV_TOWER_2 = 500,
-    ELEV_TOWER_3_PLUS = 4200,
+    ELEV_TOWER_3_PLUS = 4000,
     ELEV_TOWER_3_MINUS = 3400,
     ELEV_TOWER_3 = 500,
     ELEV_BACK = 5000,
@@ -45,7 +45,7 @@ enum SpearPos : int32_t { //
     SPEAR_CENTERING = 0
 };
 
-constexpr float SPEAR_UP_DEG = 60.0f;
+constexpr float SPEAR_UP_DEG = 55.0f;
 constexpr float SPEAR_UP_SLIGHTLY = 135.0f;
 constexpr float SPEAR_DOWN_DEG = 145.0f;
 constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms

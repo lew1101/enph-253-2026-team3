@@ -52,7 +52,7 @@ esp_err_t WormSpear::init()
 void WormSpear::calibrate()
 {
     // move quickly to switch
-    _stepper->setSpeedInHz(18000);
+    _stepper->setSpeedInHz(10000);
     if (_config.reversed) {
         _stepper->runForward();
     } else {
@@ -68,11 +68,12 @@ void WormSpear::calibrate()
     // back up
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
-    _stepper->move(_config.reversed ? 200 : -200, true);
+  
+    _stepper->move(!_config.reversed ? 2000 : -2000);
 
     // move slowly to switch
     _stepper->setSpeedInHz(500);
-    if (!_config.reversed) {
+    if (_config.reversed) {
         _stepper->runForward();
     } else {
         _stepper->runBackward();
