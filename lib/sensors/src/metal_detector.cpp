@@ -70,17 +70,19 @@ esp_err_t MetalDetector::update()
     _update_metal_state();
     _publish_snapshot();
 
-    if (!_baseline_ready) {
-        Serial.printf(">calibrating:%d\n>raw:%d\n>pulsed_baseline:%.3f\n",
-                      _baseline_count,
-                      _raw,
-                      _pulsed_baseline);
-    } else {
-        Serial.printf(">md:%.3f\n>shifted:%.3f\n>raw:%d\n>pulsed_baseline:%.3f\n",
-                      _sensor_out,
-                      adc_shifted,
-                      _raw,
-                      _pulsed_baseline);
+    if (_cfg.logging_enabled) {
+        if (!_baseline_ready) {
+            Serial.printf(">calibrating:%d\n>raw:%d\n>pulsed_baseline:%.3f\n",
+                          _baseline_count,
+                          _raw,
+                          _pulsed_baseline);
+        } else {
+            Serial.printf(">md:%.3f\n>shifted:%.3f\n>raw:%d\n>pulsed_baseline:%.3f\n",
+                          _sensor_out,
+                          adc_shifted,
+                          _raw,
+                          _pulsed_baseline);
+        }
     }
 
     return ESP_OK;
@@ -129,11 +131,12 @@ void MetalDetector::_update_metal_state()
         _clear_count = 0;
     }
 
-    const float mag = fabsf(_sensor_out);
-
     switch (_state) {
         case MetalState::METAL_DETECTED: {
-            if (mag < _cfg.clear_threshold) {
+            bool should_clear = _cfg.clear_threshold > 0.0f ? _sensor_out < _cfg.clear_threshold
+                                                            : _sensor_out > _cfg.clear_threshold;
+
+            if (should_clear) {
                 _clear_count++;
 
                 if (_clear_count >= _cfg.clear_count_required) {
@@ -149,7 +152,10 @@ void MetalDetector::_update_metal_state()
             break;
         }
         case MetalState::METAL_NONE: {
-            if (mag > _cfg.detect_threshold) {
+            bool should_detect = _cfg.detect_threshold > 0.0f ? _sensor_out > _cfg.detect_threshold
+                                                              : _sensor_out < _cfg.detect_threshold;
+
+            if (should_detect) {
                 _detect_count++;
 
                 if (_detect_count >= _cfg.detect_count_required) {
