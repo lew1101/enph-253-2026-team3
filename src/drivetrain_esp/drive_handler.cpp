@@ -78,7 +78,9 @@ esp_err_t DriveMessageHandler::_apply_command(robot_DriveCommand message)
         }
         case robot_DriveCommand_pose_tag: {
             auto &m = message.command.pose;
-            if (!std::isfinite(m.x_m) || !std::isfinite(m.y_m) || !std::isfinite(m.theta_rad))
+            if (!std::isfinite(m.x_m) || !std::isfinite(m.y_m) ||
+                !std::isfinite(m.theta_rad) || !std::isfinite(m.desired_speed_mps) ||
+                m.desired_speed_mps < 0.0f)
                 return ESP_ERR_INVALID_ARG;
             break;
         }

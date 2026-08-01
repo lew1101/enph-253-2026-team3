@@ -3,9 +3,12 @@ syntax = "proto3";
 package robot;
 
 message VelocityCommand {
-    float vx_percent = 1; // strafe velocity
+    // Robot-frame velocity requests. Percentages are scaled to the drivetrain's
+    // configured maximum translation speed and heading rate, then tracked by
+    // the pose PIDs.
+    float vx_percent = 1; // right/left velocity
     float vy_percent = 2; // forward/backward velocity
-    float omega_percent = 3;
+    float omega_percent = 3; // counter-clockwise/clockwise heading rate
 }
 
 message PoseCommand {
@@ -15,6 +18,9 @@ message PoseCommand {
     // When true, x/y are robot-frame offsets from the measured pose and
     // theta is an offset from the measured heading.
     bool relative = 4;
+    // Translational reference speed along the path. Zero (or an omitted field)
+    // uses the drivetrain's default speed.
+    float desired_speed_mps = 5;
 }
 
 message TapeFollowCommand {

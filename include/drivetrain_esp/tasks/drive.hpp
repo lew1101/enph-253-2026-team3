@@ -17,6 +17,7 @@ extern control::PID y_pid;
 extern control::PID heading_pid;
 
 namespace DriveTaskConfig {
+constexpr bool LOGGING_ENABLED = true;
 
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
@@ -120,8 +121,17 @@ constexpr float TARGET_SETTLED_TRANSLATION_DELTA_M = 0.002f;
 constexpr float TARGET_SETTLED_HEADING_DELTA_RAD = radians(0.5f);
 constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
-constexpr float POSE_PATH_WAYPOINT_SPACING_M = 0.15f;
-constexpr float POSE_PATH_LOOKAHEAD_TOLERANCE_M = 0.7f * POSE_PATH_WAYPOINT_SPACING_M;
+constexpr float DEFAULT_POSE_PATH_SPEED_MPS = 0.5f;
+// Pause reference progression if the robot falls this far behind. This is
+// independent of the endpoint tolerances above.
+constexpr float POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
+
+// Physical scaling for the percentage-based UART velocity command. Velocity
+// mode integrates a moving pose reference and tracks it with the pose PIDs.
+constexpr float VELOCITY_COMMAND_MAX_TRANSLATION_MPS = 0.5f;
+constexpr float VELOCITY_COMMAND_MAX_HEADING_RATE_RAD_S = radians(180.0f);
+constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
+constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD = radians(15.0f);
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 }; // namespace DriveTaskConfig

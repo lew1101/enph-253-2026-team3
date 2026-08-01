@@ -22,6 +22,7 @@ using namespace DriveTaskConfig;
 
 using control::Drivetrain;
 using control::PID;
+using control::Pose;
 using control::PoseEstimator;
 using control::PoseSnapshot;
 
@@ -46,6 +47,30 @@ PcntEncoder s_encoder_x;
 PcntEncoder s_encoder_y;
 
 std::atomic_bool s_reached_pose{false};
+
+Pose _robot_to_field(const Pose &robot_pose, float field_heading_rad)
+{
+    float sin_h, cos_h;
+    sincosf(field_heading_rad, &sin_h, &cos_h);
+
+    return {
+        .x_m = robot_pose.x_m * cos_h - robot_pose.y_m * sin_h,
+        .y_m = robot_pose.x_m * sin_h + robot_pose.y_m * cos_h,
+        .heading_rad = robot_pose.heading_rad,
+    };
+}
+
+Pose _field_to_robot(const Pose &field_pose, float field_heading_rad)
+{
+    float sin_h, cos_h;
+    sincosf(field_heading_rad, &sin_h, &cos_h);
+
+    return {
+        .x_m = field_pose.x_m * cos_h + field_pose.y_m * sin_h,
+        .y_m = -field_pose.x_m * sin_h + field_pose.y_m * cos_h,
+        .heading_rad = field_pose.heading_rad,
+    };
+}
 
 esp_err_t _initialize_deadwheels()
 {
@@ -146,10 +171,16 @@ void _drive_task(void *arg)
     float target_y_m = 0.0f;
     float target_heading_rad = 0.0f;
 
-    control::Pose path_start_pose{};
-    control::Pose path_end_pose{};
+    bool velocity_target_valid = false;
+    bool velocity_position_pid_stopped = false;
+    bool velocity_heading_pid_stopped = false;
 
-    uint32_t path_waypoint_count = 0;
+    Pose path_start_pose{};
+    Pose path_end_pose{};
+
+    float path_distance_m = 0.0f;
+    float path_progress_m = 0.0f;
+    float path_step_m = DEFAULT_POSE_PATH_SPEED_MPS * DT_S;
     bool path_endpoint_active = false;
 
     bool pose_target_valid = false;
@@ -157,7 +188,7 @@ void _drive_task(void *arg)
     bool heading_pid_stopped = false;
     bool target_reached_latched = false;
 
-    control::Pose endpoint_motion_reference{};
+    Pose endpoint_motion_reference{};
     TickType_t endpoint_last_motion_tick = 0;
     bool endpoint_motion_tracking = false;
 
@@ -181,16 +212,16 @@ void _drive_task(void *arg)
         }
 
         xQueueOverwrite(s_pose_queue, &pose_snapshot);
-        // if (++log_cnt % 25 == 0) {
-        Serial.printf(">trajectory:%.2f:%.2f|xy\n"
-                      ">heading:%.2f\n"
-                      ">valid:%s|t\n",
-                      pose_snapshot.pose.x_m,
-                      pose_snapshot.pose.y_m,
-                      degrees(pose_snapshot.pose.heading_rad),
-                      pose_snapshot.valid ? "true" : "false");
-        //     log_cnt = 0;
-        // }
+
+        if (LOGGING_ENABLED) {
+            Serial.printf(">trajectory:%.2f:%.2f|xy\n"
+                          ">heading:%.2f\n"
+                          ">valid:%s|t\n",
+                          pose_snapshot.pose.x_m,
+                          pose_snapshot.pose.y_m,
+                          degrees(pose_snapshot.pose.heading_rad),
+                          pose_snapshot.valid ? "true" : "false");
+        }
 
         // read latest command
         if (xQueuePeek(s_drive_cmd_queue, &cmd, 0) == pdTRUE) {
@@ -206,6 +237,12 @@ void _drive_task(void *arg)
                     case robot_DriveCommand_stop_tag:
                         break;
                     case robot_DriveCommand_velocity_tag:
+                        velocity_target_valid = false;
+                        velocity_position_pid_stopped = false;
+                        velocity_heading_pid_stopped = false;
+                        x_pid.reset();
+                        y_pid.reset();
+                        heading_pid.reset();
                         break;
                     case robot_DriveCommand_tape_follow_tag:
                         tape_pid.reset();
@@ -221,42 +258,48 @@ void _drive_task(void *arg)
                 // A valid measured pose is point A for both absolute and relative paths.
                 if (pose_snapshot.valid) {
                     if (pose_command.relative) {
-                        float sin_h, cos_h;
-                        sincosf(pose_snapshot.pose.heading_rad, &sin_h, &cos_h);
+                        const Pose field_offset = _robot_to_field(
+                            {
+                                .x_m = pose_command.x_m,
+                                .y_m = pose_command.y_m,
+                                .heading_rad = pose_command.theta_rad,
+                            },
+                            pose_snapshot.pose.heading_rad);
 
-                        // Rotate the requested robot-frame offset into the field frame.
-                        path_end_pose.x_m = pose_snapshot.pose.x_m + pose_command.x_m * cos_h -
-                                            pose_command.y_m * sin_h;
-                        path_end_pose.y_m = pose_snapshot.pose.y_m + pose_command.x_m * sin_h +
-                                            pose_command.y_m * cos_h;
+                        path_end_pose.x_m = pose_snapshot.pose.x_m + field_offset.x_m;
+                        path_end_pose.y_m = pose_snapshot.pose.y_m + field_offset.y_m;
                     } else {
                         path_end_pose.x_m = pose_command.x_m;
                         path_end_pose.y_m = pose_command.y_m;
                     }
 
-                    path_end_pose.heading_rad = control::wrap_angle_pi(
-                        pose_command.relative
-                            ? pose_snapshot.pose.heading_rad + pose_command.theta_rad
-                            : pose_command.theta_rad);
+                    const float angle = pose_command.relative ? pose_snapshot.pose.heading_rad +
+                                                                    pose_command.theta_rad
+                                                              : pose_command.theta_rad;
+
+                    path_end_pose.heading_rad = control::wrap_angle_pi(angle);
 
                     path_start_pose = pose_snapshot.pose;
+                    path_distance_m = std::hypot(path_end_pose.x_m - path_start_pose.x_m,
+                                                 path_end_pose.y_m - path_start_pose.y_m);
+                    path_progress_m = 0.0f;
 
-                    path_waypoint_count = 1;
-                    path_endpoint_active = false;
+                    const float desired_speed_mps = pose_command.desired_speed_mps > 0.0f
+                                                        ? pose_command.desired_speed_mps
+                                                        : DEFAULT_POSE_PATH_SPEED_MPS;
 
-                    const auto first_waypoint =
-                        control::get_next_lerp_pose(path_start_pose,
-                                                    path_end_pose,
-                                                    POSE_PATH_WAYPOINT_SPACING_M,
-                                                    path_waypoint_count);
+                    path_step_m = desired_speed_mps * DT_S;
 
-                    pose_target_valid = first_waypoint.has_value();
+                    // A zero-length translation is a pure heading command, so it can
+                    // use the endpoint controller immediately.
+                    path_endpoint_active = path_distance_m <= 0.0f;
+                    const Pose initial_target =
+                        path_endpoint_active ? path_end_pose : path_start_pose;
 
-                    if (first_waypoint) {
-                        target_x_m = first_waypoint->x_m;
-                        target_y_m = first_waypoint->y_m;
-                        target_heading_rad = first_waypoint->heading_rad;
-                    }
+                    target_x_m = initial_target.x_m;
+                    target_y_m = initial_target.y_m;
+                    target_heading_rad = initial_target.heading_rad;
+                    pose_target_valid = true;
 
                     x_pid.reset();
                     y_pid.reset();
@@ -282,13 +325,118 @@ void _drive_task(void *arg)
 
                 case robot_DriveCommand_velocity_tag: {
                     const auto &velocity = cmd.command.velocity;
-                    // ESP_LOGD(TAG,
-                    //          "moving at speed: x=%.2f, y=%.2f, rot=%.2f",
-                    //          velocity.vx_percent,
-                    //          velocity.vy_percent,
-                    //          velocity.omega_percent);
-                    drivetrain.move_vector(
-                        velocity.vx_percent, velocity.vy_percent, velocity.omega_percent);
+
+                    if (!pose_snapshot.valid) {
+                        velocity_target_valid = false;
+                        drivetrain.stop();
+                        break;
+                    }
+
+                    if (!velocity_target_valid) {
+                        target_x_m = pose_snapshot.pose.x_m;
+                        target_y_m = pose_snapshot.pose.y_m;
+                        target_heading_rad = pose_snapshot.pose.heading_rad;
+
+                        x_pid.reset();
+                        y_pid.reset();
+                        heading_pid.reset();
+
+                        velocity_position_pid_stopped = false;
+                        velocity_heading_pid_stopped = false;
+                        velocity_target_valid = true;
+                    }
+
+                    const float reference_error_x_field = target_x_m - pose_snapshot.pose.x_m;
+                    const float reference_error_y_field = target_y_m - pose_snapshot.pose.y_m;
+                    const float reference_heading_error =
+                        control::wrap_angle_pi(target_heading_rad - pose_snapshot.pose.heading_rad);
+
+                    // Integrate robot-frame velocity into a field-frame pose reference.
+                    // Hold an axis of the reference when the measured pose falls too far
+                    // behind, so the PID target cannot run away indefinitely.
+                    if (std::hypot(reference_error_x_field, reference_error_y_field) <=
+                        VELOCITY_REFERENCE_ADVANCE_TOLERANCE_M) {
+                        // percent is [-100, 100], scale to [-1, 1] and multiply by max translation
+                        // speed
+
+                        const float vx_mps =
+                            velocity.vx_percent * 0.01f * VELOCITY_COMMAND_MAX_TRANSLATION_MPS;
+                        const float vy_mps =
+                            velocity.vy_percent * 0.01f * VELOCITY_COMMAND_MAX_TRANSLATION_MPS;
+
+                        const Pose field_step = _robot_to_field(
+                            {
+                                .x_m = vx_mps * DT_S,
+                                .y_m = vy_mps * DT_S,
+                            },
+                            pose_snapshot.pose.heading_rad);
+
+                        target_x_m += field_step.x_m;
+                        target_y_m += field_step.y_m;
+                    }
+
+                    if (fabsf(reference_heading_error) <=
+                        VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD) {
+                        const float heading_rate_rad_s = velocity.omega_percent * 0.01f *
+                                                         VELOCITY_COMMAND_MAX_HEADING_RATE_RAD_S;
+
+                        const float angle = target_heading_rad + heading_rate_rad_s * DT_S;
+                        target_heading_rad = control::wrap_angle_pi(angle);
+                    }
+
+                    const float error_x_field = target_x_m - pose_snapshot.pose.x_m;
+                    const float error_y_field = target_y_m - pose_snapshot.pose.y_m;
+                    const float heading_error =
+                        control::wrap_angle_pi(target_heading_rad - pose_snapshot.pose.heading_rad);
+
+                    const Pose error_robot = _field_to_robot(
+                        {
+                            .x_m = error_x_field,
+                            .y_m = error_y_field,
+                            .heading_rad = heading_error,
+                        },
+                        pose_snapshot.pose.heading_rad);
+
+                    const bool translation_requested =
+                        velocity.vx_percent != 0.0f || velocity.vy_percent != 0.0f;
+
+                    if (translation_requested) {
+                        velocity_position_pid_stopped = false;
+                    } else {
+                        const float x_tolerance = velocity_position_pid_stopped
+                                                      ? X_PID_STOP_TOLERANCE_EXIT_M
+                                                      : X_PID_STOP_TOLERANCE_M;
+
+                        const float y_tolerance = velocity_position_pid_stopped
+                                                      ? Y_PID_STOP_TOLERANCE_EXIT_M
+                                                      : Y_PID_STOP_TOLERANCE_M;
+
+                        velocity_position_pid_stopped = fabsf(error_robot.x_m) <= x_tolerance &&
+                                                        fabsf(error_robot.y_m) <= y_tolerance;
+                    }
+
+                    if (velocity.omega_percent != 0.0f) {
+                        velocity_heading_pid_stopped = false;
+                    } else {
+                        velocity_heading_pid_stopped =
+                            fabsf(heading_error) <= (velocity_heading_pid_stopped
+                                                         ? HEADING_PID_STOP_TOLERANCE_EXIT_RAD
+                                                         : HEADING_PID_STOP_TOLERANCE_RAD);
+                    }
+
+                    const float x_cmd = velocity_position_pid_stopped
+                                            ? 0.0f
+                                            : x_pid.update(0.0f, -error_robot.x_m, DT_S);
+
+                    const float y_cmd = velocity_position_pid_stopped
+                                            ? 0.0f
+                                            : y_pid.update(0.0f, -error_robot.y_m, DT_S);
+
+                    const float rot_cmd = velocity_heading_pid_stopped
+                                              ? 0.0f
+                                              : heading_pid.update(0.0f, -heading_error, DT_S);
+
+                    drivetrain.move_vector(x_cmd, y_cmd, rot_cmd);
                     break;
                 }
 
@@ -296,6 +444,31 @@ void _drive_task(void *arg)
                     if (!pose_snapshot.valid || !pose_target_valid) {
                         drivetrain.stop();
                         break;
+                    }
+
+                    // Progress the reference once per fixed-rate control iteration. If
+                    // the robot falls behind, hold the reference until it catches up.
+                    // This bounds reference speed without coupling it to arrival tolerance.
+                    if (!path_endpoint_active) {
+                        const float reference_error_m =
+                            std::hypot(target_x_m - pose_snapshot.pose.x_m,
+                                       target_y_m - pose_snapshot.pose.y_m);
+
+                        if (reference_error_m <= POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M) {
+                            path_progress_m =
+                                std::min(path_progress_m + path_step_m, path_distance_m);
+
+                            const Pose next_reference = control::lerp_pose(
+                                path_start_pose, path_end_pose, path_progress_m / path_distance_m);
+
+                            target_x_m = next_reference.x_m;
+                            target_y_m = next_reference.y_m;
+                            target_heading_rad = next_reference.heading_rad;
+
+                            path_endpoint_active = path_progress_m >= path_distance_m;
+                            endpoint_motion_tracking = false;
+                            s_reached_pose.store(false, std::memory_order_relaxed);
+                        }
                     }
 
                     // calculate pos error in field coords
@@ -306,38 +479,13 @@ void _drive_task(void *arg)
                     const float heading_error =
                         control::wrap_angle_pi(target_heading_rad - pose_snapshot.pose.heading_rad);
 
-                    // Transform the position error into the robot frame used by the
-                    // independent strafe and forward controllers.
-                    float sin_h, cos_h;
-                    sincosf(pose_snapshot.pose.heading_rad, &sin_h, &cos_h);
-
-                    const float error_x_robot = error_x_field * cos_h + error_y_field * sin_h;
-                    const float error_y_robot = -error_x_field * sin_h + error_y_field * cos_h;
-
-                    const bool within_path_lookahead =
-                        std::hypot(error_x_field, error_y_field) <= POSE_PATH_LOOKAHEAD_TOLERANCE_M;
-
-                    if (!path_endpoint_active && within_path_lookahead) {
-                        const auto next_waypoint =
-                            control::get_next_lerp_pose(path_start_pose,
-                                                        path_end_pose,
-                                                        POSE_PATH_WAYPOINT_SPACING_M,
-                                                        path_waypoint_count + 1);
-
-                        if (next_waypoint) {
-                            ++path_waypoint_count;
-
-                            target_x_m = next_waypoint->x_m;
-                            target_y_m = next_waypoint->y_m;
-                            target_heading_rad = next_waypoint->heading_rad;
-                            endpoint_motion_tracking = false;
-
-                            s_reached_pose.store(false, std::memory_order_relaxed);
-                            break;
-                        }
-
-                        path_endpoint_active = true;
-                    }
+                    const Pose error_robot = _field_to_robot(
+                        {
+                            .x_m = error_x_field,
+                            .y_m = error_y_field,
+                            .heading_rad = heading_error,
+                        },
+                        pose_snapshot.pose.heading_rad);
 
                     if (path_endpoint_active) {
                         // Tight hysteresis only controls when the PID outputs stop.
@@ -346,16 +494,17 @@ void _drive_task(void *arg)
                         const float y_tolerance = position_pid_stopped ? Y_PID_STOP_TOLERANCE_EXIT_M
                                                                        : Y_PID_STOP_TOLERANCE_M;
 
-                        position_pid_stopped = fabsf(error_x_robot) <= x_tolerance &&
-                                               fabsf(error_y_robot) <= y_tolerance;
+                        position_pid_stopped = fabsf(error_robot.x_m) <= x_tolerance &&
+                                               fabsf(error_robot.y_m) <= y_tolerance;
+
                         heading_pid_stopped =
                             fabsf(heading_error) <= (heading_pid_stopped
                                                          ? HEADING_PID_STOP_TOLERANCE_EXIT_RAD
                                                          : HEADING_PID_STOP_TOLERANCE_RAD);
 
                         const bool within_reached_bounds =
-                            fabsf(error_x_robot) <= TARGET_REACHED_X_TOLERANCE_M &&
-                            fabsf(error_y_robot) <= TARGET_REACHED_Y_TOLERANCE_M &&
+                            fabsf(error_robot.x_m) <= TARGET_REACHED_X_TOLERANCE_M &&
+                            fabsf(error_robot.y_m) <= TARGET_REACHED_Y_TOLERANCE_M &&
                             fabsf(heading_error) <= TARGET_REACHED_HEADING_TOLERANCE_RAD;
 
                         const TickType_t now = pose_snapshot.tick;
@@ -367,9 +516,11 @@ void _drive_task(void *arg)
                             const float translation_delta =
                                 std::hypot(pose_snapshot.pose.x_m - endpoint_motion_reference.x_m,
                                            pose_snapshot.pose.y_m - endpoint_motion_reference.y_m);
-                            const float heading_delta = fabsf(
-                                control::wrap_angle_pi(pose_snapshot.pose.heading_rad -
-                                                       endpoint_motion_reference.heading_rad));
+
+                            const float angle_delta = pose_snapshot.pose.heading_rad -
+                                                      endpoint_motion_reference.heading_rad;
+
+                            const float heading_delta = fabsf(control::wrap_angle_pi(angle_delta));
 
                             if (translation_delta >= TARGET_SETTLED_TRANSLATION_DELTA_M ||
                                 heading_delta >= TARGET_SETTLED_HEADING_DELTA_RAD) {
@@ -389,6 +540,7 @@ void _drive_task(void *arg)
 
                         target_reached_latched = target_reached_latched || within_reached_bounds ||
                                                  (within_settle_bounds && stopped_long_enough);
+
                         s_reached_pose.store(target_reached_latched, std::memory_order_relaxed);
 
                         if (position_pid_stopped && heading_pid_stopped) {
@@ -406,9 +558,9 @@ void _drive_task(void *arg)
                     // update position pid
                     // negative sign on error necessary for robot to move in the right direction
                     const float x_cmd =
-                        position_pid_stopped ? 0.0f : x_pid.update(0.0f, -error_x_robot, DT_S);
+                        position_pid_stopped ? 0.0f : x_pid.update(0.0f, -error_robot.x_m, DT_S);
                     const float y_cmd =
-                        position_pid_stopped ? 0.0f : y_pid.update(0.0f, -error_y_robot, DT_S);
+                        position_pid_stopped ? 0.0f : y_pid.update(0.0f, -error_robot.y_m, DT_S);
                     const float rot_cmd =
                         heading_pid_stopped ? 0.0f : heading_pid.update(0.0f, -heading_error, DT_S);
 

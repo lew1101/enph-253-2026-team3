@@ -10,6 +10,8 @@
 
 using control::Pose;
 
+constexpr float DEFAULT_PATH_SPEED_MPS = 0.5f;
+
 inline bool drive_fault_active()
 {
     if (supervisor::g_robot_status_flags == nullptr) return true;
@@ -18,8 +20,10 @@ inline bool drive_fault_active()
         status, robot_flags::STATUS_DRIVE_FAULT_ACTIVE | robot_flags::STATUS_ESTOP_ACTIVE);
 }
 
-constexpr inline robot_DriveCommand make_pose_drive_command(const Pose &pose,
-                                                            bool is_relative = false)
+constexpr inline robot_DriveCommand make_pose_drive_command(
+    const Pose &pose,
+    bool is_relative = false,
+    float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
 {
     robot_DriveCommand out = robot_DriveCommand_init_zero;
 
@@ -28,6 +32,7 @@ constexpr inline robot_DriveCommand make_pose_drive_command(const Pose &pose,
     out.command.pose.x_m = pose.x_m;
     out.command.pose.y_m = pose.y_m;
     out.command.pose.theta_rad = pose.heading_rad;
+    out.command.pose.desired_speed_mps = desired_speed_mps;
 
     return out;
 }
@@ -66,9 +71,10 @@ inline void send_stop()
 
 inline esp_err_t send_pose(const Pose &waypoint,
                            bool is_relative = false,
-                           uint32_t *out_sequence = nullptr)
+                           uint32_t *out_sequence = nullptr,
+                           float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
 {
-    robot_DriveCommand cmd = make_pose_drive_command(waypoint, is_relative);
+    robot_DriveCommand cmd = make_pose_drive_command(waypoint, is_relative, desired_speed_mps);
     return send_drive_command(cmd, portMAX_DELAY, out_sequence);
 }
 
@@ -107,22 +113,24 @@ inline esp_err_t send_drive_command_and_wait(const robot_DriveCommand &command,
 
 inline esp_err_t send_pose_and_wait(const Pose &waypoint,
                                     bool relative = false,
-                                    TickType_t timeout = pdMS_TO_TICKS(5000))
+                                    TickType_t timeout = pdMS_TO_TICKS(5000),
+                                    float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
 {
     uint32_t sequence = 0;
-    const esp_err_t send_err = send_pose(waypoint, relative, &sequence);
+    const esp_err_t send_err = send_pose(waypoint, relative, &sequence, desired_speed_mps);
     if (send_err != ESP_OK) return send_err;
     return wait_for_drive_sequence(sequence, timeout);
 }
 
 inline esp_err_t send_pose_through(const Pose &waypoint,
                                    float pass_radius_m = 0.15f,
-                                   TickType_t timeout = pdMS_TO_TICKS(5000))
+                                   TickType_t timeout = pdMS_TO_TICKS(5000),
+                                   float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
 {
     if (!std::isfinite(pass_radius_m) || pass_radius_m <= 0.0f) return ESP_ERR_INVALID_ARG;
 
     uint32_t sequence = 0;
-    const esp_err_t send_err = send_pose(waypoint, false, &sequence);
+    const esp_err_t send_err = send_pose(waypoint, false, &sequence, desired_speed_mps);
     if (send_err != ESP_OK) return send_err;
 
     const TickType_t start = xTaskGetTickCount();
@@ -162,16 +170,22 @@ inline esp_err_t send_pose_through(const Pose &waypoint,
     __builtin_unreachable();
 }
 
-inline void follow_route(std::initializer_list<Pose> route)
+inline void follow_route(std::initializer_list<Pose> route,
+                         float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
 {
     size_t index = 0;
-    for (const Pose& pose : route) {
+    for (const Pose &pose : route) {
         const bool is_last = ++index == route.size();
-        const esp_err_t err = is_last ? send_pose_and_wait(pose) : send_pose_through(pose);
+        const esp_err_t err =
+            is_last ? send_pose_and_wait(pose, false, pdMS_TO_TICKS(5000), desired_speed_mps)
+                    : send_pose_through(pose, 0.15f, pdMS_TO_TICKS(5000), desired_speed_mps);
         if (err != ESP_OK) {
-            ESP_LOGE("drive_pose", "route failed at waypoint x=%.2fm, y=%.2fm, heading=%.2fdeg", pose.x_m, pose.y_m, degrees(pose.heading_rad));
+            ESP_LOGE("drive_pose",
+                     "route failed at waypoint x=%.2fm, y=%.2fm, heading=%.2fdeg",
+                     pose.x_m,
+                     pose.y_m,
+                     degrees(pose.heading_rad));
             halt_autonomous("pose route", err);
         }
     }
 }
-
