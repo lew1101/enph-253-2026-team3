@@ -6,7 +6,7 @@
 static constexpr char TAG[] = "supervisor";
 
 namespace supervisor {
-TaskHandle_t g_task_handle = nullptr;
+TaskHandle_t* g_main_handle_ptr = nullptr;
 EventGroupHandle_t g_robot_status_flags = nullptr;
 EventGroupHandle_t g_robot_control_flags = nullptr;
 
@@ -21,12 +21,12 @@ void init()
 
 esp_err_t notify_main(uint32_t notification)
 {
-    ESP_RETURN_ON_FALSE(g_task_handle != nullptr,
+    ESP_RETURN_ON_FALSE(g_main_handle_ptr != nullptr && *g_main_handle_ptr != nullptr,
                         ESP_ERR_INVALID_STATE,
                         TAG,
-                        "cannot notify supervisor because it is not initialized");
+                        "cannot notify supervisor because no autonomous task is running");
 
-    return xTaskNotify(g_task_handle, notification, eSetBits) == pdPASS ? ESP_OK : ESP_FAIL;
+    return xTaskNotify(*g_main_handle_ptr, notification, eSetBits) == pdPASS ? ESP_OK : ESP_FAIL;
 }
 
 bool wait_for_notification(uint32_t mask, TickType_t timeout)

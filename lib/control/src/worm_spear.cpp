@@ -11,15 +11,15 @@ WormSpear::WormSpear(const Config &config)
     : _config(config)
     , _spear_servo{_config.spear_servo_config}
     , _worm_limit_switch{_config.worm_calibration_switch_pin, INPUT_PULLUP, HIGH}
-    , _crescent_moon_limit_switch{_config.crescent_moon_limit_switch_pin, INPUT_PULLUP, HIGH}
 {
 }
 
 esp_err_t WormSpear::init()
 {
-    if (_config.engine == nullptr) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    configASSERT(_config.engine != nullptr);
+    configASSERT(_config.worm_step_pin != GPIO_NUM_NC &&
+                 _config.worm_calibration_switch_pin != GPIO_NUM_NC &&
+                 _config.worm_dir_pin != GPIO_NUM_NC);
 
     _stepper = _config.engine->stepperConnectToPin(_config.worm_step_pin);
     if (_stepper == nullptr) {
@@ -44,9 +44,6 @@ esp_err_t WormSpear::init()
         this);
 
     if (!_worm_limit_switch.begin("worm_spear_limit")) {
-        return ESP_ERR_NO_MEM;
-    }
-    if (!_crescent_moon_limit_switch.begin("worm_spear_crescent_moon_limit")) {
         return ESP_ERR_NO_MEM;
     }
 

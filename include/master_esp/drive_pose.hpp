@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Arduino.h"
 #include "esp_log.h"
 #include "drive.pb.h"
 
@@ -8,6 +9,14 @@
 #include "control/pose_estimator.hpp"
 
 using control::Pose;
+
+inline bool drive_fault_active()
+{
+    if (supervisor::g_robot_status_flags == nullptr) return true;
+    const EventBits_t status = xEventGroupGetBits(supervisor::g_robot_status_flags);
+    return robot_flags::has_any_flag(
+        status, robot_flags::STATUS_DRIVE_FAULT_ACTIVE | robot_flags::STATUS_ESTOP_ACTIVE);
+}
 
 constexpr inline robot_DriveCommand make_pose_drive_command(const Pose &pose,
                                                             bool is_relative = false)
@@ -22,6 +31,39 @@ constexpr inline robot_DriveCommand make_pose_drive_command(const Pose &pose,
 
     return out;
 }
+
+inline void send_velocity(float vx_percent, float vy_percent, float omega_percent = 0.0f)
+{
+    robot_DriveCommand velocity_cmd = robot_DriveCommand_init_zero;
+    velocity_cmd.which_command = robot_DriveCommand_velocity_tag;
+    velocity_cmd.command.velocity.vx_percent = vx_percent;
+    velocity_cmd.command.velocity.vy_percent = vy_percent;
+    velocity_cmd.command.velocity.omega_percent = omega_percent;
+
+    if (send_drive_command(velocity_cmd) == ESP_OK) {
+        ESP_LOGI("drive_pose",
+                 "velocity: x=%.2f%% y=%.2f%% turn=%.2f%%",
+                 vx_percent,
+                 vy_percent,
+                 omega_percent);
+    } else {
+        ESP_LOGE("drive_pose", "failed to send velocity command");
+    }
+}
+
+inline void send_stop()
+{
+    robot_DriveCommand stop_cmd = robot_DriveCommand_init_zero;
+    stop_cmd.which_command = robot_DriveCommand_stop_tag;
+    stop_cmd.command.stop.brake = true;
+
+    if (send_drive_command(stop_cmd) == ESP_OK) {
+        ESP_LOGI("drive_pose", "stopped");
+    } else {
+        ESP_LOGE("drive_pose", "failed to send stop command");
+    }
+}
+
 inline esp_err_t send_pose(const Pose &waypoint,
                            bool is_relative = false,
                            uint32_t *out_sequence = nullptr)
@@ -37,8 +79,11 @@ inline esp_err_t wait_for_drive_sequence(uint32_t sequence, TickType_t timeout)
     vTaskSetTimeOutState(&timeout_state);
 
     while (!drive_command_completed(sequence)) {
+        if (drive_fault_active()) return ESP_FAIL;
+
         if (!supervisor::wait_for_notification(robot_flags::NOTIFY_DRIVE_TARGET_REACHED,
                                                remaining)) {
+            if (drive_fault_active()) return ESP_FAIL;
             return drive_command_completed(sequence) ? ESP_OK : ESP_ERR_TIMEOUT;
         }
 
@@ -83,6 +128,8 @@ inline esp_err_t send_pose_through(const Pose &waypoint,
     const TickType_t start = xTaskGetTickCount();
 
     while (xTaskGetTickCount() - start < timeout) {
+        if (drive_fault_active()) return ESP_FAIL;
+
         drive_DriveUartMessage status = drive_DriveUartMessage_init_zero;
 
         if (get_drive_status(&status) == ESP_OK && status.last_command_sequence == sequence &&
@@ -113,5 +160,18 @@ inline esp_err_t send_pose_through(const Pose &waypoint,
 
     vTaskDelay(portMAX_DELAY);
     __builtin_unreachable();
+}
+
+inline void follow_route(std::initializer_list<Pose> route)
+{
+    size_t index = 0;
+    for (const Pose& pose : route) {
+        const bool is_last = ++index == route.size();
+        const esp_err_t err = is_last ? send_pose_and_wait(pose) : send_pose_through(pose);
+        if (err != ESP_OK) {
+            ESP_LOGE("drive_pose", "route failed at waypoint x=%.2fm, y=%.2fm, heading=%.2fdeg", pose.x_m, pose.y_m, degrees(pose.heading_rad));
+            halt_autonomous("pose route", err);
+        }
+    }
 }
 

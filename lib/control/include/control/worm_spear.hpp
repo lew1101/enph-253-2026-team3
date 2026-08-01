@@ -16,7 +16,6 @@ class WormSpear {
         gpio_num_t worm_step_pin = GPIO_NUM_NC;
         gpio_num_t worm_dir_pin = GPIO_NUM_NC;
         gpio_num_t worm_calibration_switch_pin = GPIO_NUM_NC;
-        gpio_num_t crescent_moon_limit_switch_pin = GPIO_NUM_NC;
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
 
@@ -55,8 +54,6 @@ class WormSpear {
     inline void enable_worm() { _stepper->enableOutputs(); }
     inline bool worm_done() const { return !_stepper->isRunning(); }
 
-    inline bool crescent_moon_limit_is_pressed() const { return _crescent_moon_limit_switch.is_pressed(); }
-
     // ONLY FOR TUNING PURPOSES
     void set_speed(int32_t speed_hz, unsigned int acceleration_hz_per_s);
     void set_home_position();
@@ -69,6 +66,5 @@ class WormSpear {
     driver::ServoDriver _spear_servo;
 
     DebouncedLimitSwitch _worm_limit_switch;
-    DebouncedLimitSwitch _crescent_moon_limit_switch;
 };
 } // namespace control
