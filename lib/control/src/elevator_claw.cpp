@@ -49,18 +49,20 @@ esp_err_t ElevatorClaw::init()
 
 esp_err_t ElevatorClaw::calibrate()
 {
-    // move quickly to switch
-    _stepper->setSpeedInHz(2000);
-    if (_config.reversed) {
-        _stepper->runForward();
-    } else {
-        _stepper->runBackward();
-    }
+    if (!_limit_switch.is_pressed()) {
+        // move quickly to switch
+        _stepper->setSpeedInHz(2000);
+        if (_config.reversed) {
+            _stepper->runForward();
+        } else {
+            _stepper->runBackward();
+        }
 
-    if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
-        _stepper->forceStop();
-        ESP_LOGE(TAG, "timed out during fast calibration approach");
-        return ESP_FAIL;
+        if (!_limit_switch.wait_until_pressed(_config.calibration_max_delay)) {
+            _stepper->forceStop();
+            ESP_LOGE(TAG, "timed out during fast calibration approach");
+            return ESP_FAIL;
+        }
     }
 
     // back up
