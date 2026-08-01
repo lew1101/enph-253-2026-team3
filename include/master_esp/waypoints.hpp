@@ -19,13 +19,13 @@ using control::Pose;
     X(POSE_ROCK_PICKUP_2_2, 0.1680f, 1.3046f, 30.9f)                                               \
     X(POSE_ROCK_PICKUP_2_3, 0.1135f, 1.3904f, 25.9f)                                               \
     X(POSE_ROCK_INTER_23, 0.2378f, 1.6306f, 0.0f)                                                  \
-    X(POSE_ROCK_SCAN_3, 0.2969f, 1.6980f, 45.0f)                                                   \
+    X(POSE_ROCK_SCAN_3, 0.1564f, 1.7628f, 45.0f)                                                   \
     X(POSE_ROCK_PICKUP_3_1, 0.1853f, 1.6468f, -4.4f)                                               \
     X(POSE_ROCK_PICKUP_3_2, 0.2382f, 1.8785f, -12.4f)                                              \
     X(POSE_ROCK_INTER_34_1, -0.1411f, 1.9427f, 65.0f)                                              \
     X(POSE_ROCK_SCAN_4, -0.2126f, 1.9480f, 100.0f)                                                 \
     X(POSE_ROCK_PICKUP_4_1, -0.2374f, 1.9205f, 64.4f)                                              \
-    X(POSE_ROCK_PICKUP_4_2, -0.35736f, 1.9833f, 64.4f)                                               \
+    X(POSE_ROCK_PICKUP_4_2, -0.36736f, 1.9833f, 64.4f)                                               \
     X(POSE_ROCK_INTER_45_1, -0.4305f, 1.5521f, 180.0f)                                             \
     X(POSE_ROCK_INTER_45_2, -0.4305f, 0.6295, 180.0f)                                              \
     X(POSE_ROCK_SCAN_5, -0.5664f, 0.2476f, 180.0f)                                                 \
