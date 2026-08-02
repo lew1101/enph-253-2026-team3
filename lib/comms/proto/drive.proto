@@ -27,6 +27,12 @@ message TapeFollowCommand {
     float forward_speed_percent = 1;
 }
 
+message TapeAlignmentCommand {
+    // Sign along robot-frame X used to reach the staging side before scanning.
+    // Zero (or an omitted field) uses the drivetrain default of -1.
+    float staging_direction = 1;
+}
+
 message StopCommand {
     bool brake = 1;
 }
@@ -38,5 +44,6 @@ message DriveCommand {
         TapeFollowCommand tape_follow = 3;
         PoseCommand pose = 4;
         StopCommand stop = 5;
+        TapeAlignmentCommand tape_alignment = 6;
     }
 }

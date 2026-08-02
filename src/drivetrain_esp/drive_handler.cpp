@@ -53,7 +53,9 @@ esp_err_t DriveMessageHandler::_apply_command(robot_DriveCommand message)
     if (!drive_enabled && message.which_command != robot_DriveCommand_stop_tag)
         return ESP_ERR_INVALID_STATE;
 
-    if (!tape_enabled && message.which_command == robot_DriveCommand_tape_follow_tag)
+    const bool tape_command = message.which_command == robot_DriveCommand_tape_follow_tag ||
+                              message.which_command == robot_DriveCommand_tape_alignment_tag;
+    if (!tape_enabled && tape_command)
         return ESP_ERR_INVALID_STATE;
 
     switch (message.which_command) {
@@ -84,19 +86,26 @@ esp_err_t DriveMessageHandler::_apply_command(robot_DriveCommand message)
                 return ESP_ERR_INVALID_ARG;
             break;
         }
+        case robot_DriveCommand_tape_alignment_tag:
+            if (!std::isfinite(message.command.tape_alignment.staging_direction))
+                return ESP_ERR_INVALID_ARG;
+            break;
         case robot_DriveCommand_stop_tag:
             break;
         default:
             return ESP_ERR_INVALID_ARG;
     }
 
+    // Prevent a newly accepted sequence from inheriting the completion latch
+    // belonging to the previous pose/alignment command.
+    clear_reached_pose();
     const esp_err_t err = send_drive_cmd(message);
     if (err != ESP_OK) return err;
 
     xSemaphoreTake(_mutex, portMAX_DELAY);
     _last_sequence = message.sequence;
     _have_sequence = true;
-    _tape_command_active = message.which_command == robot_DriveCommand_tape_follow_tag;
+    _tape_command_active = tape_command;
     xSemaphoreGive(_mutex);
 
     return ESP_OK;
@@ -179,7 +188,8 @@ drive_DriveUartMessage DriveMessageHandler::make_status(bool connected, uint32_t
 
     drive_DriveUartMessage status = drive_DriveUartMessage_init_zero;
     status.last_command_sequence = last_sequence;
-    status.fault = fault;
+    const uint32_t drive_task_fault = get_drive_task_fault();
+    status.fault = fault != 0 ? fault : drive_task_fault;
     status.uptime_ms = uptime;
 
     if (connected) {
