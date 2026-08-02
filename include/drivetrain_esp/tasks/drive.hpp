@@ -114,10 +114,9 @@ constexpr float TARGET_SETTLED_TRANSLATION_DELTA_M = 0.002f;
 constexpr float TARGET_SETTLED_HEADING_DELTA_RAD = radians(0.5f);
 constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
-constexpr float DEFAULT_POSE_PATH_SPEED_MPS = 0.5f;
-// Pause reference progression if the robot falls this far behind. This is
-// independent of the endpoint tolerances above.
-constexpr float POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
+// Position-reference lead along a pose path. This approximates the
+// aggressiveness of the previous 0.15 m waypoint spacing.
+constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.15f;
 
 // Physical scaling for the percentage-based UART velocity command. Velocity
 // mode integrates a moving pose reference and tracks it with the pose PIDs.

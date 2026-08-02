@@ -2,20 +2,16 @@
 
 #include <initializer_list>
 
-#include "Arduino.h"
-#include "esp_log.h"
-#include "drive.pb.h"
-
-#include "supervisor.hpp"
-#include "tasks/uart.hpp"
 #include "control/pose_estimator.hpp"
+
+#include "drive.pb.h"
 
 using control::Pose;
 
-constexpr float DEFAULT_PATH_SPEED_MPS = 0.5f;
+constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.15f;
 
 constexpr robot_DriveCommand make_pose_drive_command(
-    const Pose &pose, bool is_relative = false, float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)
+    const Pose &pose, bool is_relative = false, float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M)
 {
     robot_DriveCommand out = robot_DriveCommand_init_zero;
 
@@ -24,7 +20,7 @@ constexpr robot_DriveCommand make_pose_drive_command(
     out.command.pose.x_m = pose.x_m;
     out.command.pose.y_m = pose.y_m;
     out.command.pose.theta_rad = pose.heading_rad;
-    out.command.pose.desired_speed_mps = desired_speed_mps;
+    out.command.pose.path_lookahead_m = path_lookahead_m;
 
     return out;
 }
@@ -43,7 +39,7 @@ void send_stop();
 esp_err_t send_pose(const Pose &waypoint,
                     bool is_relative = false,
                     uint32_t *out_sequence = nullptr,
-                    float desired_speed_mps = DEFAULT_PATH_SPEED_MPS);
+                    float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 esp_err_t wait_for_drive_sequence(uint32_t sequence, TickType_t timeout);
 esp_err_t send_drive_command_and_wait(const robot_DriveCommand &command,
                                       TickType_t timeout = pdMS_TO_TICKS(5000));
@@ -52,11 +48,11 @@ esp_err_t send_tape_alignment_and_wait(float staging_direction = -1.0f,
 esp_err_t send_pose_and_wait(const Pose &waypoint,
                              bool relative = false,
                              TickType_t timeout = pdMS_TO_TICKS(5000),
-                             float desired_speed_mps = DEFAULT_PATH_SPEED_MPS);
+                             float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 esp_err_t send_pose_through(const Pose &waypoint,
                             float pass_radius_m = 0.15f,
                             TickType_t timeout = pdMS_TO_TICKS(5000),
-                            float desired_speed_mps = DEFAULT_PATH_SPEED_MPS);
+                            float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 [[noreturn]] void halt_autonomous(const char *phase, esp_err_t err);
 void follow_route(std::initializer_list<Pose> route,
-                  float desired_speed_mps = DEFAULT_PATH_SPEED_MPS);
+                  float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);

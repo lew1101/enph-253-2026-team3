@@ -54,7 +54,9 @@ class DriveController {
 
         float path_distance_m = 0.0f;
         float path_progress_m = 0.0f;
-        float path_speed_mps = 0.0f;
+        float path_unit_x = 0.0f;
+        float path_unit_y = 0.0f;
+        float path_lookahead_m = 0.0f;
 
         bool path_endpoint_active = false;
         bool target_valid = false;

@@ -18,9 +18,9 @@ message PoseCommand {
     // When true, x/y are robot-frame offsets from the measured pose and
     // theta is an offset from the measured heading.
     bool relative = 4;
-    // Translational reference speed along the path. Zero (or an omitted field)
-    // uses the drivetrain's default speed.
-    float desired_speed_mps = 5;
+    // How far ahead of the robot's measured progress to place the path
+    // reference. Zero (or an omitted field) uses the drivetrain default.
+    float path_lookahead_m = 5;
 }
 
 message TapeFollowCommand {

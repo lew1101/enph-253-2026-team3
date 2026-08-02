@@ -530,11 +530,16 @@ esp_err_t build_tower_sequence()
 esp_err_t stack_tower_sequence()
 {
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(500);
+    constexpr float MOVEMENT_LOOKAHEAD_M = DEFAULT_PATH_LOOKAHEAD_M / 2.0f;
+
     const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
 
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
     ESP_RETURN_ON_ERROR(
-        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]), TAG, "failed to reach tower stack pose");
+        send_pose_and_wait(
+            WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
+        TAG,
+        "failed to reach tower stack pose");
 
     // realign with tower tape
     // stage toward the right, so scan towards the left.
