@@ -1,4 +1,6 @@
 #include "freertos/idf_additions.h"
+#include "portmacro.h"
+
 #include <atomic>
 #include <cmath>
 #include <initializer_list>
@@ -6,16 +8,16 @@
 #include "esp_err.h"
 #include "esp_check.h"
 
-#include "portmacro.h"
 #include "shared/robot_flags.hpp"
 #include "supervisor.hpp"
-#include "drive_pose.hpp"
-#include "tasks/metal.hpp"
+
+#include "send_drive.hpp"
 #include "waypoints.hpp"
 #include "front_chassis.hpp"
 
 #include "tasks/camera_uart.hpp"
 #include "tasks/uart.hpp"
+#include "tasks/metal.hpp"
 
 #include "sensors/metal_detector.hpp"
 
@@ -396,14 +398,19 @@ esp_err_t build_tower_sequence()
     robot_DriveCommand backward = make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true);
 
     xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_ACTUATORS);
-    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
-    // TODO: tower building recalibration sequence
     // move to the tower
     follow_route({
         WAYPOINTS[POSE_INTER_ROCK_TOWER],
         WAYPOINTS[POSE_TOWER_BUILD],
     });
+
+    // realign with tower tape
+    // stage robot to the left, so scan towards the right.
+    ESP_RETURN_ON_ERROR(
+        send_tape_alignment_and_wait(-1.0f), TAG, "failed to align with tower tape");
 
     // PIECE 1
     // Starting with worm spear down, claw open, elevator up, and robot facing tower
@@ -442,7 +449,7 @@ esp_err_t build_tower_sequence()
         send_drive_command_and_wait(forward), TAG, "failed tower piece 2 forward move");
 
     worm_spear.set_spear(SPEAR_UP_DEG);
-    delay(500);
+    delay(CLAW_TOWER_DELAY);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
 
     elevator_claw.set_claw(CLAW_OPEN_DEG);
@@ -503,6 +510,10 @@ esp_err_t stack_tower_sequence()
     ESP_RETURN_ON_ERROR(
         send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]), TAG, "failed to reach tower stack pose");
 
+    // realign with tower tape
+    // stage toward the right, so scan towards the left.
+    ESP_RETURN_ON_ERROR(send_tape_alignment_and_wait(1.0f), TAG, "failed to align with tower tape");
+
     if (g_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
 
@@ -524,7 +535,10 @@ esp_err_t solar()
     ESP_RETURN_ON_ERROR(
         send_pose_and_wait(WAYPOINTS[POSE_SOLAR_ALIGN]), TAG, "failed to reach solar alignment");
     delay(500);
-    follow_route({WAYPOINTS[POSE_SOLAR_PULL], WAYPOINTS[POSE_SOLAR_TURN]});
+    follow_route({
+        WAYPOINTS[POSE_SOLAR_PULL],
+        WAYPOINTS[POSE_SOLAR_TURN],
+    });
 
     return ESP_OK;
 }
