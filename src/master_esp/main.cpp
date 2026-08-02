@@ -21,6 +21,10 @@
 
 #include "sensors/metal_detector.hpp"
 
+#define RUN_WAYPOINT_TEST_ENABLED 0
+#define RUN_WAYPOINT_PICKUP_ENABLED 0
+#define RUN_WAYPOINT_ALIGN_ENABLED 1
+
 using control::Pose;
 
 static constexpr char TAG[]{"master_main"};
@@ -50,6 +54,140 @@ bool guide_switch_available = false;
 bool front_chassis_available = false;
 
 bool is_track_a;
+
+#if RUN_WAYPOINT_TEST_ENABLED
+void test_course()
+{
+    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+
+    const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
+    const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
+
+#if RUN_WAYPOINT_PICKUP_ENABLED
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]);
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_1_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_1_2],
+        WAYPOINTS[POSE_ROCK_PICKUP_1_3],
+    });
+    delay(1500);
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]);
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_2_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_2_2],
+        WAYPOINTS[POSE_ROCK_PICKUP_2_3],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_INTER_23],
+        WAYPOINTS[POSE_ROCK_SCAN_3],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_3_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_3_2],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_INTER_34_1],
+        WAYPOINTS[POSE_ROCK_SCAN_4],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_4_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_4_2],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_INTER_45_1],
+        WAYPOINTS[POSE_ROCK_INTER_45_2],
+        WAYPOINTS[POSE_ROCK_SCAN_5],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_5_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_5_2],
+        WAYPOINTS[POSE_ROCK_PICKUP_5_3],
+    });
+    delay(1500);
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_PICKUP_6_1],
+        WAYPOINTS[POSE_ROCK_PICKUP_6_2],
+        WAYPOINTS[POSE_ROCK_PICKUP_6_3],
+    });
+    delay(1500);
+    follow_route({
+        WAYPOINTS[POSE_INTER_ROCK_TOWER],
+        WAYPOINTS[POSE_TOWER_BUILD],
+    });
+    delay(5000);
+
+#if RUN_WAYPOINT_ALIGN_ENABLED
+    send_tape_alignment_and_wait(-1.0f);
+    delay(5000);
+#endif
+
+    send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]);
+    delay(5000);
+
+#if RUN_WAYPOINT_ALIGN_ENABLED
+    send_tape_alignment_and_wait(1.0f);
+    delay(5000);
+#endif
+
+    send_pose_and_wait(WAYPOINTS[POSE_SOLAR_ALIGN]);
+    delay(500);
+    follow_route({
+        WAYPOINTS[POSE_SOLAR_PULL],
+        WAYPOINTS[POSE_SOLAR_TURN],
+    });
+#else
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]);
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]);
+    follow_route({
+        WAYPOINTS[POSE_ROCK_INTER_23],
+        WAYPOINTS[POSE_ROCK_SCAN_3],
+        WAYPOINTS[POSE_ROCK_INTER_34_1],
+        WAYPOINTS[POSE_ROCK_SCAN_4],
+    });
+    follow_route({
+        WAYPOINTS[POSE_ROCK_INTER_45_1],
+        WAYPOINTS[POSE_ROCK_INTER_45_2],
+        WAYPOINTS[POSE_ROCK_SCAN_5],
+    });
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
+    follow_route({
+        WAYPOINTS[POSE_INTER_ROCK_TOWER],
+        WAYPOINTS[POSE_TOWER_BUILD],
+    });
+    delay(5000);
+
+#if RUN_WAYPOINT_ALIGN_ENABLED
+    send_tape_alignment_and_wait(-1.0f);
+    delay(5000);
+#endif
+
+    send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]);
+    delay(5000);
+
+#if RUN_WAYPOINT_ALIGN_ENABLED
+    send_tape_alignment_and_wait(1.0f);
+    delay(5000);
+#endif
+
+    send_pose_and_wait(WAYPOINTS[POSE_SOLAR_ALIGN]);
+    delay(500);
+    follow_route({
+        WAYPOINTS[POSE_SOLAR_PULL],
+        WAYPOINTS[POSE_SOLAR_TURN],
+    });
+#endif
+}
+#endif
 
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
@@ -82,118 +220,6 @@ constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
 constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
 
 constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
-
-void test_course()
-{
-    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
-
-    constexpr bool DO_PICKUP = false;
-
-    const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
-    const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
-
-    if (DO_PICKUP) {
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]);
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_1_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_1_2],
-            WAYPOINTS[POSE_ROCK_PICKUP_1_3],
-        });
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]);
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_2_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_2_2],
-            WAYPOINTS[POSE_ROCK_PICKUP_2_3],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_INTER_23],
-            WAYPOINTS[POSE_ROCK_SCAN_3],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_3_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_3_2],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_INTER_34_1],
-            WAYPOINTS[POSE_ROCK_SCAN_4],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_4_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_4_2],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_INTER_45_1],
-            WAYPOINTS[POSE_ROCK_INTER_45_2],
-            WAYPOINTS[POSE_ROCK_SCAN_5],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_5_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_5_2],
-            WAYPOINTS[POSE_ROCK_PICKUP_5_3],
-        });
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_6_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_6_2],
-            WAYPOINTS[POSE_ROCK_PICKUP_6_3],
-        });
-        delay(1500);
-        follow_route({
-            WAYPOINTS[POSE_INTER_ROCK_TOWER],
-            WAYPOINTS[POSE_TOWER_BUILD],
-        });
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]);
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_SOLAR_ALIGN]);
-        delay(500);
-
-        follow_route({
-            WAYPOINTS[POSE_SOLAR_PULL],
-            WAYPOINTS[POSE_SOLAR_TURN],
-        });
-    } else {
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]);
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]);
-        follow_route({
-            WAYPOINTS[POSE_ROCK_INTER_23],
-            WAYPOINTS[POSE_ROCK_SCAN_3],
-            WAYPOINTS[POSE_ROCK_INTER_34_1],
-            WAYPOINTS[POSE_ROCK_SCAN_4],
-        });
-        follow_route({
-            WAYPOINTS[POSE_ROCK_INTER_45_1],
-            WAYPOINTS[POSE_ROCK_INTER_45_2],
-            WAYPOINTS[POSE_ROCK_SCAN_5],
-        });
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
-        follow_route({
-            WAYPOINTS[POSE_INTER_ROCK_TOWER],
-            WAYPOINTS[POSE_TOWER_BUILD],
-        });
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK]);
-        delay(1500);
-        send_pose_and_wait(WAYPOINTS[POSE_SOLAR_ALIGN]);
-        delay(500);
-
-        follow_route({
-            WAYPOINTS[POSE_SOLAR_PULL],
-            WAYPOINTS[POSE_SOLAR_TURN],
-        });
-    }
-}
 
 esp_err_t rocks_sequence()
 {
@@ -652,8 +678,11 @@ esp_err_t setup_autonomous()
 
     is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
 
+    // start drivetrain UART tasks
     ESP_RETURN_ON_ERROR(
         start_master_uart_tasks(), TAG, "drivetrain UART task start failed, aborting setup.");
+
+    // init elevator_claw and worm_spear
     const esp_err_t front_chassis_err = front_chassis_init();
     front_chassis_available = front_chassis_err == ESP_OK;
     if (!front_chassis_available)
@@ -661,6 +690,7 @@ esp_err_t setup_autonomous()
                  "front chassis unavailable; pickup and tower phases will be skipped: %s",
                  esp_err_to_name(front_chassis_err));
 
+    // init metal detector task
     const esp_err_t metal_detector_err = start_metal_detector_task();
     metal_detector_available = metal_detector_err == ESP_OK;
     if (!metal_detector_available)
@@ -668,6 +698,7 @@ esp_err_t setup_autonomous()
                  "metal detector unavailable; rock phase will be skipped: %s",
                  esp_err_to_name(metal_detector_err));
 
+    // init camera UART task
     const esp_err_t camera_uart_err = start_camera_uart_task();
     camera_available = camera_uart_err == ESP_OK;
     if (!camera_available)
@@ -677,6 +708,7 @@ esp_err_t setup_autonomous()
 
     delay(1000);
 
+    // calibrate elevator and worm spear if available
     if (front_chassis_available) {
         elevator_claw.set_claw(CLAW_OPEN_DEG);
         worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
@@ -747,6 +779,10 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
+    supervisor::init();
+    supervisor::attach_main_loop(&g_autonomous_task);
+
+#if !RUN_WAYPOINT_TEST_ENABLED
     if (!g_enable_limit_switch.begin("autonomous_enable_switch")) {
         ESP_LOGE(TAG, "switches: failed to start autonomous enable switch");
         return;
@@ -767,20 +803,21 @@ void setup()
         },
         nullptr);
 
-    supervisor::init();
-    supervisor::attach_main_loop(&g_autonomous_task);
-
     const esp_err_t setup_err = setup_autonomous();
     if (setup_err != ESP_OK) {
         ESP_LOGE(TAG,
                  "autonomous setup failed: %s; mission will remain stopped",
                  esp_err_to_name(setup_err));
     }
+#else
+    ESP_ERROR_CHECK(start_master_uart_tasks());
+    test_course();
+#endif
 
     vTaskDelete(nullptr);
 }
 
-void loop() { vTaskDelay(portMAX_DELAY); }
+void loop() {}
 
 // void loop()
 // {
