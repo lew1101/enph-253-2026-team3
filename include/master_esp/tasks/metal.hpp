@@ -35,7 +35,7 @@ constexpr metal_detector::MetalDetector::Config METAL_1_CFG{
     .detect_threshold = -1.0f,
     .clear_threshold = -0.5f,
 
-    .baseline_samples = 400,
+    .baseline_samples = 200,
     .baseline_discard = 70,
 
     .output_alpha = 0.08f,
@@ -57,7 +57,7 @@ constexpr metal_detector::MetalDetector::Config METAL_2_CFG{
     .detect_threshold = -1.0f,
     .clear_threshold = -0.5f,
 
-    .baseline_samples = 400,
+    .baseline_samples = 200,
     .baseline_discard = 70,
 
     .output_alpha = 0.08f,
