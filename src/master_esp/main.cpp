@@ -46,12 +46,12 @@ namespace {
 DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
 DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
 
-RmtTx status_led_rmt_tx{{
-    .gpio = STATUS_LED,
-    .resolution_hz = 10'000, // 1 tick = 100 µs
-    .memory_symbols = 64,
-    .queue_depth = 1,
-}};
+// RmtTx status_led_rmt_tx{{
+//     .gpio = STATUS_LED,
+//     .resolution_hz = 10'000, // 1 tick = 100 µs
+//     .memory_symbols = 64,
+//     .queue_depth = 1,
+// }};
 
 TaskHandle_t g_autonomous_task = nullptr;
 
@@ -84,7 +84,7 @@ inline void status_double_flash()
         },
     };
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(status_led_rmt_tx.transmit(double_blink));
+    // ESP_ERROR_CHECK_WITHOUT_ABORT(status_led_rmt_tx.transmit(double_blink));
 }
 
 #if RUN_WAYPOINT_TEST_ENABLED
@@ -461,10 +461,10 @@ esp_err_t build_tower_sequence()
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     // move to the tower
-    follow_route({
-        WAYPOINTS[POSE_INTER_ROCK_TOWER],
-        WAYPOINTS[POSE_TOWER_BUILD],
-    });
+    // follow_route({
+    //     WAYPOINTS[POSE_INTER_ROCK_TOWER],
+    //     WAYPOINTS[POSE_TOWER_BUILD],
+    // });
 
     // realign with tower tape
     // stage robot to the left, so scan towards the right.
@@ -622,18 +622,18 @@ void autonomous_task(void *arg)
         worm_spear.set_spear(SPEAR_UP_DEG, SPEAR_MOVE_DELAY);
     }
 
-    // PHASE 1: ROCKS and TELETUBBY
+    // // PHASE 1: ROCKS and TELETUBBY
 
     esp_err_t err = ESP_OK;
-    if (metal_detector_available && elev_calibrated) {
-        err = rocks_sequence();
-        if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) halt_autonomous("rocks sequence", err);
-    } else {
-        ESP_LOGW(TAG,
-                 "skipping rocks: metal=%s elevator=%s",
-                 metal_detector_available ? "ready" : "unavailable",
-                 elev_calibrated ? "ready" : "uncalibrated");
-    }
+    // if (metal_detector_available && elev_calibrated) {
+    //     err = rocks_sequence();
+    //     if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) halt_autonomous("rocks sequence", err);
+    // } else {
+    //     ESP_LOGW(TAG,
+    //              "skipping rocks: metal=%s elevator=%s",
+    //              metal_detector_available ? "ready" : "unavailable",
+    //              elev_calibrated ? "ready" : "uncalibrated");
+    // }
 
     // PHASE 2: TOWER
     //===============
@@ -641,23 +641,29 @@ void autonomous_task(void *arg)
     /* Tower tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors */
 
-    if (worm_calibrated && elev_calibrated && guide_switch_available) {
-        err = build_tower_sequence();
-        if (err != ESP_OK) halt_autonomous("tower build sequence", err);
+    err = build_tower_sequence();
+    if (err != ESP_OK) halt_autonomous("tower build sequence", err);
 
-        err = stack_tower_sequence();
-        if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
-    } else {
-        ESP_LOGW(TAG,
-                 "skipping tower: worm=%s elevator=%s guide=%s",
-                 worm_calibrated ? "ready" : "uncalibrated",
-                 elev_calibrated ? "ready" : "uncalibrated",
-                 guide_switch_available ? "ready" : "unavailable");
-    }
+    err = stack_tower_sequence();
+    if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
+
+    // if (worm_calibrated && elev_calibrated && guide_switch_available) {
+    //     err = build_tower_sequence();
+    //     if (err != ESP_OK) halt_autonomous("tower build sequence", err);
+
+    //     err = stack_tower_sequence();
+    //     if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
+    // } else {
+    //     ESP_LOGW(TAG,
+    //              "skipping tower: worm=%s elevator=%s guide=%s",
+    //              worm_calibrated ? "ready" : "uncalibrated",
+    //              elev_calibrated ? "ready" : "uncalibrated",
+    //              guide_switch_available ? "ready" : "unavailable");
+    // }
 
     // PHASE 3: SOLAR PANEL
-    err = solar();
-    if (err != ESP_OK) halt_autonomous("solar sequence", err);
+    // err = solar();
+    // if (err != ESP_OK) halt_autonomous("solar sequence", err);
 
     celebration_sequence(); // yahoo
 
@@ -744,26 +750,30 @@ esp_err_t setup_autonomous()
 
     delay(1000);
 
-    // calibrate elevator and worm spear if available
-    if (front_chassis_available) {
-        elevator_claw.set_claw(CLAW_OPEN_DEG);
-        worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
+    constexpr bool CALIBRATE = false;
 
-        const esp_err_t worm_err = worm_spear.calibrate();
-        worm_calibrated = worm_err == ESP_OK;
-        if (!worm_calibrated)
-            ESP_LOGW(TAG,
-                     "worm spear calibration failed; tower phase will be skipped: %s",
-                     esp_err_to_name(worm_err));
+    if (CALIBRATE) {
+        // calibrate elevator and worm spear if available
+        if (front_chassis_available) {
+            elevator_claw.set_claw(CLAW_OPEN_DEG);
+            worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
 
-        const esp_err_t elev_err = elevator_claw.calibrate();
-        elev_calibrated = elev_err == ESP_OK;
-        if (!elev_calibrated)
-            ESP_LOGW(TAG,
-                     "elevator calibration failed; pickup and tower phases will be skipped: %s",
-                     esp_err_to_name(elev_err));
+            const esp_err_t worm_err = worm_spear.calibrate();
+            worm_calibrated = worm_err == ESP_OK;
+            if (!worm_calibrated)
+                ESP_LOGW(TAG,
+                         "worm spear calibration failed; tower phase will be skipped: %s",
+                         esp_err_to_name(worm_err));
 
-        if (elev_calibrated) elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+            const esp_err_t elev_err = elevator_claw.calibrate();
+            elev_calibrated = elev_err == ESP_OK;
+            if (!elev_calibrated)
+                ESP_LOGW(TAG,
+                         "elevator calibration failed; pickup and tower phases will be skipped: %s",
+                         esp_err_to_name(elev_err));
+
+            if (elev_calibrated) elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+        }
     }
 
     setup_completed.store(true, std::memory_order_release);
@@ -815,7 +825,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    status_led_rmt_tx.init();
+    // status_led_rmt_tx.init();
 
     supervisor::init();
     supervisor::attach_main_loop(&g_autonomous_task);
@@ -850,11 +860,11 @@ void setup()
 #else
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
-    ESP_ERROR_CHECK(start_master_uart_tasks());
 
-    delay(1000);
-    send_tape_alignment_and_wait();
-    // test_course();
+    setup_autonomous();
+    // start_autonomous_task();
+
+    test_course();
 #endif
 
     vTaskDelete(nullptr);
