@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <cmath>
-#include <initializer_list>
 
 #include "esp_err.h"
 #include "esp_check.h"
@@ -20,10 +19,14 @@
 #include "tasks/metal.hpp"
 
 #include "sensors/metal_detector.hpp"
+#include "drivers/rmt_tx.hpp"
 
 #define RUN_WAYPOINT_TEST_ENABLED 0
 #define RUN_WAYPOINT_PICKUP_ENABLED 0
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
+
+using driver::DebouncedLimitSwitch;
+using driver::RmtTx;
 
 using control::Pose;
 
@@ -33,13 +36,22 @@ constexpr gpio_num_t GUIDE_LIM_SWITCH_PIN = GPIO_NUM_9; // debounced
 constexpr gpio_num_t ENABLE_SWITCH_PIN = GPIO_NUM_14;   // debounced
 constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
 
+constexpr gpio_num_t STATUS_LED = GPIO_NUM_13;
+
 esp_err_t setup_autonomous();
 esp_err_t start_autonomous_task();
 
 namespace {
 
-driver::DebouncedLimitSwitch g_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
-driver::DebouncedLimitSwitch g_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
+DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
+DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
+
+RmtTx status_led_rmt_tx{{
+    .gpio = STATUS_LED,
+    .resolution_hz = 10'000, // 1 tick = 100 µs
+    .memory_symbols = 64,
+    .queue_depth = 1,
+}};
 
 TaskHandle_t g_autonomous_task = nullptr;
 
@@ -54,6 +66,26 @@ bool guide_switch_available = false;
 bool front_chassis_available = false;
 
 bool is_track_a;
+
+inline void status_double_flash()
+{
+    static constexpr rmt_symbol_word_t double_blink[2]{
+        {
+            .duration0 = 2000, // ON 200 ms
+            .level0 = 1,
+            .duration1 = 1800, // OFF 180 ms
+            .level1 = 0,
+        },
+        {
+            .duration0 = 2000, // ON 200 ms
+            .level0 = 1,
+            .duration1 = 6200, // OFF 620 ms
+            .level1 = 0,
+        },
+    };
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(status_led_rmt_tx.transmit(double_blink));
+}
 
 #if RUN_WAYPOINT_TEST_ENABLED
 void test_course()
@@ -236,6 +268,7 @@ esp_err_t rocks_sequence()
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_METAL_ENABLED);
 
+    // ensure control metal enabled bits are cleared when function out of scope
     struct MetalControlGuard {
         ~MetalControlGuard()
         {
@@ -286,21 +319,20 @@ esp_err_t rocks_sequence()
                                                 pdFALSE,
                                                 MD_TIMEOUT);
 
-        if (!robot_flags::has_any_flag(status_flags, robot_flags::STATUS_METAL_SEEN_MASK)) {
-            ESP_LOGI(TAG, "metal not detected.");
-            return false;
+        bool metal_detected =
+            (is_check_md_left &&
+             robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_1_SEEN)) ||
+            (!is_check_md_left &&
+             robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_2_SEEN));
+
+        if (metal_detected) {
+            ESP_LOGI(
+                TAG, "metal detected on the %s", is_check_md_left ? "left side" : "right side");
+            status_double_flash();
+            return true;
         }
 
-        if (is_check_md_left &&
-            robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_1_SEEN)) {
-            ESP_LOGI(TAG, "metal detected on the left");
-            return true;
-        } else if (robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_2_SEEN)) {
-            ESP_LOGI(TAG, "metal detected on the right");
-            return true;
-        }
-
-        ESP_LOGI(TAG, "metal detected on opposite side!?");
+        ESP_LOGI(TAG, "metal not detected");
         return false;
     };
 
@@ -536,8 +568,7 @@ esp_err_t stack_tower_sequence()
 
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
     ESP_RETURN_ON_ERROR(
-        send_pose_and_wait(
-            WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
+        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
         TAG,
         "failed to reach tower stack pose");
 
@@ -545,7 +576,7 @@ esp_err_t stack_tower_sequence()
     // stage toward the right, so scan towards the left.
     ESP_RETURN_ON_ERROR(send_tape_alignment_and_wait(1.0f), TAG, "failed to align with tower tape");
 
-    if (g_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
+    if (s_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
 
         elevator_claw.move_to_position(ELEV_FLOOR);
@@ -680,7 +711,6 @@ esp_err_t setup_autonomous()
                         static_cast<unsigned>(GUIDE_LIM_SWITCH_PIN));
 
     pinMode(TRACK_SWITCH_PIN, INPUT_PULLDOWN);
-
     is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
 
     // start drivetrain UART tasks
@@ -784,20 +814,22 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
+    status_led_rmt_tx.init();
+
     supervisor::init();
     supervisor::attach_main_loop(&g_autonomous_task);
 
 #if !RUN_WAYPOINT_TEST_ENABLED
-    if (!g_enable_limit_switch.begin("autonomous_enable_switch")) {
+    if (!s_enable_limit_switch.begin("autonomous_enable_switch")) {
         ESP_LOGE(TAG, "switches: failed to start autonomous enable switch");
         return;
     }
 
-    guide_switch_available = g_guide_limit_switch.begin("tower_guide_switch");
+    guide_switch_available = s_guide_limit_switch.begin("tower_guide_switch");
     if (!guide_switch_available)
         ESP_LOGW(TAG, "guide switch unavailable; tower phase will be skipped");
 
-    g_enable_limit_switch.register_pressed_callback(
+    s_enable_limit_switch.register_pressed_callback(
         [](void *arg) {
             (void)arg;
             if (g_autonomous_task == nullptr) {

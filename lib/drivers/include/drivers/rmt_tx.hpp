@@ -36,9 +36,8 @@ class RmtTx {
     esp_err_t init()
     {
         ESP_RETURN_ON_FALSE(!_initialized, ESP_ERR_INVALID_STATE, LOG_TAG, "already initialized");
-        ESP_RETURN_ON_FALSE(_cfg.gpio != GPIO_NUM_NC &&
-                                _cfg.resolution_hz != 0 && _cfg.memory_symbols != 0 &&
-                                _cfg.queue_depth != 0,
+        ESP_RETURN_ON_FALSE(_cfg.gpio != GPIO_NUM_NC && _cfg.resolution_hz != 0 &&
+                                _cfg.memory_symbols != 0 && _cfg.queue_depth != 0,
                             ESP_ERR_INVALID_ARG,
                             LOG_TAG,
                             "invalid rmt tx config args");
@@ -127,6 +126,15 @@ class RmtTx {
             _channel, _encoder, symbols, symbol_count * sizeof(rmt_symbol_word_t), &tx_config);
     }
 
+    template <size_t N>
+    inline esp_err_t transmit(const rmt_symbol_word_t (&symbols)[N],
+                              int loop_count = 0,
+                              bool queue_nonblocking = true,
+                              bool end_level = false)
+    {
+        return transmit(symbols, N, loop_count, queue_nonblocking, end_level);
+    }
+
     inline esp_err_t wait(TickType_t timeout = portMAX_DELAY)
     {
         ESP_RETURN_ON_FALSE(_initialized, ESP_ERR_INVALID_STATE, LOG_TAG, "not initialized");
@@ -134,10 +142,10 @@ class RmtTx {
     }
 
     inline esp_err_t transmit_and_wait(const rmt_symbol_word_t *symbols,
-                                size_t symbol_count,
-                                int loop_count = 0,
-                                TickType_t timeout = portMAX_DELAY,
-                                bool end_level = false)
+                                       size_t symbol_count,
+                                       int loop_count = 0,
+                                       TickType_t timeout = portMAX_DELAY,
+                                       bool end_level = false)
     {
         ESP_RETURN_ON_ERROR(transmit(symbols, symbol_count, loop_count, false, end_level),
                             LOG_TAG,

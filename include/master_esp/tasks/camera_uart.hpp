@@ -19,7 +19,6 @@ constexpr float MIN_BOX_HEIGHT_RATIO = 0.08f;
 constexpr float MIN_BOX_AREA_RATIO = 0.01f;
 constexpr float MAX_BOX_AREA_RATIO = 0.80f;
 
-constexpr gpio_num_t TELETUBBY_LED_PIN = GPIO_NUM_12;
 constexpr uint8_t REQUIRED_CONSECUTIVE_DETECTIONS = 3;
 constexpr TickType_t TELETUBBY_LED_HOLD_TIME = pdMS_TO_TICKS(500);
 
