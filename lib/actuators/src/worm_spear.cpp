@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include "control/worm_spear.hpp"
+#include "actuators/worm_spear.hpp"
 #include "FastAccelStepper.h"
-#include "actuators/servo.hpp"
+#include "drivers/servo.hpp"
 
 using control::WormSpear;
 

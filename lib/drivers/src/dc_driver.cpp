@@ -1,14 +1,16 @@
 #include <algorithm>
 
-#include "actuators/dc_driver.hpp"
+#include "drivers/dc_driver.hpp"
 #include "esp_check.h"
 
 #include <esp32-hal-log.h>
 #include <cmath>
 
-static constexpr char TAG[] = "dc_driver";
-
 namespace driver {
+namespace {
+constexpr char TAG[] = "dc_driver";
+} // namespace
+
 // --- Constructor ---
 
 using std::clamp;

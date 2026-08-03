@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <esp_err.h>
 
-#include "actuators/limit.hpp"
-#include "actuators/servo.hpp"
+#include "drivers/limit.hpp"
+#include "drivers/servo.hpp"
 
 namespace control {
 
@@ -22,16 +22,16 @@ class ElevatorClaw {
         bool reversed = false;
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
 
-        driver::ServoDriver ::Config claw_servo_config = {.gpio = GPIO_NUM_NC,
-                                                          .channel = 1,
-                                                          .freq_hz = 50,
-                                                          .duty_res_bits = 14,
-                                                          .min_pulse_us = 500,
-                                                          .max_pulse_us = 2400,
-                                                          .min_pulse_deg = 0.0f,
-                                                          .max_pulse_deg = 180.0f,
-                                                          .min_clamp_deg = 0.0f,
-                                                          .max_clamp_deg = 180.0f};
+        driver::ServoDriver::Config claw_servo_config = {.gpio = GPIO_NUM_NC,
+                                                         .channel = 1,
+                                                         .freq_hz = 50,
+                                                         .duty_res_bits = 14,
+                                                         .min_pulse_us = 500,
+                                                         .max_pulse_us = 2400,
+                                                         .min_pulse_deg = 0.0f,
+                                                         .max_pulse_deg = 180.0f,
+                                                         .min_clamp_deg = 0.0f,
+                                                         .max_clamp_deg = 180.0f};
     };
 
     explicit ElevatorClaw(const Config &config);
@@ -67,6 +67,6 @@ class ElevatorClaw {
     FastAccelStepper *_stepper = nullptr;
     driver::ServoDriver _claw_servo;
 
-    DebouncedLimitSwitch _limit_switch;
+    driver::DebouncedLimitSwitch _limit_switch;
 };
 } // namespace control

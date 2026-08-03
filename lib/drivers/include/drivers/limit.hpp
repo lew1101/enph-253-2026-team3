@@ -7,6 +7,8 @@
 #include <atomic>
 #include <cstdint>
 
+namespace driver {
+
 class DebouncedLimitSwitch {
     using Callback = void (*)(void *context);
 
@@ -83,3 +85,5 @@ class DebouncedLimitSwitch {
     void *_pressed_context = nullptr;
     void *_released_context = nullptr;
 };
+
+} // namespace driver

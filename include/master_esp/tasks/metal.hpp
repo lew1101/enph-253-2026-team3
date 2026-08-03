@@ -27,19 +27,21 @@ constexpr metal_detector::MetalDetector::Config METAL_1_CFG{
     .gpio_md_adc_in = METAL_1_ADC_PIN,
 
     .md_pulse_us = 20,
-    .md_blank_us = 5,
+    .md_blank_us = 15,
 
     .detect_count_required = 4,
     .clear_count_required = 8,
 
-    .detect_threshold = 2.0f,
-    .clear_threshold = 1.0f,
+    .detect_threshold = -1.0f,
+    .clear_threshold = -0.5f,
 
-    .baseline_samples = 400,
+    .baseline_samples = 200,
     .baseline_discard = 70,
 
-    .output_alpha = 0.06f,
+    .output_alpha = 0.08f,
     .baseline_alpha = 0.00005f,
+
+    .logging_enabled = false,
 };
 
 constexpr metal_detector::MetalDetector::Config METAL_2_CFG{
@@ -47,19 +49,21 @@ constexpr metal_detector::MetalDetector::Config METAL_2_CFG{
     .gpio_md_adc_in = METAL_2_ADC_PIN,
 
     .md_pulse_us = 20,
-    .md_blank_us = 5,
+    .md_blank_us = 15,
 
     .detect_count_required = 4,
     .clear_count_required = 8,
 
-    .detect_threshold = 2.0f,
-    .clear_threshold = 1.0f,
+    .detect_threshold = -1.0f,
+    .clear_threshold = -0.5f,
 
-    .baseline_samples = 400,
+    .baseline_samples = 200,
     .baseline_discard = 70,
 
-    .output_alpha = 0.06f,
+    .output_alpha = 0.08f,
     .baseline_alpha = 0.00005f,
+
+    .logging_enabled = false,
 };
 }; // namespace MetalTaskConfig
 

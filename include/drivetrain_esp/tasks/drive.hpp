@@ -7,16 +7,10 @@
 #include "sensors/pcnt_encoder.hpp"
 
 #include "control/drivetrain.hpp"
-#include "control/tape_pid.hpp"
-#include "control/pid.hpp"
 #include "control/pose_estimator.hpp"
 
-extern control::TapePID tape_pid;
-extern control::PID x_pid;
-extern control::PID y_pid;
-extern control::PID heading_pid;
-
 namespace DriveTaskConfig {
+constexpr bool LOGGING_ENABLED = true;
 
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
@@ -120,10 +114,20 @@ constexpr float TARGET_SETTLED_TRANSLATION_DELTA_M = 0.002f;
 constexpr float TARGET_SETTLED_HEADING_DELTA_RAD = radians(0.5f);
 constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
-constexpr float POSE_PATH_WAYPOINT_SPACING_M = 0.15f;
-constexpr float POSE_PATH_LOOKAHEAD_TOLERANCE_M = 0.7f * POSE_PATH_WAYPOINT_SPACING_M;
+// Position-reference lead along a pose path. This approximates the
+// aggressiveness of the previous 0.15 m waypoint spacing.
+constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.15f;
+
+// Physical scaling for the percentage-based UART velocity command. Velocity
+// mode integrates a moving pose reference and tracks it with the pose PIDs.
+constexpr float VELOCITY_COMMAND_MAX_TRANSLATION_MPS = 0.5f;
+constexpr float VELOCITY_COMMAND_MAX_HEADING_RATE_RAD_S = radians(180.0f);
+constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
+constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD = radians(15.0f);
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
+constexpr uint32_t TAPE_SNAPSHOT_TIMEOUT_MS = 100;
+constexpr uint32_t TAPE_SNAPSHOT_WARNING_PERIOD_MS = 1000;
 }; // namespace DriveTaskConfig
 
 /// ========================================
@@ -133,3 +137,5 @@ esp_err_t send_drive_cmd(const robot_DriveCommand &cmd);
 esp_err_t start_drive_task(TaskHandle_t *out_handle);
 esp_err_t get_pose(control::PoseSnapshot *out);
 bool reached_pose();
+void clear_reached_pose();
+uint32_t get_drive_task_fault();

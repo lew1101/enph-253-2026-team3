@@ -193,7 +193,7 @@ bool get_metal_detector_snapshots(MetalDetectorSnapshots *snapshots)
 
 esp_err_t start_metal_detector_task(TaskHandle_t *out_handle)
 {
-    if (!MD_1_ENABLE || !MD_2_ENABLE) return ESP_FAIL;
+    if (!MD_1_ENABLE && !MD_2_ENABLE) return ESP_FAIL;
 
     ESP_RETURN_ON_FALSE(MD_SAMPLE_PERIOD_US > 0 && MD_SAMPLE_PERIOD_US % 2 == 0 &&
                             MD_STAGGER_US > METAL_1_CFG.md_pulse_us + METAL_1_CFG.md_blank_us &&

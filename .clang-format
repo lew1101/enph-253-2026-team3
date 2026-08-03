@@ -6,6 +6,7 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 ColumnLimit: 100
+ReflowComments: false
 
 PointerAlignment: Right
 DerivePointerAlignment: false

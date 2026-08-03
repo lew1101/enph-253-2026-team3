@@ -9,6 +9,7 @@
 #include "comms/pb_codec.hpp"
 #include "esp_check.h"
 #include "shared/robot_flags.hpp"
+#include "status_led.hpp"
 #include "supervisor.hpp"
 
 namespace {
@@ -63,8 +64,10 @@ void _rx_task(void *)
 {
     log_i("%s: starting camera task", TAG);
 
-    pinMode(TELETUBBY_LED_PIN, OUTPUT);
-    digitalWrite(TELETUBBY_LED_PIN, LOW);
+    const esp_err_t led_err = status_led::init();
+    const bool status_led_available = led_err == ESP_OK;
+    if (led_err != ESP_OK)
+        log_e("%s: status LED initialization failed: %s", TAG, esp_err_to_name(led_err));
 
     std::array<uint8_t, vision_TeletubbyDetection_size> payload{};
     TickType_t last_valid_receive = xTaskGetTickCount();
@@ -156,7 +159,7 @@ void _rx_task(void *)
             (teletubby_seen && now - last_positive_detection >= TELETUBBY_LED_HOLD_TIME))
             teletubby_seen = false;
 
-        digitalWrite(TELETUBBY_LED_PIN, teletubby_seen ? HIGH : LOW);
+        if (status_led_available) status_led::set(teletubby_seen);
         if (teletubby_seen) {
             xEventGroupSetBits(supervisor::g_robot_status_flags,
                                robot_flags::STATUS_TELETUBBY_SEEN);

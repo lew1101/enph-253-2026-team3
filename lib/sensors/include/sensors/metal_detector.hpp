@@ -26,6 +26,8 @@ class MetalDetector {
 
         float output_alpha = 0.06f;
         float baseline_alpha = 0.00005f;
+
+        bool logging_enabled = false;
     };
 
     struct Snapshot {

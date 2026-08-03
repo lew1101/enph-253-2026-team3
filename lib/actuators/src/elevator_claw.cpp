@@ -1,6 +1,6 @@
 #include <Arduino.h>
-#include "control/elevator_claw.hpp"
-#include "actuators/servo.hpp"
+#include "actuators/elevator_claw.hpp"
+#include "drivers/servo.hpp"
 #include "FastAccelStepper.h"
 
 using control::ElevatorClaw;
