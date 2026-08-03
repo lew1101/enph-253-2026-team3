@@ -96,17 +96,17 @@ constexpr control::PoseEstimator::Config POSE_ESTIMATION_CFG{
     .deadwheel_y_x_offset_m = 42.62525f / 1000.0f,
 };
 
-constexpr float X_PID_STOP_TOLERANCE_M = 0.008f;
-constexpr float X_PID_STOP_TOLERANCE_EXIT_M = 0.011f;
-constexpr float Y_PID_STOP_TOLERANCE_M = 0.008f;
-constexpr float Y_PID_STOP_TOLERANCE_EXIT_M = 0.011f;
+constexpr float X_PID_STOP_TOLERANCE_M = 0.005f;
+constexpr float X_PID_STOP_TOLERANCE_EXIT_M = 0.008f;
+constexpr float Y_PID_STOP_TOLERANCE_M = 0.005f;
+constexpr float Y_PID_STOP_TOLERANCE_EXIT_M = 0.008f;
 
-constexpr float HEADING_PID_STOP_TOLERANCE_RAD = radians(1.0f);
-constexpr float HEADING_PID_STOP_TOLERANCE_EXIT_RAD = radians(1.5f);
+constexpr float HEADING_PID_STOP_TOLERANCE_RAD = radians(0.7f);
+constexpr float HEADING_PID_STOP_TOLERANCE_EXIT_RAD = radians(1.2f);
 
-constexpr float TARGET_REACHED_X_TOLERANCE_M = 0.04f;
-constexpr float TARGET_REACHED_Y_TOLERANCE_M = 0.04f;
-constexpr float TARGET_REACHED_HEADING_TOLERANCE_RAD = radians(6.0f);
+constexpr float TARGET_REACHED_X_TOLERANCE_M = 0.03f;
+constexpr float TARGET_REACHED_Y_TOLERANCE_M = 0.03f;
+constexpr float TARGET_REACHED_HEADING_TOLERANCE_RAD = radians(4.5f);
 
 constexpr float TARGET_SETTLED_MAX_POSITION_ERROR_M = 0.05f;
 constexpr float TARGET_SETTLED_MAX_HEADING_ERROR_RAD = radians(5.0f);
