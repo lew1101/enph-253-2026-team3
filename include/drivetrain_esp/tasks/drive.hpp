@@ -116,14 +116,7 @@ constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
 // Position-reference lead along a pose path. This approximates the
 // aggressiveness of the previous 0.15 m waypoint spacing.
-constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.15f;
-
-// Physical scaling for the percentage-based UART velocity command. Velocity
-// mode integrates a moving pose reference and tracks it with the pose PIDs.
-constexpr float VELOCITY_COMMAND_MAX_TRANSLATION_MPS = 0.5f;
-constexpr float VELOCITY_COMMAND_MAX_HEADING_RATE_RAD_S = radians(180.0f);
-constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
-constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD = radians(15.0f);
+constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.18f;
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 constexpr uint32_t TAPE_SNAPSHOT_TIMEOUT_MS = 100;
