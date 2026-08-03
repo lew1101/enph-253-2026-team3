@@ -30,7 +30,7 @@ using control::Pose;
     X(POSE_ROCK_INTER_45_1, -0.4305f, 1.5521f, 180.0f)                                             \
     X(POSE_ROCK_INTER_45_2, -0.4305f, 0.6295, 180.0f)                                              \
     X(POSE_ROCK_SCAN_5, -0.5464f, 0.2426f, 180.0f)                                                 \
-    X(POSE_ROCK_PICKUP_5_1, -0.641ff, 0.2968f, 180.0f)                                              \
+    X(POSE_ROCK_PICKUP_5_1, -0.641f, 0.2968f, 180.0f)                                              \
     X(POSE_ROCK_PICKUP_5_2, -0.641f, 0.2968f, 219.4f)                                              \
     X(POSE_ROCK_PICKUP_5_3, -0.5446f, 0.3116f, 219.4f)                                             \
     X(POSE_ROCK_PICKUP_5_4, -0.4763f, 0.1859f, 219.4f)                                             \

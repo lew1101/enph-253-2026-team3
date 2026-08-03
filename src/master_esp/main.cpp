@@ -21,8 +21,8 @@
 #include "sensors/metal_detector.hpp"
 #include "drivers/rmt_tx.hpp"
 
-#define RUN_WAYPOINT_TEST_ENABLED 0
-#define RUN_WAYPOINT_PICKUP_ENABLED 0
+#define RUN_WAYPOINT_TEST_ENABLED 1
+#define RUN_WAYPOINT_PICKUP_ENABLED 1
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
 
 using driver::DebouncedLimitSwitch;
