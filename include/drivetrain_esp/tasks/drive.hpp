@@ -10,7 +10,7 @@
 #include "control/pose_estimator.hpp"
 
 namespace DriveTaskConfig {
-constexpr bool LOGGING_ENABLED = true;
+constexpr bool LOGGING_ENABLED = false;
 
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
@@ -106,7 +106,7 @@ constexpr float HEADING_PID_STOP_TOLERANCE_EXIT_RAD = radians(1.5f);
 
 constexpr float TARGET_REACHED_X_TOLERANCE_M = 0.04f;
 constexpr float TARGET_REACHED_Y_TOLERANCE_M = 0.04f;
-constexpr float TARGET_REACHED_HEADING_TOLERANCE_RAD = radians(6.0f);
+constexpr float TARGET_REACHED_HEADING_TOLERANCE_RAD = radians(4.5f);
 
 constexpr float TARGET_SETTLED_MAX_POSITION_ERROR_M = 0.05f;
 constexpr float TARGET_SETTLED_MAX_HEADING_ERROR_RAD = radians(5.0f);
@@ -114,16 +114,21 @@ constexpr float TARGET_SETTLED_TRANSLATION_DELTA_M = 0.002f;
 constexpr float TARGET_SETTLED_HEADING_DELTA_RAD = radians(0.5f);
 constexpr uint32_t TARGET_SETTLED_TIME_MS = 500;
 
-// Position-reference lead along a pose path. This approximates the
-// aggressiveness of the previous 0.15 m waypoint spacing.
-constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.15f;
-
 // Physical scaling for the percentage-based UART velocity command. Velocity
 // mode integrates a moving pose reference and tracks it with the pose PIDs.
-constexpr float VELOCITY_COMMAND_MAX_TRANSLATION_MPS = 0.5f;
+constexpr float VELOCITY_COMMAND_MAX_TRANSLATION_MPS = 0.7f;
 constexpr float VELOCITY_COMMAND_MAX_HEADING_RATE_RAD_S = radians(180.0f);
 constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
 constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD = radians(15.0f);
+
+// Tape centering often produces a correction too small for the pose PID to
+// clear the motor command deadband. Keep the final correction moving until it
+// reaches the tape alignment tolerance.
+constexpr float TAPE_CENTER_MIN_TRANSLATION_COMMAND_PERCENT = 2.0f;
+
+// Position-reference lead along a pose path. This approximates the
+// aggressiveness of the previous 0.15 m waypoint spacing.
+constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.18f;
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 constexpr uint32_t TAPE_SNAPSHOT_TIMEOUT_MS = 100;

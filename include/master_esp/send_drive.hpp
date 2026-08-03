@@ -8,7 +8,7 @@
 
 using control::Pose;
 
-constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.15f;
+constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.22f;
 
 constexpr robot_DriveCommand make_pose_drive_command(
     const Pose &pose, bool is_relative = false, float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M)

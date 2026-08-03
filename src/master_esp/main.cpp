@@ -21,8 +21,8 @@
 #include "sensors/metal_detector.hpp"
 #include "drivers/rmt_tx.hpp"
 
-#define RUN_WAYPOINT_TEST_ENABLED 0
-#define RUN_WAYPOINT_PICKUP_ENABLED 0
+#define RUN_WAYPOINT_TEST_ENABLED 1
+#define RUN_WAYPOINT_PICKUP_ENABLED 1
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
 
 using driver::DebouncedLimitSwitch;
@@ -126,7 +126,8 @@ constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
 
 void test_course()
 {
-    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
     const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
@@ -485,7 +486,7 @@ esp_err_t build_tower_sequence()
     -> Boss tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors -> Drive forward slowly (cresent moon will auto
     align the robot with the boss) -> Elevator down -> Claw open */
-    constexpr float Y_OFFSET = 0.08f; // m
+    constexpr float Y_OFFSET = 0.1f; // m
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
     robot_DriveCommand forward = make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true);
@@ -587,7 +588,7 @@ esp_err_t build_tower_sequence()
 esp_err_t stack_tower_sequence()
 {
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(500);
-    constexpr float MOVEMENT_LOOKAHEAD_M = DEFAULT_PATH_LOOKAHEAD_M / 2.0f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14;
 
     const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
 
@@ -874,8 +875,13 @@ void setup()
                  esp_err_to_name(setup_err));
     }
 #else
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
     ESP_ERROR_CHECK(start_master_uart_tasks());
-    test_course();
+
+    delay(1000);
+    send_tape_alignment_and_wait();
+    // test_course();
 #endif
 
     vTaskDelete(nullptr);

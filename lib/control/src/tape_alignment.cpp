@@ -1,7 +1,9 @@
+#include <Arduino.h>
 #include "control/tape_alignment.hpp"
 
 #include <cmath>
 
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 
 namespace control {
@@ -36,7 +38,7 @@ inline float _project_onto_strafe_axis(const Pose &field_strafe_axis, const Pose
 void _update_tape_edge_capture(TapeEdgeCapture &capture,
                                bool sees_tape,
                                float strafe_position_m,
-                               float tape_alignement_debounce_samples)
+                               uint8_t tape_alignment_debounce_samples)
 {
     if (sees_tape == capture.stable_state) {
         // current state matches stable state
@@ -49,26 +51,19 @@ void _update_tape_edge_capture(TapeEdgeCapture &capture,
         capture.candidate_state = sees_tape;
         capture.candidate_position_m = strafe_position_m;
         capture.candidate_samples = 1;
-        return;
+    } else {
+        ++capture.candidate_samples;
     }
 
-    // candidate state matches previous candidate state, increment the sample count
-    // this is debounce to ensure sensor readings stable
-    if (++capture.candidate_samples < tape_alignement_debounce_samples) return;
+    if (capture.candidate_samples < tape_alignment_debounce_samples) return;
 
     capture.stable_state = capture.candidate_state;
     capture.candidate_samples = 0;
 
     // Record the first sample in the confirmed transition, avoiding debounce
     // travel from shifting the measured crossing.
-    if (capture.stable_state) {
-        // The sensor has just seen tape, record the entry position if not already set
-        if (!capture.tape_entry_position_m)
-            capture.tape_entry_position_m = capture.candidate_position_m;
-    } else if (capture.tape_entry_position_m && !capture.tape_exit_position_m) {
-        // The sensor has just left tape, record the exit position if not already set
-        capture.tape_exit_position_m = capture.candidate_position_m;
-    }
+    if (capture.stable_state && !capture.tape_entry_position_m)
+        capture.tape_entry_position_m = capture.candidate_position_m;
 }
 
 std::optional<float> _update_tape_center_capture(TapeCenterCapture &capture,
@@ -91,25 +86,25 @@ std::optional<float> _update_tape_center_capture(TapeCenterCapture &capture,
     const auto &a = capture.sensor_a;
     const auto &b = capture.sensor_b;
 
-    if (!a.tape_entry_position_m || !a.tape_exit_position_m || !b.tape_entry_position_m ||
-        !b.tape_exit_position_m) {
+    if (!a.tape_entry_position_m || !b.tape_entry_position_m) {
         // not enough information to calculate the center yet
         return std::nullopt;
     }
 
-    // along strafe axis, the center is the average of the four tape edge positions
-    return (*a.tape_entry_position_m + *a.tape_exit_position_m + *b.tape_entry_position_m +
-            *b.tape_exit_position_m) /
-           4.0f;
+    // Both sensors crossed the same tape edge. The robot is centered when its
+    // strafe position is halfway between those two crossing positions.
+    return (*a.tape_entry_position_m + *b.tape_entry_position_m) / 2.0f;
 }
 
-TapeAlignmentOutput _failed(TapeAlignmentState &state)
+TapeAlignmentOutput _failed(TapeAlignmentState &state, TapeAlignmentFailure failure)
 {
     state.phase = TapeAlignmentPhase::FAILED;
+    log_i("failed");
     return {
         .phase = state.phase,
         .action = TapeAlignmentAction::FAILED,
         .pose_target = state.center_target,
+        .failure = failure,
     };
 }
 
@@ -122,7 +117,9 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
                                           TickType_t tape_tick,
                                           const PoseSnapshot &pose_snapshot)
 {
-    if (!pose_snapshot.valid) return _failed(state);
+    if (!pose_snapshot.valid) return _failed(state, TapeAlignmentFailure::INVALID_POSE);
+
+    log_i("a=%d, b=%d", sensor_a_sees_tape, sensor_b_sees_tape);
 
     const Pose &pose = pose_snapshot.pose;
     const bool new_tape_sample = !state.have_tape_tick || tape_tick != state.last_tape_tick;
@@ -137,44 +134,25 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
             !std::isfinite(cfg.staging_direction) || !std::isfinite(cfg.search_speed_mps) ||
             cfg.staging_direction == 0.0f || cfg.search_speed_mps <= 0.0f ||
             cfg.staging_distance_m <= 0.0f || cfg.max_staging_distance_m < cfg.staging_distance_m ||
-            cfg.max_scan_distance_m <= 0.0f || cfg.tape_alignment_debounce_samples == 0;
+            cfg.max_scan_distance_m <= 0.0f ||
+            !std::isfinite(cfg.post_detection_scan_distance_m) ||
+            cfg.post_detection_scan_distance_m < 0.0f || cfg.clear_debounce_samples == 0 ||
+            cfg.edge_debounce_samples == 0;
 
-        if (invalid_config) return _failed(state);
+        if (invalid_config) return _failed(state, TapeAlignmentFailure::INVALID_CONFIG);
 
         state.start_tick = pose_snapshot.tick;
         state.strafe_heading_rad = pose.heading_rad;
         state.field_strafe_axis = _robot_to_field({.x_m = 1.0f}, state.strafe_heading_rad);
         state.start_strafe_position_m = _project_onto_strafe_axis(state.field_strafe_axis, pose);
 
-        // Only shortcut if both sensors remain on the tape for consecutive
-        // fresh tape-task samples. The drive loop may see one snapshot more
-        // than once, so duplicate ticks must not advance the confirmation.
-        if (sensor_a_sees_tape && sensor_b_sees_tape) {
-            if (new_tape_sample && ++state.clear_samples >= cfg.tape_alignment_debounce_samples) {
-                // debounce good big boy, lets skip tape alignment yahoo
-                state.center_target = pose;
-                state.phase = TapeAlignmentPhase::COMPLETE;
-
-                return {
-                    .phase = state.phase,
-                    .action = TapeAlignmentAction::COMPLETE,
-                    .pose_target = state.center_target,
-                };
-            }
-
-            // not enough consecutive samples yet
-            return {
-                .phase = state.phase,
-                .action = TapeAlignmentAction::HOLD,
-            };
-        }
-
-        state.clear_samples = 0;
+        // Both sensors seeing black is not proof that the robot is centered.
+        // Always stage to a confirmed all-white side before scanning edges.
         state.phase = TapeAlignmentPhase::PREPOSITION;
     }
 
     if ((pose_snapshot.tick - state.start_tick) >= pdMS_TO_TICKS(cfg.timeout_ms))
-        return _failed(state); // timed out
+        return _failed(state, TapeAlignmentFailure::TIMEOUT);
 
     // +ve is to the right of the robot, -ve is to the left. The staging direction is
     const float staging_direction = cfg.staging_direction > 0.0f ? 1.0f : -1.0f;
@@ -202,7 +180,8 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
             }
 
             // if we have travelled too far, fail
-            if (staging_travel_m >= cfg.max_staging_distance_m) return _failed(state);
+            if (staging_travel_m >= cfg.max_staging_distance_m)
+                return _failed(state, TapeAlignmentFailure::MAX_STAGING_DISTANCE);
 
             // not yet stage far enough, keep moving in staging direction
             return {
@@ -228,7 +207,7 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
                 }
 
                 // clear for enough consecutive samples, start scanning
-                if (++state.clear_samples >= cfg.tape_alignment_debounce_samples) {
+                if (++state.clear_samples >= cfg.clear_debounce_samples) {
                     state.crossing_capture = {};
                     state.crossing_capture.strafe_heading_rad = state.strafe_heading_rad;
                     state.scan_start_position_m = strafe_position_m;
@@ -260,28 +239,31 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
                                                 sensor_a_sees_tape,
                                                 sensor_b_sees_tape,
                                                 pose,
-                                                cfg.tape_alignment_debounce_samples);
+                                                cfg.edge_debounce_samples);
             }
 
             if (center_position_m) {
                 // we found the tape centre, yay, now next step move to centre
                 const float correction_m = *center_position_m - strafe_position_m;
+
                 state.center_target = Pose{
                     .x_m = pose.x_m + correction_m * state.field_strafe_axis.x_m,
                     .y_m = pose.y_m + correction_m * state.field_strafe_axis.y_m,
                     .heading_rad = state.strafe_heading_rad,
                 };
-                state.phase = TapeAlignmentPhase::MOVE_TO_CENTRE;
+                state.post_detection_start_position_m = strafe_position_m;
+                state.phase = TapeAlignmentPhase::SCAN_PAST_TAPE;
 
                 return {
                     .phase = state.phase,
-                    .action = TapeAlignmentAction::POSE,
-                    .pose_target = state.center_target,
+                    .action = TapeAlignmentAction::VELOCITY,
+                    .velocity = {.vx_mps = scan_direction * cfg.search_speed_mps},
                 };
             }
 
             // scanned too far and still haven't found the tape centre, fail.
-            if (scan_travel_m >= cfg.max_scan_distance_m) return _failed(state);
+            if (scan_travel_m >= cfg.max_scan_distance_m)
+                return _failed(state, TapeAlignmentFailure::MAX_SCAN_DISTANCE);
 
             // not found tape yet, keep scanning.
             return {
@@ -291,8 +273,33 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
             };
         }
 
+        case TapeAlignmentPhase::SCAN_PAST_TAPE: {
+            const float scan_direction = -staging_direction;
+            const float travel_m =
+                (strafe_position_m - state.post_detection_start_position_m) * scan_direction;
+
+            if (travel_m >= cfg.post_detection_scan_distance_m) {
+                if (!state.center_target)
+                    return _failed(state, TapeAlignmentFailure::MISSING_CENTER_TARGET);
+
+                state.phase = TapeAlignmentPhase::MOVE_TO_CENTRE;
+                return {
+                    .phase = state.phase,
+                    .action = TapeAlignmentAction::POSE,
+                    .pose_target = state.center_target,
+                };
+            }
+
+            return {
+                .phase = state.phase,
+                .action = TapeAlignmentAction::VELOCITY,
+                .velocity = {.vx_mps = scan_direction * cfg.search_speed_mps},
+            };
+        }
+
         case TapeAlignmentPhase::MOVE_TO_CENTRE: {
-            if (!state.center_target) return _failed(state); // what? shouldn't happen
+            if (!state.center_target)
+                return _failed(state, TapeAlignmentFailure::MISSING_CENTER_TARGET);
 
             // find relative error between measured pose and target pose
             const float position_error_m = std::hypot(state.center_target->x_m - pose.x_m,
@@ -329,13 +336,13 @@ TapeAlignmentOutput update_tape_alignment(TapeAlignmentState &state,
             };
 
         case TapeAlignmentPhase::FAILED:
-            return _failed(state);
+            return _failed(state, TapeAlignmentFailure::NONE);
 
         case TapeAlignmentPhase::UNINITIALIZED:
             break;
     }
 
-    return _failed(state);
+    return _failed(state, TapeAlignmentFailure::INVALID_CONFIG);
 }
 
 } // namespace control

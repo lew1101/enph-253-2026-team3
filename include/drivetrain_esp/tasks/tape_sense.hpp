@@ -8,7 +8,7 @@ namespace TapeSenseTaskConfig {
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;
 constexpr BaseType_t TASK_CORE_ID = 1;
-constexpr float TASK_PERIOD_MS = 20.0f; // 50 Hz control loop
+constexpr float TASK_PERIOD_MS = 10.0f; // 100 Hz sensor loop
 
 constexpr gpio_num_t FL_TAPE_PIN = GPIO_NUM_1;
 constexpr gpio_num_t FM_TAPE_PIN = GPIO_NUM_2;
