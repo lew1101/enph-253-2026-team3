@@ -51,13 +51,13 @@ bool is_track_a;
 
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
-    ELEV_TOWER_1 = 500,
+    ELEV_TOWER_1 = 1000,
     ELEV_TOWER_2_PLUS = 4000,
     ELEV_TOWER_2_MINUS = 3400,
-    ELEV_TOWER_2 = 500,
+    ELEV_TOWER_2 = 1000,
     ELEV_TOWER_3_PLUS = 4000,
     ELEV_TOWER_3_MINUS = 3400,
-    ELEV_TOWER_3 = 500,
+    ELEV_TOWER_3 = 1000,
     ELEV_TOP_FRONT = 4700,
     ELEV_TIPPITY_TOP = 5000,
     ELEV_BACK = 5400,
@@ -70,10 +70,14 @@ enum SpearPos : int32_t { //
     SPEAR_CENTERING = 0
 };
 
-constexpr float SPEAR_UP_DEG = 90.0f;
+//Spear Angle
+constexpr float SPEAR_UP_DEG = 85.0f;
+constexpr float SPEAR_UP_TILTED = 75.0f;
 constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
 constexpr float SPEAR_DOWN_DEG = 5.0f;
-constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms
+constexpr float SPEAR_DOWN_TILTED = 15.0f;
+constexpr float MOON_OUT_OF_WAY_DEG = 100.0f;
+constexpr float SPEAR_MOVE_DELAY = 600UL; // ms
 
 constexpr float CLAW_OPEN_DEG = 90.0f;
 constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
@@ -406,33 +410,28 @@ esp_err_t build_tower_sequence()
     });
 
     // PIECE 1
-    // Starting with worm spear down, claw open, elevator up, and robot facing tower
+    // Starting with worm spear down, spear on the left, claw open, elevator at TOP_FRONT, and robot facing tower
     worm_spear.set_spear(SPEAR_DOWN_DEG);
-    delay(1000);
-
-    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
-    elevator_claw.set_claw(CLAW_OPEN_DEG);
-    worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
     ESP_RETURN_ON_ERROR(
         send_drive_command_and_wait(forward), TAG, "failed tower piece 1 forward move");
 
     worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
-    worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
     uint32_t movement_sequence = 0;
     ESP_RETURN_ON_ERROR(send_drive_command(backward, portMAX_DELAY, &movement_sequence),
                         TAG,
                         "failed to start tower piece 1 backward move");
-
-    worm_spear.set_spear(SPEAR_UP_DEG);
+    worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
 
+    // Pick up tower piece tilted, stack them straight
+    worm_spear.set_spear(SPEAR_UP_TILTED);
     elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
     delay(CLAW_TOWER_DELAY);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_PLUS);
     ESP_LOGI(TAG, "Tower assembly sequence: Piece 1 complete.");
 
     worm_spear.set_spear(SPEAR_DOWN_DEG);
-    // delay(1500); // TEMPORARY DELAY, REMOVE LATER
     ESP_RETURN_ON_ERROR(wait_for_drive_sequence(movement_sequence, pdMS_TO_TICKS(5000)),
                         TAG,
                         "tower piece 1 backward move timed out");
@@ -440,22 +439,20 @@ esp_err_t build_tower_sequence()
     // PIECE 2
     ESP_RETURN_ON_ERROR(
         send_drive_command_and_wait(forward), TAG, "failed tower piece 2 forward move");
-
     worm_spear.set_spear(SPEAR_UP_DEG);
-    delay(500);
-    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
-
-    elevator_claw.set_claw(CLAW_OPEN_DEG);
-    delay(CLAW_TOWER_DELAY);
-    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2);
-
-    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
-    delay(CLAW_TOWER_DELAY);
-    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_PLUS);
 
     ESP_RETURN_ON_ERROR(send_drive_command(backward, portMAX_DELAY, &movement_sequence),
                         TAG,
                         "failed to start tower piece 2 backward move");
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+    delay(CLAW_TOWER_DELAY);
+
+    worm_spear.set_spear(SPEAR_UP_TILTED);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2);
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    delay(CLAW_TOWER_DELAY);
+    elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_PLUS);
 
     ESP_LOGI(TAG, "Tower assembly sequence: Piece 2 complete.");
     worm_spear.set_spear(SPEAR_DOWN_DEG);
@@ -473,7 +470,6 @@ esp_err_t build_tower_sequence()
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
 
     worm_spear.set_spear(SPEAR_UP_DEG);
-    delay(500);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_MINUS);
 
     elevator_claw.set_claw(CLAW_OPEN_DEG);
@@ -485,9 +481,6 @@ esp_err_t build_tower_sequence()
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_PLUS);
 
     ESP_LOGI(TAG, "Tower assembly sequence: Piece 3 complete.");
-    worm_spear.set_spear(SPEAR_DOWN_DEG);
-    worm_spear.move_to_position(SpearPos::SPEAR_CENTERING);
-
     ESP_RETURN_ON_ERROR(
         send_drive_command_and_wait(backward), TAG, "failed tower piece 3 backward move");
 
@@ -506,6 +499,7 @@ esp_err_t stack_tower_sequence()
     if (g_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
 
+        worm_spear.set_spear(SPEAR_UP_DEG);
         elevator_claw.move_to_position(ELEV_FLOOR);
         elevator_claw.set_claw(CLAW_OPEN_DEG);
         ESP_LOGI(TAG, "guide limit switch hit and stopping on nub");
@@ -539,10 +533,11 @@ void autonomous_task(void *arg)
     // test_course();
     // INITILIZATION:
 
-    if (elev_calibrated) elevator_claw.move_to_position(ELEV_TOWER_2);
+    if (elev_calibrated) elevator_claw.move_to_position(ELEV_TOP_FRONT);
     if (worm_calibrated) {
+        worm_spear.set_spear(SPEAR_DOWN_DEG, 100UL);
         worm_spear.move_to_position(SPEAR_LEFT);
-        worm_spear.set_spear(SPEAR_UP_DEG, SPEAR_MOVE_DELAY);
+        worm_spear.set_spear(SPEAR_UP_DEG, 100UL);
     }
 
     // PHASE 1: ROCKS and TELETUBBY
