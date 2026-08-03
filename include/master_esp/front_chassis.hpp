@@ -1,8 +1,8 @@
 #pragma once
 
 #include "soc/gpio_num.h"
-#include "control/elevator_claw.hpp"
-#include "control/worm_spear.hpp"
+#include "actuators/elevator_claw.hpp"
+#include "actuators/worm_spear.hpp"
 
 #include "FastAccelStepperEngine.h"
 

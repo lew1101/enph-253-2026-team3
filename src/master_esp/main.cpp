@@ -38,8 +38,8 @@ esp_err_t start_autonomous_task();
 
 namespace {
 
-DebouncedLimitSwitch g_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
-DebouncedLimitSwitch g_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
+driver::DebouncedLimitSwitch g_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
+driver::DebouncedLimitSwitch g_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
 
 TaskHandle_t g_autonomous_task = nullptr;
 

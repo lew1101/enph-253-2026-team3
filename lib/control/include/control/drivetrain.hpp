@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <array>
 
-#include "actuators/dc_driver.hpp"
+#include "drivers/dc_driver.hpp"
 
 namespace control {
 

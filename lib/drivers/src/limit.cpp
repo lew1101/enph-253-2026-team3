@@ -1,4 +1,6 @@
-#include "actuators/limit.hpp"
+#include "drivers/limit.hpp"
+
+namespace driver {
 
 bool DebouncedLimitSwitch::begin(const char *task_name,
                                  uint32_t stack_bytes,
@@ -98,3 +100,5 @@ void DebouncedLimitSwitch::_run()
         }
     }
 }
+
+} // namespace driver

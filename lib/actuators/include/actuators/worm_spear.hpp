@@ -1,8 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include "FastAccelStepper.h"
-#include "actuators/limit.hpp"
-#include "actuators/servo.hpp"
+#include "drivers/limit.hpp"
+#include "drivers/servo.hpp"
 
 namespace control {
 
@@ -22,7 +22,7 @@ class WormSpear {
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
         bool reversed = false;
 
-        driver::ServoDriver ::Config spear_servo_config = {
+        driver::ServoDriver::Config spear_servo_config = {
             .gpio = GPIO_NUM_NC,
             .channel = 1,
             .freq_hz = 50,
@@ -65,6 +65,6 @@ class WormSpear {
     FastAccelStepper *_stepper = nullptr;
     driver::ServoDriver _spear_servo;
 
-    DebouncedLimitSwitch _worm_limit_switch;
+    driver::DebouncedLimitSwitch _worm_limit_switch;
 };
 } // namespace control
