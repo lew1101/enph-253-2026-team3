@@ -91,8 +91,7 @@ inline void status_double_flash()
 void test_course()
 {
     xEventGroupSetBits(supervisor::g_robot_control_flags,
-                       robot_flags::CONTROL_DRIVE_ENABLED |
-                           robot_flags::CONTROL_TAPE_ENABLED);
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
     const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
@@ -849,8 +848,13 @@ void setup()
                  esp_err_to_name(setup_err));
     }
 #else
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
     ESP_ERROR_CHECK(start_master_uart_tasks());
-    test_course();
+
+    delay(1000);
+    send_tape_alignment_and_wait();
+    // test_course();
 #endif
 
     vTaskDelete(nullptr);

@@ -78,6 +78,8 @@ void _tape_task(void *arg)
     float l2_adc_val = 0.0f;
 
     TickType_t last_wake_time = xTaskGetTickCount();
+    bool previous_l1 = s_snapshot.tape_l1;
+    bool previous_l2 = s_snapshot.tape_l2;
 
     while (true) {
         // xEventGroupWaitBits(
@@ -105,6 +107,17 @@ void _tape_task(void *arg)
         s_snapshot.tape_l1 = _apply_hyteresis(s_snapshot.tape_l1, l1_adc_val);
         s_snapshot.tape_l2 = _apply_hyteresis(s_snapshot.tape_l2, l2_adc_val);
 
+        if (s_snapshot.tape_l1 != previous_l1 || s_snapshot.tape_l2 != previous_l2) {
+            ESP_LOGI(TAG,
+                     "left tape transition: l1=%d l2=%d adc=(%.0f, %.0f)",
+                     s_snapshot.tape_l1,
+                     s_snapshot.tape_l2,
+                     l1_adc_val,
+                     l2_adc_val);
+            previous_l1 = s_snapshot.tape_l1;
+            previous_l2 = s_snapshot.tape_l2;
+        }
+
         float new_front_err = _get_tape_error(s_snapshot.tape_fl, s_snapshot.tape_fr, s_snapshot.front_err);
         s_snapshot.front_err = ALPHA * new_front_err + (1 - ALPHA) * s_snapshot.front_err;
 
@@ -119,6 +132,22 @@ void _tape_task(void *arg)
         s_snapshot.valid = true;
 
         xQueueOverwrite(s_snapshot_queue, &s_snapshot);
+
+        // if (s_snapshot.tick - last_log_tick >= pdMS_TO_TICKS(500)) {
+        //     ESP_LOGI(TAG,
+        //              "tape: front=%d%d%d back=%d%d%d left=%d%d left_adc=(%.0f, %.0f)",
+        //              s_snapshot.tape_fl,
+        //              s_snapshot.tape_fm,
+        //              s_snapshot.tape_fr,
+        //              s_snapshot.tape_bl,
+        //              s_snapshot.tape_bm,
+        //              s_snapshot.tape_br,
+        //              s_snapshot.tape_l1,
+        //              s_snapshot.tape_l2,
+        //              l1_adc_val,
+        //              l2_adc_val);
+        //     last_log_tick = s_snapshot.tick;
+        // }
 
         // s_tape_error.store(error);
         // ESP_LOGI("TapeSense", "FL: %d, FR: %d, Error: %.2f", FL_sees_tape, FR_sees_tape, error);

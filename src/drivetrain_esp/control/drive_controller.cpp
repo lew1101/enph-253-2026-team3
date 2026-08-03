@@ -1,6 +1,7 @@
 #include "control/drive_controller.hpp"
 
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 
 #include "control/path.hpp"
@@ -18,6 +19,22 @@ using control::PoseSnapshot;
 
 namespace {
 constexpr char TAG[] = "drive_controller";
+
+const char *tape_alignment_phase_name(control::TapeAlignmentPhase phase)
+{
+    switch (phase) {
+        case control::TapeAlignmentPhase::UNINITIALIZED: return "UNINITIALIZED";
+        case control::TapeAlignmentPhase::PREPOSITION: return "PREPOSITION";
+        case control::TapeAlignmentPhase::CONFIRM_CLEAR: return "CONFIRM_CLEAR";
+        case control::TapeAlignmentPhase::SCAN: return "SCAN";
+        case control::TapeAlignmentPhase::SCAN_PAST_TAPE: return "SCAN_PAST_TAPE";
+        case control::TapeAlignmentPhase::MOVE_TO_CENTRE: return "MOVE_TO_CENTRE";
+        case control::TapeAlignmentPhase::COMPLETE: return "COMPLETE";
+        case control::TapeAlignmentPhase::FAILED: return "FAILED";
+    }
+
+    return "UNKNOWN";
+}
 } // namespace
 
 Pose DriveController::_robot_to_field(const Pose &robot_pose, float field_heading_rad)
@@ -163,14 +180,23 @@ void DriveController::_drive_to_reference(Drivetrain &drivetrain,
                                           const PoseReferenceError &error,
                                           bool position_pid_stopped,
                                           bool heading_pid_stopped,
-                                          float dt_s)
+                                          float dt_s,
+                                          float minimum_translation_command)
 {
-    const float x_cmd =
+    float x_cmd =
         position_pid_stopped ? 0.0f : _x_pid.update(0.0f, -error.robot_pose.x_m, dt_s);
-    const float y_cmd =
+    float y_cmd =
         position_pid_stopped ? 0.0f : _y_pid.update(0.0f, -error.robot_pose.y_m, dt_s);
     const float heading_cmd =
         heading_pid_stopped ? 0.0f : _heading_pid.update(0.0f, -error.robot_pose.heading_rad, dt_s);
+
+    const float translation_command = std::hypot(x_cmd, y_cmd);
+    if (!position_pid_stopped && translation_command > 0.0f &&
+        translation_command < minimum_translation_command) {
+        const float scale = minimum_translation_command / translation_command;
+        x_cmd *= scale;
+        y_cmd *= scale;
+    }
 
     drivetrain.move_vector(x_cmd, y_cmd, heading_cmd);
 }
@@ -216,6 +242,17 @@ void DriveController::_begin_tape_alignment_command(const robot_DriveCommand &cm
 
     _tape_alignment.reference.pose = pose_snapshot.pose;
     _previous_tape_alignment_sequence = cmd.sequence;
+
+    ESP_LOGI(TAG,
+             "tape alignment start: sequence=%" PRIu32
+             " staging_direction=%.0f speed=%.2f m/s max_staging=%.3f m max_scan=%.3f m"
+             " post_detection_scan=%.3f m",
+             cmd.sequence,
+             _tape_alignment.config.staging_direction,
+             _tape_alignment.config.search_speed_mps,
+             _tape_alignment.config.max_staging_distance_m,
+             _tape_alignment.config.max_scan_distance_m,
+             _tape_alignment.config.post_detection_scan_distance_m);
 
     _reset_pose_pids();
     _reached_pose.store(false, std::memory_order_release);
@@ -445,6 +482,7 @@ void DriveController::_update_tape_alignment(Drivetrain &drivetrain,
     const bool tape_snapshot_fresh =
         have_tape_snapshot && tape_snapshot.valid &&
         (xTaskGetTickCount() - tape_snapshot.tick) <= pdMS_TO_TICKS(TAPE_SNAPSHOT_TIMEOUT_MS);
+
     if (!tape_snapshot_fresh) {
         ESP_LOGW(TAG, "failed to get tape snapshot for alignment");
         drivetrain.stop();
@@ -457,10 +495,55 @@ void DriveController::_update_tape_alignment(Drivetrain &drivetrain,
     const control::TapeAlignmentOutput alignment =
         control::update_tape_alignment(_tape_alignment.alignment,
                                        _tape_alignment.config,
-                                       tape_snapshot.tape_l1,
-                                       tape_snapshot.tape_l2,
+                                       tape_snapshot.tape_fl,
+                                       tape_snapshot.tape_fr,
                                        tape_snapshot.tick,
                                        pose_snapshot);
+
+    const auto &capture = _tape_alignment.alignment.crossing_capture;
+    if (capture.sensor_a.tape_entry_position_m && !_tape_alignment.logged_sensor_a_edge) {
+        ESP_LOGI(TAG,
+                 "tape alignment captured L1 white-to-black edge at %.3f m",
+                 *capture.sensor_a.tape_entry_position_m);
+        _tape_alignment.logged_sensor_a_edge = true;
+    }
+    if (capture.sensor_b.tape_entry_position_m && !_tape_alignment.logged_sensor_b_edge) {
+        ESP_LOGI(TAG,
+                 "tape alignment captured L2 white-to-black edge at %.3f m",
+                 *capture.sensor_b.tape_entry_position_m);
+        _tape_alignment.logged_sensor_b_edge = true;
+    }
+
+    const bool phase_changed =
+        !_tape_alignment.have_phase || alignment.phase != _tape_alignment.previous_phase;
+    if (phase_changed) {
+        const esp_log_level_t level = alignment.phase == control::TapeAlignmentPhase::FAILED
+                                          ? ESP_LOG_ERROR
+                                          : ESP_LOG_INFO;
+        esp_log_write(level,
+                      TAG,
+                      "tape alignment phase: %s -> %s; l1=%d l2=%d pose=(%.3f, %.3f, %.1f deg)\n",
+                      _tape_alignment.have_phase
+                          ? tape_alignment_phase_name(_tape_alignment.previous_phase)
+                          : "START",
+                      tape_alignment_phase_name(alignment.phase),
+                      tape_snapshot.tape_l1,
+                      tape_snapshot.tape_l2,
+                      pose_snapshot.pose.x_m,
+                      pose_snapshot.pose.y_m,
+                      pose_snapshot.pose.heading_rad * 180.0f / static_cast<float>(M_PI));
+
+        if (alignment.pose_target) {
+            ESP_LOGI(TAG,
+                     "tape alignment target: (%.3f, %.3f, %.1f deg)",
+                     alignment.pose_target->x_m,
+                     alignment.pose_target->y_m,
+                     alignment.pose_target->heading_rad * 180.0f / static_cast<float>(M_PI));
+        }
+
+        _tape_alignment.previous_phase = alignment.phase;
+        _tape_alignment.have_phase = true;
+    }
 
     const bool action_changed =
         !_tape_alignment.have_action || alignment.action != _tape_alignment.previous_action;
@@ -529,7 +612,10 @@ void DriveController::_update_tape_alignment(Drivetrain &drivetrain,
                                 error,
                                 _tape_alignment.reference.position_pid_stopped,
                                 _tape_alignment.reference.heading_pid_stopped,
-                                dt_s);
+                                dt_s,
+                                actively_centering
+                                    ? TAPE_CENTER_MIN_TRANSLATION_COMMAND_PERCENT
+                                    : 0.0f);
             _reached_pose.store(false, std::memory_order_relaxed);
             break;
         }

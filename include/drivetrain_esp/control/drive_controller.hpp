@@ -71,8 +71,12 @@ class DriveController {
         control::TapeAlignmentState alignment{};
         control::TapeAlignmentConfig config{};
         control::TapeAlignmentAction previous_action = control::TapeAlignmentAction::FAILED;
+        control::TapeAlignmentPhase previous_phase = control::TapeAlignmentPhase::UNINITIALIZED;
         ReferenceState reference{};
         bool have_action = false;
+        bool have_phase = false;
+        bool logged_sensor_a_edge = false;
+        bool logged_sensor_b_edge = false;
     };
 
     static control::Pose _robot_to_field(const control::Pose &robot_pose, float field_heading_rad);
@@ -112,7 +116,8 @@ class DriveController {
                              const PoseReferenceError &error,
                              bool position_pid_stopped,
                              bool heading_pid_stopped,
-                             float dt_s);
+                             float dt_s,
+                             float minimum_translation_command = 0.0f);
     void _reset_pose_pids();
 
     pb_size_t _command_tag = robot_DriveCommand_stop_tag;
