@@ -7,6 +7,7 @@
 #include "esp_err.h"
 #include "esp_check.h"
 
+#include "projdefs.h"
 #include "shared/robot_flags.hpp"
 #include "supervisor.hpp"
 
@@ -117,7 +118,7 @@ constexpr float MOON_OUT_OF_WAY_DEG = 100.0f;
 constexpr float SPEAR_MOVE_DELAY = 600UL; // ms
 
 constexpr float CLAW_OPEN_DEG = 90.0f;
-constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
+constexpr float CLAW_CLOSE_TOWER_DEG = 15.0f;
 constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
 
 constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
@@ -455,6 +456,8 @@ esp_err_t build_tower_sequence()
     constexpr float Y_OFFSET = 0.1f; // m
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
+    const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
+
     robot_DriveCommand forward = make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true);
     robot_DriveCommand backward = make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true);
 
@@ -477,11 +480,11 @@ esp_err_t build_tower_sequence()
     // Starting with worm spear down, spear on the left, claw open, elevator at TOP_FRONT, and robot facing tower
     worm_spear.set_spear(SPEAR_DOWN_DEG);
     ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward), TAG, "failed tower piece 1 forward move");
+        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 1 forward move");
 
     worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
     uint32_t movement_sequence = 0;
-    ESP_RETURN_ON_ERROR(send_drive_command(backward, portMAX_DELAY, &movement_sequence),
+    ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
                         TAG,
                         "failed to start tower piece 1 backward move");
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
@@ -496,16 +499,16 @@ esp_err_t build_tower_sequence()
     ESP_LOGI(TAG, "Tower assembly sequence: Piece 1 complete.");
 
     worm_spear.set_spear(SPEAR_DOWN_DEG);
-    ESP_RETURN_ON_ERROR(wait_for_drive_sequence(movement_sequence, pdMS_TO_TICKS(5000)),
+    ESP_RETURN_ON_ERROR(wait_for_drive_sequence(movement_sequence, DRIVE_TIMEOUT),
                         TAG,
                         "tower piece 1 backward move timed out");
 
     // PIECE 2
     ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward), TAG, "failed tower piece 2 forward move");
+        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 2 forward move");
     worm_spear.set_spear(SPEAR_UP_DEG);
 
-    ESP_RETURN_ON_ERROR(send_drive_command(backward, portMAX_DELAY, &movement_sequence),
+    ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
                         TAG,
                         "failed to start tower piece 2 backward move");
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
@@ -522,13 +525,13 @@ esp_err_t build_tower_sequence()
     worm_spear.set_spear(SPEAR_DOWN_DEG);
     worm_spear.move_to_position(SpearPos::SPEAR_RIGHT);
 
-    ESP_RETURN_ON_ERROR(wait_for_drive_sequence(movement_sequence, pdMS_TO_TICKS(5000)),
+    ESP_RETURN_ON_ERROR(wait_for_drive_sequence(movement_sequence, DRIVE_TIMEOUT),
                         TAG,
                         "tower piece 2 backward move timed out");
 
     // PIECE 3
     ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward), TAG, "failed tower piece 3 forward move");
+        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 3 forward move");
 
     worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
@@ -637,8 +640,8 @@ void autonomous_task(void *arg)
     err = build_tower_sequence();
     if (err != ESP_OK) halt_autonomous("tower build sequence", err);
 
-    err = stack_tower_sequence();
-    if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
+    // err = stack_tower_sequence();
+    // if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
 
     // if (worm_calibrated && elev_calibrated && guide_switch_available) {
     //     err = build_tower_sequence();
@@ -743,7 +746,7 @@ esp_err_t setup_autonomous()
 
     delay(1000);
 
-    constexpr bool CALIBRATE = false;
+    constexpr bool CALIBRATE = true;
 
     if (CALIBRATE) {
         // calibrate elevator and worm spear if available
@@ -855,9 +858,9 @@ void setup()
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     setup_autonomous();
-    // start_autonomous_task();
+    start_autonomous_task();
 
-    test_course();
+    // test_course();
 #endif
 
     vTaskDelete(nullptr);

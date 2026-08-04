@@ -135,10 +135,10 @@ class RmtTx {
         return transmit(symbols, N, loop_count, queue_nonblocking, end_level);
     }
 
-    inline esp_err_t wait(TickType_t timeout = portMAX_DELAY)
+    inline esp_err_t wait(int timeout_ms = -1)
     {
         ESP_RETURN_ON_FALSE(_initialized, ESP_ERR_INVALID_STATE, LOG_TAG, "not initialized");
-        return rmt_tx_wait_all_done(_channel, timeout);
+        return rmt_tx_wait_all_done(_channel, timeout_ms);
     }
 
     inline esp_err_t transmit_and_wait(const rmt_symbol_word_t *symbols,
