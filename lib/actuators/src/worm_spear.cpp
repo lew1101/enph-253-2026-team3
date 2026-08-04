@@ -21,7 +21,7 @@ esp_err_t WormSpear::init()
                  _config.worm_calibration_switch_pin != GPIO_NUM_NC &&
                  _config.worm_dir_pin != GPIO_NUM_NC);
 
-    _stepper = _config.engine->stepperConnectToPin(_config.worm_step_pin);
+_stepper = _config.engine->stepperConnectToPin(_config.worm_step_pin, _config.driver_type);
     if (_stepper == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }

@@ -1,6 +1,7 @@
 #pragma once
 #include "FastAccelStepper.h"
 
+#include "pd_esp32/pd_config.h"
 #include "soc/gpio_num.h"
 #include <cstdint>
 #include <esp_err.h>
@@ -19,7 +20,9 @@ class ElevatorClaw {
         gpio_num_t elevator_calibration_switch_pin = GPIO_NUM_NC;
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
+
         bool reversed = false;
+        FasDriver driver_type = DRIVER_MCPWM_PCNT;
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
 
         driver::ServoDriver::Config claw_servo_config = {.gpio = GPIO_NUM_NC,
