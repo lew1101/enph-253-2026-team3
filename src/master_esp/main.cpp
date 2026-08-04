@@ -103,18 +103,18 @@ enum ElevatorPos : int32_t {
 };
 
 enum SpearPos : int32_t { //
-    SPEAR_LEFT = 50'000,
-    SPEAR_CENTRE = 24'000,
+    SPEAR_LEFT = 55'500,
+    SPEAR_CENTRE = 27'750,
     SPEAR_RIGHT = 0,
     SPEAR_CENTERING = 0
 };
 
 //Spear Angle
-constexpr float SPEAR_UP_DEG = 85.0f;
+constexpr float SPEAR_UP_DEG = 80.0f;
 constexpr float SPEAR_UP_TILTED = 75.0f;
 constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
-constexpr float SPEAR_DOWN_DEG = 5.0f;
-constexpr float SPEAR_DOWN_TILTED = 15.0f;
+constexpr float SPEAR_DOWN_DEG = 0.0f;
+constexpr float SPEAR_DOWN_TILTED = 5.0f;
 constexpr float MOON_OUT_OF_WAY_DEG = 100.0f;
 constexpr float SPEAR_MOVE_DELAY = 600UL; // ms
 
@@ -257,38 +257,6 @@ void test_course()
 #endif
 }
 #endif
-
-enum ElevatorPos : int32_t {
-    ELEV_FLOOR = 0,
-    ELEV_TOWER_1 = 500,
-    ELEV_TOWER_2_PLUS = 4000,
-    ELEV_TOWER_2_MINUS = 3400,
-    ELEV_TOWER_2 = 500,
-    ELEV_TOWER_3_PLUS = 4000,
-    ELEV_TOWER_3_MINUS = 3400,
-    ELEV_TOWER_3 = 500,
-    ELEV_TOP_FRONT = 4700,
-    ELEV_TIPPITY_TOP = 5000,
-    ELEV_BACK = 5400,
-};
-
-enum SpearPos : int32_t { //
-    SPEAR_LEFT = 50'000,
-    SPEAR_CENTRE = 24'000,
-    SPEAR_RIGHT = 0,
-    SPEAR_CENTERING = 0
-};
-
-constexpr float SPEAR_UP_DEG = 90.0f;
-constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
-constexpr float SPEAR_DOWN_DEG = 5.0f;
-constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms
-
-constexpr float CLAW_OPEN_DEG = 90.0f;
-constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
-constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
-
-constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
 
 esp_err_t rocks_sequence()
 {
