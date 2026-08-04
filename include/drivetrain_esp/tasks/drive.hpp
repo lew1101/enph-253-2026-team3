@@ -10,7 +10,7 @@
 #include "control/pose_estimator.hpp"
 
 namespace DriveTaskConfig {
-constexpr bool LOGGING_ENABLED = false;
+constexpr bool LOGGING_ENABLED = true;
 
 constexpr uint32_t TASK_STACK_DEPTH = 4096;
 constexpr UBaseType_t TASK_PRIORITY = 4;

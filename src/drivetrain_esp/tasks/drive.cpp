@@ -142,8 +142,8 @@ void _drive_task(void *arg)
         xQueueOverwrite(s_pose_queue, &pose_snapshot);
 
         if (LOGGING_ENABLED) {
-            Serial.printf(">trajectory:%.2f:%.2f|xy\n"
-                          ">heading:%.2f\n"
+            Serial.printf(">trajectory:%.4f:%.4f|xy\n"
+                          ">heading:%.4f\n"
                           ">valid:%s|t\n",
                           pose_snapshot.pose.x_m,
                           pose_snapshot.pose.y_m,

@@ -258,38 +258,6 @@ void test_course()
 }
 #endif
 
-enum ElevatorPos : int32_t {
-    ELEV_FLOOR = 0,
-    ELEV_TOWER_1 = 500,
-    ELEV_TOWER_2_PLUS = 4000,
-    ELEV_TOWER_2_MINUS = 3400,
-    ELEV_TOWER_2 = 500,
-    ELEV_TOWER_3_PLUS = 4000,
-    ELEV_TOWER_3_MINUS = 3400,
-    ELEV_TOWER_3 = 500,
-    ELEV_TOP_FRONT = 4700,
-    ELEV_TIPPITY_TOP = 5000,
-    ELEV_BACK = 5400,
-};
-
-enum SpearPos : int32_t { //
-    SPEAR_LEFT = 50'000,
-    SPEAR_CENTRE = 24'000,
-    SPEAR_RIGHT = 0,
-    SPEAR_CENTERING = 0
-};
-
-constexpr float SPEAR_UP_DEG = 90.0f;
-constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
-constexpr float SPEAR_DOWN_DEG = 5.0f;
-constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms
-
-constexpr float CLAW_OPEN_DEG = 180.0f;
-constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
-constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
-
-constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
-
 esp_err_t rocks_sequence()
 {
     using metal_detector::MetalDetector;
@@ -893,8 +861,8 @@ void setup()
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
-    setup_autonomous();
-    start_autonomous_task();
+    // setup_autonomous();
+    // start_autonomous_task();
 
     // test_course();
 #endif
