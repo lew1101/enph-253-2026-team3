@@ -1,6 +1,10 @@
 #include "tasks/camera_uart.hpp"
 
 #include <Arduino.h>
+#include "esp_err.h"
+#include "shared/robot_flags.hpp"
+
+#include "drivers/rmt_tx.hpp"
 
 #include <array>
 #include <atomic>
@@ -8,12 +12,19 @@
 
 #include "comms/pb_codec.hpp"
 #include "esp_check.h"
-#include "shared/robot_flags.hpp"
 #include "supervisor.hpp"
 
 namespace {
 static constexpr char TAG[] = "camera_uart";
 using namespace CameraUartTaskConfig;
+using driver::RmtTx;
+
+driver::RmtTx s_teletubby_led_rmt_tx{{
+    .gpio = GPIO_NUM_12,
+    .resolution_hz = 10'000, // 1 tick = 100 µs
+    .memory_symbols = 48,
+    .queue_depth = 1,
+}};
 
 TaskHandle_t s_rx_task_handle = nullptr;
 QueueHandle_t s_detection_queue = nullptr;
@@ -69,10 +80,27 @@ void _rx_task(void *)
     uint32_t consecutive_timeouts = 0;
     uint8_t consecutive_detections = 0;
     bool teletubby_seen = false;
+    bool prev_teletubby_seen = false;
+
+    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[2]{
+        {
+            .duration0 = 2000, // ON 200 ms
+            .level0 = 1,
+            .duration1 = 1800, // OFF 180 ms
+            .level1 = 0,
+        },
+        {
+            .duration0 = 2000, // ON 200 ms
+            .level0 = 1,
+            .duration1 = 6200, // OFF 620 ms
+            .level1 = 0,
+        },
+    };
 
     while (true) {
         uint16_t payload_size = 0;
         uint16_t packet_sequence = 0;
+
         const esp_err_t receive_err = s_uart_link.receive(
             payload.data(), payload.size(), &payload_size, &packet_sequence, RX_TIMEOUT);
 
@@ -153,6 +181,14 @@ void _rx_task(void *)
             (teletubby_seen && now - last_positive_detection >= TELETUBBY_LED_HOLD_TIME))
             teletubby_seen = false;
 
+        if (!prev_teletubby_seen && teletubby_seen) {
+            const esp_err_t flash_err = s_teletubby_led_rmt_tx.transmit(DOUBLE_BLINK_MSG);
+            if (flash_err != ESP_OK)
+                log_w("%s: failed to transmit teletubby flash: %s",
+                      TAG,
+                      esp_err_to_name(flash_err));
+        }
+
         if (teletubby_seen) {
             xEventGroupSetBits(supervisor::g_robot_status_flags,
                                robot_flags::STATUS_TELETUBBY_SEEN);
@@ -160,6 +196,8 @@ void _rx_task(void *)
             xEventGroupClearBits(supervisor::g_robot_status_flags,
                                  robot_flags::STATUS_TELETUBBY_SEEN);
         }
+
+        prev_teletubby_seen = teletubby_seen;
     }
 }
 } // namespace
@@ -179,6 +217,14 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
         return err;
     }
 
+    err = s_teletubby_led_rmt_tx.init();
+    if (err != ESP_OK) {
+        s_uart_link.deinit();
+        vQueueDelete(s_detection_queue);
+        s_detection_queue = nullptr;
+        return err;
+    }
+
     const BaseType_t task_created =
         xTaskCreatePinnedToCore(_rx_task,
                                 "camera_uart_rx",
@@ -190,6 +236,7 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
 
     if (task_created != pdPASS) {
         s_rx_task_handle = nullptr;
+        s_teletubby_led_rmt_tx.deinit();
         s_uart_link.deinit();
         vQueueDelete(s_detection_queue);
         s_detection_queue = nullptr;

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "actuators/elevator_claw.hpp"
+#include "FastAccelStepperEngine.h"
 #include "drivers/servo.hpp"
 #include "FastAccelStepper.h"
 

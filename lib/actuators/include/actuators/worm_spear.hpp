@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "FastAccelStepper.h"
+#include "FastAccelStepperEngine.h"
 #include "drivers/limit.hpp"
 #include "drivers/servo.hpp"
 
@@ -20,6 +21,7 @@ class WormSpear {
         int32_t acceleration_hz_per_s = 100;
 
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
+        FasDriver driver_type = DRIVER_MCPWM_PCNT;
         bool reversed = false;
 
         driver::ServoDriver::Config spear_servo_config = {

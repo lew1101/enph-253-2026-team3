@@ -25,33 +25,31 @@
 #define RUN_WAYPOINT_PICKUP_ENABLED 1
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
 
-using driver::DebouncedLimitSwitch;
-using driver::RmtTx;
-
 using control::Pose;
+using driver::DebouncedLimitSwitch;
 
 static constexpr char TAG[]{"master_main"};
-
-constexpr gpio_num_t GUIDE_LIM_SWITCH_PIN = GPIO_NUM_9; // debounced
-constexpr gpio_num_t ENABLE_SWITCH_PIN = GPIO_NUM_14;   // debounced
-constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
-
-constexpr gpio_num_t STATUS_LED = GPIO_NUM_13;
 
 esp_err_t setup_autonomous();
 esp_err_t start_autonomous_task();
 
 namespace {
 
+constexpr gpio_num_t GUIDE_LIM_SWITCH_PIN = GPIO_NUM_9; // debounced
+constexpr gpio_num_t ENABLE_SWITCH_PIN = GPIO_NUM_14;   // debounced
+constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
+
+constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_13;
+
+driver::RmtTx s_status_led_rmt_tx{{
+    .gpio = STATUS_LED_PIN,
+    .resolution_hz = 10'000, // 1 tick = 100 µs
+    .memory_symbols = 48,
+    .queue_depth = 1,
+}};
+
 DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
 DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
-
-// RmtTx status_led_rmt_tx{{
-//     .gpio = STATUS_LED,
-//     .resolution_hz = 10'000, // 1 tick = 100 µs
-//     .memory_symbols = 64,
-//     .queue_depth = 1,
-// }};
 
 TaskHandle_t g_autonomous_task = nullptr;
 
@@ -69,7 +67,7 @@ bool is_track_a;
 
 inline void status_double_flash()
 {
-    static constexpr rmt_symbol_word_t double_blink[2]{
+    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[2]{
         {
             .duration0 = 2000, // ON 200 ms
             .level0 = 1,
@@ -84,7 +82,7 @@ inline void status_double_flash()
         },
     };
 
-    // ESP_ERROR_CHECK_WITHOUT_ABORT(status_led_rmt_tx.transmit(double_blink));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_rmt_tx.transmit(DOUBLE_BLINK_MSG));
 }
 
 #if RUN_WAYPOINT_TEST_ENABLED
@@ -825,7 +823,7 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    // status_led_rmt_tx.init();
+    s_status_led_rmt_tx.init();
 
     supervisor::init();
     supervisor::attach_main_loop(&g_autonomous_task);
