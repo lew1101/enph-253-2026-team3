@@ -188,6 +188,7 @@ void _rx_task(void *)
             teletubby_seen = false;
 
         if (!prev_teletubby_seen && teletubby_seen) {
+            log_i("%s: teletubby detected; flashing LED", TAG);
             const esp_err_t flash_err = s_teletubby_led_rmt_tx.transmit(DOUBLE_BLINK_MSG);
             if (flash_err != ESP_OK)
                 log_w(
@@ -223,6 +224,8 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
     }
 
     err = s_teletubby_led_rmt_tx.init();
+    log_i("%s: teletubby LED RMT init: %s", TAG, esp_err_to_name(err));
+
     if (err != ESP_OK) {
         s_uart_link.deinit();
         vQueueDelete(s_detection_queue);
