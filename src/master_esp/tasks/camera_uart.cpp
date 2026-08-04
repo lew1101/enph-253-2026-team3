@@ -82,11 +82,17 @@ void _rx_task(void *)
     bool teletubby_seen = false;
     bool prev_teletubby_seen = false;
 
-    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[2]{
+    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[3]{
         {
             .duration0 = 2000, // ON 200 ms
             .level0 = 1,
             .duration1 = 1800, // OFF 180 ms
+            .level1 = 0,
+        },
+        {
+            .duration0 = 2000, // ON 200 ms
+            .level0 = 1,
+            .duration1 = 6200, // OFF 620 ms
             .level1 = 0,
         },
         {
@@ -184,9 +190,8 @@ void _rx_task(void *)
         if (!prev_teletubby_seen && teletubby_seen) {
             const esp_err_t flash_err = s_teletubby_led_rmt_tx.transmit(DOUBLE_BLINK_MSG);
             if (flash_err != ESP_OK)
-                log_w("%s: failed to transmit teletubby flash: %s",
-                      TAG,
-                      esp_err_to_name(flash_err));
+                log_w(
+                    "%s: failed to transmit teletubby flash: %s", TAG, esp_err_to_name(flash_err));
         }
 
         if (teletubby_seen) {
