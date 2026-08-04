@@ -16,21 +16,30 @@ using namespace DriveTaskConfig;
 using control::Drivetrain;
 using control::Pose;
 using control::PoseSnapshot;
+using control::TapeAlignmentPhase;
 
 namespace {
 constexpr char TAG[] = "drive_controller";
 
-const char *tape_alignment_phase_name(control::TapeAlignmentPhase phase)
+const char *tape_alignment_phase_name(TapeAlignmentPhase phase)
 {
     switch (phase) {
-        case control::TapeAlignmentPhase::UNINITIALIZED: return "UNINITIALIZED";
-        case control::TapeAlignmentPhase::PREPOSITION: return "PREPOSITION";
-        case control::TapeAlignmentPhase::CONFIRM_CLEAR: return "CONFIRM_CLEAR";
-        case control::TapeAlignmentPhase::SCAN: return "SCAN";
-        case control::TapeAlignmentPhase::SCAN_PAST_TAPE: return "SCAN_PAST_TAPE";
-        case control::TapeAlignmentPhase::MOVE_TO_CENTRE: return "MOVE_TO_CENTRE";
-        case control::TapeAlignmentPhase::COMPLETE: return "COMPLETE";
-        case control::TapeAlignmentPhase::FAILED: return "FAILED";
+        case TapeAlignmentPhase::UNINITIALIZED:
+            return "UNINITIALIZED";
+        case TapeAlignmentPhase::PREPOSITION:
+            return "PREPOSITION";
+        case TapeAlignmentPhase::CONFIRM_CLEAR:
+            return "CONFIRM_CLEAR";
+        case TapeAlignmentPhase::SCAN:
+            return "SCAN";
+        case TapeAlignmentPhase::SCAN_PAST_TAPE:
+            return "SCAN_PAST_TAPE";
+        case TapeAlignmentPhase::MOVE_TO_CENTRE:
+            return "MOVE_TO_CENTRE";
+        case TapeAlignmentPhase::COMPLETE:
+            return "COMPLETE";
+        case TapeAlignmentPhase::FAILED:
+            return "FAILED";
     }
 
     return "UNKNOWN";
@@ -174,8 +183,6 @@ void DriveController::update(Drivetrain &drivetrain,
     }
 }
 
-
-
 void DriveController::_drive_to_reference(Drivetrain &drivetrain,
                                           const PoseReferenceError &error,
                                           bool position_pid_stopped,
@@ -183,10 +190,8 @@ void DriveController::_drive_to_reference(Drivetrain &drivetrain,
                                           float dt_s,
                                           float minimum_translation_command)
 {
-    float x_cmd =
-        position_pid_stopped ? 0.0f : _x_pid.update(0.0f, -error.robot_pose.x_m, dt_s);
-    float y_cmd =
-        position_pid_stopped ? 0.0f : _y_pid.update(0.0f, -error.robot_pose.y_m, dt_s);
+    float x_cmd = position_pid_stopped ? 0.0f : _x_pid.update(0.0f, -error.robot_pose.x_m, dt_s);
+    float y_cmd = position_pid_stopped ? 0.0f : _y_pid.update(0.0f, -error.robot_pose.y_m, dt_s);
     const float heading_cmd =
         heading_pid_stopped ? 0.0f : _heading_pid.update(0.0f, -error.robot_pose.heading_rad, dt_s);
 
@@ -294,16 +299,9 @@ void DriveController::_begin_pose_command(const robot_DriveCommand &cmd,
     _pose.path_distance_m = std::hypot(_pose.path_end.x_m - _pose.path_start.x_m,
                                        _pose.path_end.y_m - _pose.path_start.y_m);
     _pose.path_progress_m = 0.0f;
-    if (_pose.path_distance_m > 0.0f) {
-        _pose.path_unit_x = (_pose.path_end.x_m - _pose.path_start.x_m) / _pose.path_distance_m;
-        _pose.path_unit_y = (_pose.path_end.y_m - _pose.path_start.y_m) / _pose.path_distance_m;
-    } else {
-        _pose.path_unit_x = 0.0f;
-        _pose.path_unit_y = 0.0f;
-    }
-    _pose.path_lookahead_m = pose_command.path_lookahead_m > 0.0f
-                                 ? pose_command.path_lookahead_m
-                                 : DEFAULT_POSE_PATH_LOOKAHEAD_M;
+    _pose.path_speed_mps = pose_command.desired_speed_mps > 0.0f
+                               ? pose_command.desired_speed_mps
+                               : DEFAULT_POSE_PATH_SPEED_MPS;
 
     // A zero-length translation is a pure heading command, so it can use the
     // endpoint controller immediately.
@@ -374,23 +372,22 @@ void DriveController::_update_pose(Drivetrain &drivetrain,
         return;
     }
 
-    // Keep the reference the requested distance ahead of measured progress
-    // along the path. Never move the reference backward if pose data jitters.
+    // Advance the reference at the requested physical speed. Hold it when the
+    // robot falls too far behind so the target cannot run away from the robot.
     if (!_pose.path_endpoint_active) {
-        const float measured_path_progress_m = std::clamp(
-            (pose_snapshot.pose.x_m - _pose.path_start.x_m) * _pose.path_unit_x +
-                (pose_snapshot.pose.y_m - _pose.path_start.y_m) * _pose.path_unit_y,
-            0.0f,
-            _pose.path_distance_m);
-        const float lookahead_progress_m =
-            std::min(measured_path_progress_m + _pose.path_lookahead_m, _pose.path_distance_m);
+        const float reference_error_m =
+            std::hypot(_pose.reference.pose.x_m - pose_snapshot.pose.x_m,
+                       _pose.reference.pose.y_m - pose_snapshot.pose.y_m);
 
-        _pose.path_progress_m = std::max(_pose.path_progress_m, lookahead_progress_m);
-        _pose.reference.pose = control::lerp_pose(
-            _pose.path_start, _pose.path_end, _pose.path_progress_m / _pose.path_distance_m);
-        _pose.path_endpoint_active = _pose.path_progress_m >= _pose.path_distance_m;
-        _pose.endpoint_motion_tracking = false;
-        _reached_pose.store(false, std::memory_order_relaxed);
+        if (reference_error_m <= POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M) {
+            _pose.path_progress_m = std::min(
+                _pose.path_progress_m + _pose.path_speed_mps * dt_s, _pose.path_distance_m);
+            _pose.reference.pose = control::lerp_pose(
+                _pose.path_start, _pose.path_end, _pose.path_progress_m / _pose.path_distance_m);
+            _pose.path_endpoint_active = _pose.path_progress_m >= _pose.path_distance_m;
+            _pose.endpoint_motion_tracking = false;
+            _reached_pose.store(false, std::memory_order_relaxed);
+        }
     }
 
     const PoseReferenceError error =
@@ -517,9 +514,8 @@ void DriveController::_update_tape_alignment(Drivetrain &drivetrain,
     const bool phase_changed =
         !_tape_alignment.have_phase || alignment.phase != _tape_alignment.previous_phase;
     if (phase_changed) {
-        const esp_log_level_t level = alignment.phase == control::TapeAlignmentPhase::FAILED
-                                          ? ESP_LOG_ERROR
-                                          : ESP_LOG_INFO;
+        const esp_log_level_t level =
+            alignment.phase == control::TapeAlignmentPhase::FAILED ? ESP_LOG_ERROR : ESP_LOG_INFO;
         esp_log_write(level,
                       TAG,
                       "tape alignment phase: %s -> %s; l1=%d l2=%d pose=(%.3f, %.3f, %.1f deg)\n",
@@ -613,9 +609,8 @@ void DriveController::_update_tape_alignment(Drivetrain &drivetrain,
                                 _tape_alignment.reference.position_pid_stopped,
                                 _tape_alignment.reference.heading_pid_stopped,
                                 dt_s,
-                                actively_centering
-                                    ? TAPE_CENTER_MIN_TRANSLATION_COMMAND_PERCENT
-                                    : 0.0f);
+                                actively_centering ? TAPE_CENTER_MIN_TRANSLATION_COMMAND_PERCENT
+                                                   : 0.0f);
             _reached_pose.store(false, std::memory_order_relaxed);
             break;
         }

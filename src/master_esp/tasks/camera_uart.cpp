@@ -4,7 +4,7 @@
 #include "esp_err.h"
 #include "shared/robot_flags.hpp"
 
-#include "drivers/rmt_tx.hpp"
+#include "drivers/pulse_tx.hpp"
 
 #include <array>
 #include <atomic>
@@ -17,14 +17,9 @@
 namespace {
 static constexpr char TAG[] = "camera_uart";
 using namespace CameraUartTaskConfig;
-using driver::RmtTx;
+using driver::PulseTx;
 
-driver::RmtTx s_teletubby_led_rmt_tx{{
-    .gpio = GPIO_NUM_12,
-    .resolution_hz = 10'000, // 1 tick = 100 µs
-    .memory_symbols = 48,
-    .queue_depth = 1,
-}};
+PulseTx s_teletubby_led_pulse_tx{TELETUBBY_LED_PIN};
 
 TaskHandle_t s_rx_task_handle = nullptr;
 QueueHandle_t s_detection_queue = nullptr;
@@ -82,25 +77,13 @@ void _rx_task(void *)
     bool teletubby_seen = false;
     bool prev_teletubby_seen = false;
 
-    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[3]{
-        {
-            .duration0 = 2000, // ON 200 ms
-            .level0 = 1,
-            .duration1 = 1800, // OFF 180 ms
-            .level1 = 0,
-        },
-        {
-            .duration0 = 2000, // ON 200 ms
-            .level0 = 1,
-            .duration1 = 6200, // OFF 620 ms
-            .level1 = 0,
-        },
-        {
-            .duration0 = 2000, // ON 200 ms
-            .level0 = 1,
-            .duration1 = 6200, // OFF 620 ms
-            .level1 = 0,
-        },
+    static constexpr PulseTx::Word TELETUBBY_BLINK_MSG[]{
+        {1, 200'000},
+        {0, 180'000},
+        {1, 200'000},
+        {0, 180'000},
+        {1, 200'000},
+        {0, 0},
     };
 
     while (true) {
@@ -189,7 +172,7 @@ void _rx_task(void *)
 
         if (!prev_teletubby_seen && teletubby_seen) {
             log_i("%s: teletubby detected; flashing LED", TAG);
-            const esp_err_t flash_err = s_teletubby_led_rmt_tx.transmit(DOUBLE_BLINK_MSG);
+            const esp_err_t flash_err = s_teletubby_led_pulse_tx.transmit(TELETUBBY_BLINK_MSG);
             if (flash_err != ESP_OK)
                 log_w(
                     "%s: failed to transmit teletubby flash: %s", TAG, esp_err_to_name(flash_err));
@@ -223,7 +206,7 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
         return err;
     }
 
-    err = s_teletubby_led_rmt_tx.init();
+    err = s_teletubby_led_pulse_tx.init();
     log_i("%s: teletubby LED RMT init: %s", TAG, esp_err_to_name(err));
 
     if (err != ESP_OK) {
@@ -244,7 +227,6 @@ esp_err_t start_camera_uart_task(TaskHandle_t *rx_handle_out)
 
     if (task_created != pdPASS) {
         s_rx_task_handle = nullptr;
-        s_teletubby_led_rmt_tx.deinit();
         s_uart_link.deinit();
         vQueueDelete(s_detection_queue);
         s_detection_queue = nullptr;

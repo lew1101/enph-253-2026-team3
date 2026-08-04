@@ -22,7 +22,8 @@ class ElevatorClaw {
         int32_t acceleration_hz_per_s = 100;
 
         bool reversed = false;
-        FasDriver driver_type = DRIVER_MCPWM_PCNT;
+        // FasDriver driver_type = DRIVER_MCPWM_PCNT;
+        FasDriver driver_type = DRIVER_RMT;
         TickType_t calibration_max_delay = pdMS_TO_TICKS(5000);
 
         driver::ServoDriver::Config claw_servo_config = {.gpio = GPIO_NUM_NC,

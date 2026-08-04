@@ -20,7 +20,7 @@
 #include "tasks/metal.hpp"
 
 #include "sensors/metal_detector.hpp"
-#include "drivers/rmt_tx.hpp"
+#include "drivers/pulse_tx.hpp"
 
 #define RUN_WAYPOINT_TEST_ENABLED 1
 #define RUN_WAYPOINT_PICKUP_ENABLED 1
@@ -28,6 +28,7 @@
 
 using control::Pose;
 using driver::DebouncedLimitSwitch;
+using driver::PulseTx;
 
 static constexpr char TAG[]{"master_main"};
 
@@ -42,12 +43,7 @@ constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
 
 constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_13;
 
-driver::RmtTx s_status_led_rmt_tx{{
-    .gpio = STATUS_LED_PIN,
-    .resolution_hz = 10'000, // 1 tick = 100 µs
-    .memory_symbols = 48,
-    .queue_depth = 1,
-}};
+PulseTx s_status_led_pulse_tx{STATUS_LED_PIN};
 
 DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
 DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
@@ -68,22 +64,14 @@ bool is_track_a;
 
 inline void status_double_flash()
 {
-    static constexpr rmt_symbol_word_t DOUBLE_BLINK_MSG[2]{
-        {
-            .duration0 = 2000, // ON 200 ms
-            .level0 = 1,
-            .duration1 = 1800, // OFF 180 ms
-            .level1 = 0,
-        },
-        {
-            .duration0 = 2000, // ON 200 ms
-            .level0 = 1,
-            .duration1 = 6200, // OFF 620 ms
-            .level1 = 0,
-        },
+    static constexpr PulseTx::Word DOUBLE_BLINK_MSG[]{
+        {1, 200'000},
+        {0, 180'000},
+        {1, 200'000},
+        {0, 0},
     };
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_rmt_tx.transmit(DOUBLE_BLINK_MSG));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_pulse_tx.transmit(DOUBLE_BLINK_MSG));
 }
 
 #if RUN_WAYPOINT_TEST_ENABLED
@@ -458,20 +446,25 @@ esp_err_t build_tower_sequence()
     constexpr float Y_OFFSET = 0.1f; // m
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
+    constexpr float MOVEMENT_SPEED_MPS = 0.14f;
     const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
 
-    robot_DriveCommand forward = make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true);
-    robot_DriveCommand backward = make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true);
+    robot_DriveCommand forward =
+        make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_SPEED_MPS);
+    robot_DriveCommand backward =
+        make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true, MOVEMENT_SPEED_MPS);
 
     xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_ACTUATORS);
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     // move to the tower
-    // follow_route({
-    //     WAYPOINTS[POSE_INTER_ROCK_TOWER],
-    //     WAYPOINTS[POSE_TOWER_BUILD],
-    // });
+    follow_route(
+        {
+            WAYPOINTS[POSE_INTER_ROCK_TOWER],
+            WAYPOINTS[POSE_TOWER_BUILD],
+        },
+        MOVEMENT_SPEED_MPS);
 
     // realign with tower tape
     // stage robot to the left, so scan towards the right.
@@ -481,8 +474,9 @@ esp_err_t build_tower_sequence()
     // PIECE 1
     // Starting with worm spear down, spear on the left, claw open, elevator at TOP_FRONT, and robot facing tower
     worm_spear.set_spear(SPEAR_DOWN_DEG);
-    ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 1 forward move");
+    ESP_RETURN_ON_ERROR(send_drive_command_and_wait(forward, DRIVE_TIMEOUT),
+                        TAG,
+                        "failed tower piece 1 forward move");
 
     worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
     uint32_t movement_sequence = 0;
@@ -506,8 +500,9 @@ esp_err_t build_tower_sequence()
                         "tower piece 1 backward move timed out");
 
     // PIECE 2
-    ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 2 forward move");
+    ESP_RETURN_ON_ERROR(send_drive_command_and_wait(forward, DRIVE_TIMEOUT),
+                        TAG,
+                        "failed tower piece 2 forward move");
     worm_spear.set_spear(SPEAR_UP_DEG);
 
     ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
@@ -532,8 +527,9 @@ esp_err_t build_tower_sequence()
                         "tower piece 2 backward move timed out");
 
     // PIECE 3
-    ESP_RETURN_ON_ERROR(
-        send_drive_command_and_wait(forward, DRIVE_TIMEOUT), TAG, "failed tower piece 3 forward move");
+    ESP_RETURN_ON_ERROR(send_drive_command_and_wait(forward, DRIVE_TIMEOUT),
+                        TAG,
+                        "failed tower piece 3 forward move");
 
     worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
@@ -558,20 +554,26 @@ esp_err_t build_tower_sequence()
 
 esp_err_t stack_tower_sequence()
 {
-    constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(500);
-    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14;
+    constexpr float MOVEMENT_SPEED_MPS = 0.14f;
+    constexpr float FORWARD_SPEED = 0.05f;
+
+    constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(700);
 
     const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
 
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
     ESP_RETURN_ON_ERROR(
-        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
+        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_SPEED_MPS),
         TAG,
         "failed to reach tower stack pose");
+
+    worm_spear.set_spear(SPEAR_UP_DEG);
 
     // realign with tower tape
     // stage toward the right, so scan towards the left.
     ESP_RETURN_ON_ERROR(send_tape_alignment_and_wait(1.0f), TAG, "failed to align with tower tape");
+
+    send_velocity(0, FORWARD_SPEED);
 
     if (s_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
@@ -776,6 +778,8 @@ esp_err_t setup_autonomous()
         }
     }
 
+    s_status_led_pulse_tx.init();
+
     setup_completed.store(true, std::memory_order_release);
 
     ESP_LOGI(TAG,
@@ -825,8 +829,6 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
-    s_status_led_rmt_tx.init();
-
     supervisor::init();
     supervisor::attach_main_loop(&g_autonomous_task);
 
@@ -861,7 +863,7 @@ void setup()
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
-    // setup_autonomous();
+    setup_autonomous();
     // start_autonomous_task();
 
     // test_course();

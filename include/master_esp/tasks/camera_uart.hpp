@@ -20,6 +20,8 @@ constexpr float MIN_BOX_AREA_RATIO = 0.01f;
 constexpr float MAX_BOX_AREA_RATIO = 0.80f;
 
 constexpr uint8_t REQUIRED_CONSECUTIVE_DETECTIONS = 3;
+
+constexpr gpio_num_t TELETUBBY_LED_PIN = GPIO_NUM_12;
 constexpr TickType_t TELETUBBY_LED_HOLD_TIME = pdMS_TO_TICKS(1200);
 
 constexpr comms::UartLink::Config UART_LINK_CFG{

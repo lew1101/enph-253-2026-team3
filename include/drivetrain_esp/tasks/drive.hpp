@@ -126,9 +126,10 @@ constexpr float VELOCITY_REFERENCE_ADVANCE_TOLERANCE_RAD = radians(15.0f);
 // reaches the tape alignment tolerance.
 constexpr float TAPE_CENTER_MIN_TRANSLATION_COMMAND_PERCENT = 2.0f;
 
-// Position-reference lead along a pose path. This approximates the
-// aggressiveness of the previous 0.15 m waypoint spacing.
-constexpr float DEFAULT_POSE_PATH_LOOKAHEAD_M = 0.18f;
+constexpr float DEFAULT_POSE_PATH_SPEED_MPS = 0.5f;
+// Pause reference progression if the robot falls this far behind. This is
+// independent of endpoint completion and PID stopping tolerances.
+constexpr float POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M = 0.105f;
 
 constexpr uint32_t IMU_TIMEOUT_MS = 100;
 constexpr uint32_t TAPE_SNAPSHOT_TIMEOUT_MS = 100;

@@ -40,8 +40,8 @@ using control::Pose;
     X(POSE_ROCK_PICKUP_6_3, -1.0292f, 0.2583f, 56.9f)                                              \
     X(POSE_INTER_ROCK_TOWER, -1.3125f, 0.1606f, 92.0f)                                             \
     X(POSE_TOWER_BUILD_A, -1.7109f, 0.4304f, 123.5f)                                               \
-    X(POSE_TOWER_STACK_A, -1.8282f, 0.5931f, 62.1f)                                                \
-    X(POSE_TOWER_BUILD_B, -1.6876f, 0.3989f, 124.5f)                                               \
+    X(POSE_TOWER_STACK_A, -1.8282f, 0.5931f, 64.1f)                                                \
+    X(POSE_TOWER_BUILD_B, -1.6976f, 0.3889f, 124.5f)                                               \
     X(POSE_TOWER_STACK_B, -1.8082f, 0.5131f, 64.1f)                                                \
     X(POSE_SOLAR_ALIGN, -1.3007f, 0.5311f, 0.0f)                                                   \
     X(POSE_SOLAR_PULL, -1.3007f, 1.4611f, 0.0f)                                                    \
