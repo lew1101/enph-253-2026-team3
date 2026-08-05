@@ -16,12 +16,12 @@ constexpr gpio_num_t CLAW_SERVO_PIN = GPIO_NUM_6;
 constexpr gpio_num_t WORM_STEP_PIN = GPIO_NUM_15;
 constexpr gpio_num_t WORM_DIR_PIN = GPIO_NUM_16;
 constexpr gpio_num_t WORM_LIMIT_SWITCH_PIN = GPIO_NUM_10;
-constexpr gpio_num_t WORM_EN_PIN = GPIO_NUM_21;
+constexpr gpio_num_t WORM_EN_PIN = GPIO_NUM_4;
 
 constexpr gpio_num_t ELEVATOR_STEP_PIN = GPIO_NUM_42;
 constexpr gpio_num_t ELEVATOR_DIR_PIN = GPIO_NUM_41;
 constexpr gpio_num_t ELEVATOR_LIMIT_SWITCH_PIN = GPIO_NUM_8;
-constexpr gpio_num_t ELEVATOR_EN_PIN = GPIO_NUM_18;
+constexpr gpio_num_t ELEVATOR_EN_PIN = GPIO_NUM_2;
 
 constexpr control::WormSpear::Config worm_config{
     .engine = &stepper_engine,

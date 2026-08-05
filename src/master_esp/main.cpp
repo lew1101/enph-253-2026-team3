@@ -39,7 +39,7 @@ namespace {
 
 constexpr gpio_num_t GUIDE_LIM_SWITCH_PIN = GPIO_NUM_9; // debounced
 constexpr gpio_num_t ENABLE_SWITCH_PIN = GPIO_NUM_14;   // debounced
-// constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
+constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_18;    // no debounce
 
 constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_13;
 
@@ -771,10 +771,10 @@ esp_err_t setup_autonomous()
                         "guide and worm calibration switches cannot share GPIO %u",
                         static_cast<unsigned>(GUIDE_LIM_SWITCH_PIN));
 
-    // pinMode(TRACK_SWITCH_PIN, INPUT_PULLDOWN);
-    // is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
+    pinMode(TRACK_SWITCH_PIN, INPUT_PULLUP);
+    is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
 
-    is_track_a = true; // TEMPORARY OVERRIDE FOR TESTING
+    ESP_LOGI(TAG, "Using track %s", is_track_a ? "A" : "B");
 
     // start drivetrain UART tasks
     ESP_RETURN_ON_ERROR(
