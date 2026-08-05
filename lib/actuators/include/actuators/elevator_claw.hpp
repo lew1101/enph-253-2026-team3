@@ -18,6 +18,8 @@ class ElevatorClaw {
         gpio_num_t elevator_step_pin = GPIO_NUM_NC;
         gpio_num_t elevator_dir_pin = GPIO_NUM_NC;
         gpio_num_t elevator_calibration_switch_pin = GPIO_NUM_NC;
+        gpio_num_t elevator_en_pin = GPIO_NUM_NC;
+
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
 
@@ -48,15 +50,31 @@ class ElevatorClaw {
         _stepper->moveTo(_config.reversed ? -step : step, blocking);
     }
 
-    inline void move(int32_t step, bool blocking = true) {
+    inline void move(int32_t step, bool blocking = true)
+    {
         if (_limit_switch.is_pressed() && step < 0) return;
         _stepper->move(_config.reversed ? -step : step, blocking);
     }
 
     inline void set_claw(float deg) { _claw_servo.set_deg(deg); }
     inline void stop_elevator() { _stepper->forceStop(); }
-    inline void disable_elevator() { _stepper->disableOutputs(); }
-    inline void enable_elevator() { _stepper->enableOutputs(); }
+
+    inline bool enable()
+    {
+        const bool servo_enabled = _claw_servo.attach();
+        const bool stepper_enabled = _stepper->enableOutputs();
+        return servo_enabled && stepper_enabled;
+    }
+
+    inline bool disable()
+    {
+        _stepper->forceStop();
+        vTaskDelay(pdMS_TO_TICKS(10));
+        const bool servo_disabled = _claw_servo.detach();
+        const bool stepper_disabled = _stepper->disableOutputs();
+        return servo_disabled && stepper_disabled;
+    }
+
     inline bool elevator_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES

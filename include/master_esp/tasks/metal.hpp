@@ -32,16 +32,16 @@ constexpr metal_detector::MetalDetector::Config METAL_1_CFG{
     .detect_count_required = 4,
     .clear_count_required = 8,
 
-    .detect_threshold = -1.0f,
-    .clear_threshold = -0.5f,
+    .detect_threshold = -7.5f,
+    .clear_threshold = -4.0f,
 
     .baseline_samples = 200,
     .baseline_discard = 70,
 
-    .output_alpha = 0.08f,
+    .output_alpha = 0.04f,
     .baseline_alpha = 0.00005f,
 
-    .logging_enabled = false,
+    .logging_enabled = true,
 };
 
 constexpr metal_detector::MetalDetector::Config METAL_2_CFG{
@@ -54,8 +54,8 @@ constexpr metal_detector::MetalDetector::Config METAL_2_CFG{
     .detect_count_required = 4,
     .clear_count_required = 8,
 
-    .detect_threshold = -1.0f,
-    .clear_threshold = -0.5f,
+    .detect_threshold = -7.0f,
+    .clear_threshold = -4.0f,
 
     .baseline_samples = 200,
     .baseline_discard = 70,

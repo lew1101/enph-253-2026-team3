@@ -7,6 +7,7 @@
 #include "esp_check.h"
 
 #include "tasks/metal.hpp"
+#include "projdefs.h"
 #include "sensors/metal_detector.hpp"
 #include "shared/robot_flags.hpp"
 #include "supervisor.hpp"
@@ -89,6 +90,25 @@ void metal_task(void *arg)
         return vTaskDelete(nullptr);
     }
 
+    // Remove any notification left from a previous enabled period.
+    ulTaskNotifyTake(pdTRUE, 0);
+
+    // reset the metal detector. this will cause them to recalibrate.
+    if (MD_1_ENABLE) md_1.reset();
+    if (MD_2_ENABLE) md_2.reset();
+
+    xEventGroupClearBits(supervisor::g_robot_status_flags,
+                         robot_flags::STATUS_METAL_CALIBRATED_MASK |
+                             robot_flags::STATUS_METAL_SEEN_MASK);
+
+    arm_timer_us(MD_START_DELAY_US);
+
+    MetalDetectorSnapshots snapshots;
+
+    bool was_all_calibrated = false;
+    bool was_any_metal_seen = false;
+    bool sample_detector_1 = true; // if true, sample detector 1. else sample detector 2
+
     while (true) {
         xEventGroupWaitBits(supervisor::g_robot_control_flags,
                             robot_flags::CONTROL_METAL_ENABLED,
@@ -96,90 +116,69 @@ void metal_task(void *arg)
                             pdTRUE,
                             portMAX_DELAY);
 
-        // Remove any notification left from a previous enabled period.
-        ulTaskNotifyTake(pdTRUE, 0);
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        // reset the metal detector. this will cause them to recalibrate.
-        if (MD_1_ENABLE) md_1.reset();
-        if (MD_2_ENABLE) md_2.reset();
-
-        xEventGroupClearBits(supervisor::g_robot_status_flags,
-                             robot_flags::STATUS_METAL_CALIBRATED_MASK |
-                                 robot_flags::STATUS_METAL_SEEN_MASK);
-
-        arm_timer_us(MD_START_DELAY_US);
-
-        MetalDetectorSnapshots snapshots;
-
-        bool was_all_calibrated = false;
-        bool was_any_metal_seen = false;
-        bool sample_detector_1 = true; // if true, sample detector 1. else sample detector 2
-
-        while (true) {
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-            if (MD_1_ENABLE && sample_detector_1) {
-                md_1.pulse_and_sample();
-            } else if (MD_2_ENABLE) {
-                md_2.pulse_and_sample();
-            }
-            arm_timer_us(MD_STAGGER_US);
-
-            if (MD_1_ENABLE && sample_detector_1) {
-                md_1.update();
-                md_1.get_snapshot(&snapshots.detector_1);
-            } else if (MD_2_ENABLE) {
-                md_2.update();
-                md_2.get_snapshot(&snapshots.detector_2);
-            }
-
-            sample_detector_1 = !sample_detector_1;
-
-            xQueueOverwrite(s_metal_snapshot_queue, &snapshots);
-
-            EventBits_t calibrated_bits = 0;
-            if (MD_1_ENABLE && md_1.is_calibration_complete()) {
-                calibrated_bits |= robot_flags::STATUS_METAL_1_CALIBRATED;
-            }
-            if (MD_2_ENABLE && md_2.is_calibration_complete()) {
-                calibrated_bits |= robot_flags::STATUS_METAL_2_CALIBRATED;
-            }
-            sync_status_bits(robot_flags::STATUS_METAL_CALIBRATED_MASK, calibrated_bits);
-
-            const bool all_calibrated = robot_flags::has_all_flags(
-                calibrated_bits, robot_flags::STATUS_METAL_CALIBRATED_MASK);
-            if (all_calibrated && !was_all_calibrated) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    supervisor::notify_main(robot_flags::NOTIFY_METAL_CALIBRATED));
-            }
-            was_all_calibrated = all_calibrated;
-
-            EventBits_t seen_bits = 0;
-            if (snapshots.detector_1.state == MetalState::METAL_DETECTED) {
-                seen_bits |= robot_flags::STATUS_METAL_1_SEEN;
-            }
-            if (snapshots.detector_2.state == MetalState::METAL_DETECTED) {
-                seen_bits |= robot_flags::STATUS_METAL_2_SEEN;
-            }
-
-            sync_status_bits(robot_flags::STATUS_METAL_SEEN_MASK, seen_bits);
-
-            const bool any_metal_seen = seen_bits != 0;
-            if (any_metal_seen && !was_any_metal_seen) {
-                ESP_ERROR_CHECK_WITHOUT_ABORT(
-                    supervisor::notify_main(robot_flags::NOTIFY_METAL_FOUND));
-            }
-            was_any_metal_seen = any_metal_seen;
-
-            const EventBits_t control_flags = xEventGroupGetBits(supervisor::g_robot_control_flags);
-            if (!robot_flags::has_flag(control_flags, robot_flags::CONTROL_METAL_ENABLED)) {
-                break;
-            }
+        const EventBits_t control_flags =
+            xEventGroupGetBits(supervisor::g_robot_control_flags);
+        if (!robot_flags::has_flag(control_flags, robot_flags::CONTROL_METAL_ENABLED)) {
+            // Leave one timer notification pending so a later enable can resume sampling.
+            arm_timer_us(MD_START_DELAY_US);
+            continue;
         }
 
-        xEventGroupClearBits(supervisor::g_robot_status_flags,
-                             robot_flags::STATUS_METAL_CALIBRATED_MASK |
-                                 robot_flags::STATUS_METAL_SEEN_MASK);
+        if (MD_1_ENABLE && sample_detector_1) {
+            md_1.pulse_and_sample();
+        } else if (MD_2_ENABLE) {
+            md_2.pulse_and_sample();
+        }
+        arm_timer_us(MD_STAGGER_US);
+
+        if (MD_1_ENABLE && sample_detector_1) {
+            md_1.update();
+            md_1.get_snapshot(&snapshots.detector_1);
+        } else if (MD_2_ENABLE) {
+            md_2.update();
+            md_2.get_snapshot(&snapshots.detector_2);
+        }
+
+        sample_detector_1 = !sample_detector_1;
+
+        xQueueOverwrite(s_metal_snapshot_queue, &snapshots);
+
+        EventBits_t calibrated_bits = 0;
+        if (MD_1_ENABLE && md_1.is_calibration_complete()) {
+            calibrated_bits |= robot_flags::STATUS_METAL_1_CALIBRATED;
+        }
+        if (MD_2_ENABLE && md_2.is_calibration_complete()) {
+            calibrated_bits |= robot_flags::STATUS_METAL_2_CALIBRATED;
+        }
+
+        sync_status_bits(robot_flags::STATUS_METAL_CALIBRATED_MASK, calibrated_bits);
+
+        const bool all_calibrated =
+            robot_flags::has_all_flags(calibrated_bits, robot_flags::STATUS_METAL_CALIBRATED_MASK);
+        if (all_calibrated && !was_all_calibrated) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(
+                supervisor::notify_main(robot_flags::NOTIFY_METAL_CALIBRATED));
+        }
+        was_all_calibrated = all_calibrated;
+
+        EventBits_t seen_bits = 0;
+        if (snapshots.detector_1.state == MetalState::METAL_DETECTED) {
+            seen_bits |= robot_flags::STATUS_METAL_1_SEEN;
+        }
+        if (snapshots.detector_2.state == MetalState::METAL_DETECTED) {
+            seen_bits |= robot_flags::STATUS_METAL_2_SEEN;
+        }
+
+        sync_status_bits(robot_flags::STATUS_METAL_SEEN_MASK, seen_bits);
+
+        const bool any_metal_seen = seen_bits != 0;
+        if (any_metal_seen && !was_any_metal_seen) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(supervisor::notify_main(robot_flags::NOTIFY_METAL_FOUND));
+        }
+        was_any_metal_seen = any_metal_seen;
+
     }
 }
 } // namespace

@@ -8,44 +8,46 @@
 using control::Pose;
 
 // IN METERS, (x_pos_m, y_pos_m, heading_deg)
+// IN METERS, (x_pos_m, y_pos_m, heading_deg)
 #define WAYPOINT_LIST(X)                                                                           \
-    X(POSE_HOME, 0.0f, -0.0f, 0.0f)                                                         \
-    X(POSE_ROCK_SCAN_1, -0.1200f, 0.8097f, 0.0f)                                                   \
-    X(POSE_ROCK_PICKUP_1_1, -0.2100f, 0.7997f, 0.0f)                                               \
-    X(POSE_ROCK_PICKUP_1_2, -0.3096f, 0.9008f, -67.4f)                                             \
-    X(POSE_ROCK_PICKUP_1_3, -0.1076f, 0.9497f, -67.4f)                                             \
-    X(POSE_ROCK_SCAN_2, -0.1784f, 1.3564f, 0.0f)                                                   \
-    X(POSE_ROCK_PICKUP_2_1, -0.1076f, 1.2646f, 0.0f)                                               \
-    X(POSE_ROCK_PICKUP_2_2, -0.1292f, 1.2977f, 30.9f)                                              \
-    X(POSE_ROCK_PICKUP_2_3, -0.2037f, 1.4135f, 31.4f)                                              \
-    X(POSE_ROCK_INTER_23, -0.0594f, 1.6237f, 0.0f)                                                 \
-    X(POSE_ROCK_SCAN_3, -0.0823f, 1.7581f, 45.0f)                                                  \
-    X(POSE_ROCK_PICKUP_3_1, -0.1319f, 1.6299f, -4.4f)                                              \
-    X(POSE_ROCK_PICKUP_3_2, -0.1290f, 1.8716f, -12.4f)                                             \
-    X(POSE_ROCK_INTER_34_1, -0.4383f, 1.9358f, 65.0f)                                              \
-    X(POSE_ROCK_SCAN_4, -0.5761f, 1.9611f, 90.0f)                                                  \
-    X(POSE_ROCK_PICKUP_4_1, -0.4961f, 1.9611f, 90.0f)                                              \
-    X(POSE_ROCK_PICKUP_4_2, -0.4961f, 1.9611f, 64.4f)                                              \
-    X(POSE_ROCK_PICKUP_4_3, -0.6546f, 1.9911f, 180.0f)                                             \
-    X(POSE_ROCK_INTER_45_1, -0.7677f, 1.8271f, 180.0f)                                             \
-    X(POSE_ROCK_INTER_45_2, -0.7277f, 1.5452f, 180.0f)                                             \
-    X(POSE_ROCK_INTER_45_3, -0.7277f, 0.6226f, 180.0f)                                             \
-    X(POSE_ROCK_SCAN_5, -0.8236f, 0.2307f, 180.0f)                                                 \
-    X(POSE_ROCK_PICKUP_5_1, -0.8236f, 0.4007f, 180.0f)                                             \
-    X(POSE_ROCK_PICKUP_5_2, -0.6636f, 0.4007f, 180.0f)                                             \
-    X(POSE_ROCK_PICKUP_5_3, -0.6636f, 0.2307f, 180.0f)                                             \
-    X(POSE_ROCK_SCAN_6, -1.0092f, 0.1654f, 90.0f)                                                  \
-    X(POSE_ROCK_PICKUP_6_1, -0.8542f, 0.1723f, 90.0f)                                              \
-    X(POSE_ROCK_PICKUP_6_2, -0.8958f, 0.1753f, 56.9f)                                              \
-    X(POSE_ROCK_PICKUP_6_3, -1.0292f, 0.2583f, 56.9f)                                              \
-    X(POSE_INTER_ROCK_TOWER, -1.3125f, 0.1606f, 92.0f)                                             \
-    X(POSE_TOWER_BUILD_A, -1.7109f, 0.4304f, 123.5f)                                               \
-    X(POSE_TOWER_STACK_A, -1.8282f, 0.5931f, 64.1f)                                                \
-    X(POSE_TOWER_BUILD_B, -1.6976f, 0.3889f, 124.5f)                                               \
-    X(POSE_TOWER_STACK_B, -1.8082f, 0.5131f, 64.1f)                                                \
-    X(POSE_SOLAR_ALIGN, -1.3007f, 0.5311f, 0.0f)                                                   \
-    X(POSE_SOLAR_PULL, -1.3007f, 1.4611f, 0.0f)                                                    \
-    X(POSE_SOLAR_TURN, -1.3007f, 1.4611f, 90.0f)
+    X(POSE_HOME, 0.0f, 0.0f, 0.0f)                                                           \
+    X(POSE_ROCK_SCAN_1, 0.1902f, 0.8366f, 0.0f)                                                    \
+    X(POSE_ROCK_PICKUP_1_1, 0.0872f, 0.8066f, 0.0f)                                                \
+    X(POSE_ROCK_PICKUP_1_2, -0.0124f, 0.9077f, -67.4f)                                             \
+    X(POSE_ROCK_PICKUP_1_3, 0.1896f, 0.9566f, -67.4f)                                              \
+    X(POSE_ROCK_SCAN_2, 0.1088f, 1.4233f, 90.0f)                                                   \
+    X(POSE_ROCK_PICKUP_2_1, 0.2588f, 1.4433f, 90.0f)                                               \
+    X(POSE_ROCK_PICKUP_2_2, 0.2588f, 1.5683f, 90.0f)                                               \
+    X(POSE_ROCK_PICKUP_2_3, 0.1088f, 1.5683f, 90.0f)                                               \
+    X(POSE_ROCK_INTER_23, 0.2378f, 1.6306f, 0.0f)                                                  \
+    X(POSE_ROCK_SCAN_3, 0.2449f, 1.8050f, 45.0f)                                                   \
+    X(POSE_ROCK_PICKUP_3_1, 0.1653f, 1.6368f, 20.0f)                                               \
+    X(POSE_ROCK_PICKUP_3_2, 0.1652f, 1.8785f, 0.0f)                                              \
+    X(POSE_ROCK_INTER_34_1, -0.1411f, 1.9427f, 65.0f)                                              \
+    X(POSE_ROCK_SCAN_4, -0.2989f, 1.9480f, 90.0f)                                                  \
+    X(POSE_ROCK_PICKUP_4_1, -0.1789f, 1.9680f, 90.0f)                                              \
+    X(POSE_ROCK_PICKUP_4_2, -0.1789f, 2.0880f, 90.0f)                                              \
+    X(POSE_ROCK_PICKUP_4_3, -0.2989f, 2.0880f, 90.0f)                                              \
+    X(POSE_ROCK_INTER_45_1, -0.4705f, 1.8340f, 180.0f)                                             \
+    X(POSE_ROCK_INTER_45_2, -0.4305f, 1.5521f, 180.0f)                                             \
+    X(POSE_ROCK_INTER_45_3, -0.4305f, 0.6295f, 180.0f)                                             \
+    X(POSE_ROCK_SCAN_5, -0.5264f, 0.2376f, 180.0f)                                                 \
+    X(POSE_ROCK_PICKUP_5_1, -0.5264f, 0.4076f, 180.0f)                                             \
+    X(POSE_ROCK_PICKUP_5_2, -0.3664f, 0.4076f, 180.0f)                                             \
+    X(POSE_ROCK_PICKUP_5_3, -0.3664f, 0.2376f, 180.0f)                                             \
+    X(POSE_ROCK_SCAN_6, -0.6620f, 0.2423f, 90.0f)                                                  \
+    X(POSE_ROCK_PICKUP_6_1, -0.5570f, 0.1792f, 90.0f)                                              \
+    X(POSE_ROCK_PICKUP_6_2, -0.5986f, 0.1822f, 56.9f)                                              \
+    X(POSE_ROCK_PICKUP_6_3, -0.7320f, 0.2652f, 56.9f)                                              \
+    X(POSE_INTER_ROCK_TOWER, -1.0153f, 0.1675f, 92.0f)                                             \
+    X(POSE_TOWER_BUILD_A, -1.4137f, 0.4373f, 123.5f)                                               \
+    X(POSE_TOWER_STACK_A, -1.5310f, 0.6000f, 64.1f)                                                \
+    X(POSE_TOWER_BUILD_B, -1.4004f, 0.3958f, 124.5f)                                               \
+    X(POSE_TOWER_STACK_B, -1.5110f, 0.5200f, 64.1f)                                                \
+    X(POSE_SOLAR_ALIGN, -1.0035f, 0.5380f, 0.0f)                                                   \
+    X(POSE_SOLAR_PULL, -1.0035f, 1.4680f, 0.0f)                                                    \
+    X(POSE_SOLAR_TURN, -1.0035f, 1.4680f, 90.0f)
+
 
 
 enum WaypointIndex : std::size_t {

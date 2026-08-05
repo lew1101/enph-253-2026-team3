@@ -1,5 +1,6 @@
 #pragma once
 
+#include "esp32-hal-ledc.h"
 #include <Arduino.h>
 
 #include <cstdint>
@@ -35,12 +36,16 @@ class ServoDriver {
     bool set_deg(float deg);
     bool sweep_to_deg(float target_deg, uint32_t duration_ms);
     bool set_us(uint32_t us);
+    bool attach();
+    bool detach();
+    inline bool is_attached() const { return _attached; }
 
     bool center();
 
   private:
     Config _config;
     bool _initialized = false;
+    bool _attached = false;
     float _current_deg = 0.0f;
 
     uint32_t deg_to_us(float deg) const;

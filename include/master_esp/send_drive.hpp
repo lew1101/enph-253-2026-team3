@@ -8,7 +8,7 @@
 
 using control::Pose;
 
-constexpr float DEFAULT_PATH_SPEED_MPS = 0.5f;
+constexpr float DEFAULT_PATH_SPEED_MPS = 0.6f;
 
 constexpr robot_DriveCommand make_pose_drive_command(
     const Pose &pose, bool is_relative = false, float desired_speed_mps = DEFAULT_PATH_SPEED_MPS)

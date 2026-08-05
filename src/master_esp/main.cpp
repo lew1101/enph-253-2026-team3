@@ -22,7 +22,7 @@
 #include "sensors/metal_detector.hpp"
 #include "drivers/pulse_tx.hpp"
 
-#define RUN_WAYPOINT_TEST_ENABLED 1
+#define RUN_WAYPOINT_TEST_ENABLED 0
 #define RUN_WAYPOINT_PICKUP_ENABLED 1
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
 
@@ -39,14 +39,14 @@ namespace {
 
 constexpr gpio_num_t GUIDE_LIM_SWITCH_PIN = GPIO_NUM_9; // debounced
 constexpr gpio_num_t ENABLE_SWITCH_PIN = GPIO_NUM_14;   // debounced
-constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
+// constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_40;    // no debounce
 
 constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_13;
 
 PulseTx s_status_led_pulse_tx{STATUS_LED_PIN};
 
-DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP};
-DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT_PULLUP};
+DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP, HIGH};
+DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT, HIGH};
 
 TaskHandle_t g_autonomous_task = nullptr;
 
@@ -62,6 +62,36 @@ bool front_chassis_available = false;
 
 bool is_track_a;
 
+bool enable_front_chassis_outputs()
+{
+    if (!front_chassis_available) return false;
+
+    const bool elevator_enabled = elevator_claw.enable();
+    const bool worm_enabled = worm_spear.enable();
+    if (!elevator_enabled || !worm_enabled) {
+        ESP_LOGE(TAG,
+                 "failed to enable front chassis outputs: elevator=%s worm=%s",
+                 elevator_enabled ? "ok" : "failed",
+                 worm_enabled ? "ok" : "failed");
+    }
+    return elevator_enabled && worm_enabled;
+}
+
+bool disable_front_chassis_outputs()
+{
+    if (!front_chassis_available) return false;
+
+    const bool elevator_disabled = elevator_claw.disable();
+    const bool worm_disabled = worm_spear.disable();
+    if (!elevator_disabled || !worm_disabled) {
+        ESP_LOGE(TAG,
+                 "failed to disable front chassis outputs: elevator=%s worm=%s",
+                 elevator_disabled ? "ok" : "failed",
+                 worm_disabled ? "ok" : "failed");
+    }
+    return elevator_disabled && worm_disabled;
+}
+
 inline void status_double_flash()
 {
     static constexpr PulseTx::Word DOUBLE_BLINK_MSG[]{
@@ -74,16 +104,15 @@ inline void status_double_flash()
     ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_pulse_tx.transmit(DOUBLE_BLINK_MSG));
 }
 
-#if RUN_WAYPOINT_TEST_ENABLED
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
-    ELEV_TOWER_1 = 1000,
+    ELEV_TOWER_1 = 500,
     ELEV_TOWER_2_PLUS = 4000,
     ELEV_TOWER_2_MINUS = 3400,
-    ELEV_TOWER_2 = 1000,
+    ELEV_TOWER_2 = 500,
     ELEV_TOWER_3_PLUS = 4000,
     ELEV_TOWER_3_MINUS = 3400,
-    ELEV_TOWER_3 = 1000,
+    ELEV_TOWER_3 = 500,
     ELEV_TOP_FRONT = 4700,
     ELEV_TIPPITY_TOP = 5000,
     ELEV_BACK = 5400,
@@ -91,26 +120,24 @@ enum ElevatorPos : int32_t {
 
 enum SpearPos : int32_t { //
     SPEAR_LEFT = 55'500,
-    SPEAR_CENTRE = 27'750,
+    SPEAR_CENTRE = 24'000,
     SPEAR_RIGHT = 0,
     SPEAR_CENTERING = 0
 };
 
-//Spear Angle
-constexpr float SPEAR_UP_DEG = 80.0f;
+constexpr float SPEAR_UP_DEG = 90.0f;
 constexpr float SPEAR_UP_TILTED = 75.0f;
 constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
-constexpr float SPEAR_DOWN_DEG = 0.0f;
-constexpr float SPEAR_DOWN_TILTED = 5.0f;
-constexpr float MOON_OUT_OF_WAY_DEG = 100.0f;
-constexpr float SPEAR_MOVE_DELAY = 600UL; // ms
+constexpr float SPEAR_DOWN_DEG = 5.0f;
+constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms
 
-constexpr float CLAW_OPEN_DEG = 90.0f;
-constexpr float CLAW_CLOSE_TOWER_DEG = 15.0f;
+constexpr float CLAW_OPEN_DEG = 180.0f;
+constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
 constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
 
 constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
 
+#if RUN_WAYPOINT_TEST_ENABLED
 void test_course()
 {
     xEventGroupSetBits(supervisor::g_robot_control_flags,
@@ -254,12 +281,10 @@ esp_err_t rocks_sequence()
     constexpr TickType_t METAL_CALIBRATION_TIMEOUT = pdMS_TO_TICKS(15000);
     constexpr TickType_t MD_TIMEOUT = pdMS_TO_TICKS(3000);
 
-    xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_ACTUATORS);
-    xEventGroupClearBits(supervisor::g_robot_status_flags,
-                         robot_flags::STATUS_METAL_CALIBRATED_MASK |
-                             robot_flags::STATUS_METAL_SEEN_MASK);
-    xEventGroupSetBits(supervisor::g_robot_control_flags,
-                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_METAL_ENABLED);
+    struct ActuatorControlGuard {
+        ActuatorControlGuard() { disable_front_chassis_outputs(); }
+        ~ActuatorControlGuard() { enable_front_chassis_outputs(); }
+    } actuator_guard;
 
     // ensure control metal enabled bits are cleared when function out of scope
     struct MetalControlGuard {
@@ -270,22 +295,34 @@ esp_err_t rocks_sequence()
         }
     } metal_control_guard;
 
-    // SEQUENCE START
-    auto status_flags = xEventGroupWaitBits(supervisor::g_robot_status_flags,
-                                            robot_flags::STATUS_METAL_CALIBRATED_MASK,
-                                            pdFALSE,
-                                            pdTRUE,
-                                            METAL_CALIBRATION_TIMEOUT);
+    delay(1000);
 
-    if (!robot_flags::has_all_flags(status_flags, robot_flags::STATUS_METAL_CALIBRATED_MASK)) {
-        ESP_LOGE(TAG, "metal detector calibration timed out; skipping rocks");
-        return ESP_ERR_NOT_FOUND;
-    }
+    xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+    xEventGroupClearBits(supervisor::g_robot_status_flags, robot_flags::STATUS_METAL_SEEN_MASK);
+    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+
+    // // make sure metal calibration really was done
+    // auto status_flags = xEventGroupWaitBits(supervisor::g_robot_status_flags,
+    //                                         robot_flags::STATUS_METAL_CALIBRATED_MASK,
+    //                                         pdFALSE,
+    //                                         pdTRUE,
+    //                                         METAL_CALIBRATION_TIMEOUT);
+
+    // if (!robot_flags::has_all_flags(status_flags, robot_flags::STATUS_METAL_CALIBRATED_MASK)) {
+    //     ESP_LOGE(TAG, "metal detector calibration timed out; skipping rocks");
+    //     return ESP_ERR_NOT_FOUND;
+    // }
 
     bool rock_was_found = false;
 
     const auto pick_up_and_go_to_next = [&](const Pose &waypoint) -> esp_err_t {
         rock_was_found = true;
+
+        xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+        ESP_RETURN_ON_FALSE(enable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to enable front chassis for rock pickup");
 
         elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
         elevator_claw.set_claw(CLAW_CLOSE_ROCK_DEG);
@@ -304,23 +341,25 @@ esp_err_t rocks_sequence()
     };
 
     // is_check_md_left: true for check md_1, false for check md_2
-    const auto scan_if_not_found = [&](bool is_check_md_left) -> bool {
+    const auto scan_if_not_found = [&]() -> bool {
         if (rock_was_found) return false;
+
+        delay(500);
+        xEventGroupClearBits(supervisor::g_robot_status_flags, robot_flags::STATUS_METAL_SEEN_MASK);
+        xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+        delay(1000);
         auto status_flags = xEventGroupWaitBits(supervisor::g_robot_status_flags,
                                                 robot_flags::STATUS_METAL_SEEN_MASK,
                                                 pdFALSE,
                                                 pdFALSE,
                                                 MD_TIMEOUT);
+        xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
 
-        bool metal_detected =
-            (is_check_md_left &&
-             robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_1_SEEN)) ||
-            (!is_check_md_left &&
-             robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_2_SEEN));
+        bool metal_detected = robot_flags::has_flag(status_flags, robot_flags::STATUS_METAL_1_SEEN);
 
         if (metal_detected) {
-            ESP_LOGI(
-                TAG, "metal detected on the %s", is_check_md_left ? "left side" : "right side");
+            ESP_LOGI(TAG, "metal detected");
+
             status_double_flash();
             return true;
         }
@@ -332,7 +371,7 @@ esp_err_t rocks_sequence()
     ESP_RETURN_ON_ERROR(
         send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]), TAG, "failed to reach rock scan 1");
 
-    if (scan_if_not_found(false)) {
+    if (scan_if_not_found()) {
         follow_route({
             WAYPOINTS[POSE_ROCK_PICKUP_1_1],
             WAYPOINTS[POSE_ROCK_PICKUP_1_2],
@@ -347,7 +386,7 @@ esp_err_t rocks_sequence()
         ESP_RETURN_ON_ERROR(
             send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]), TAG, "failed to reach rock scan 2");
 
-        if (scan_if_not_found(true)) {
+        if (scan_if_not_found()) {
             follow_route({
                 WAYPOINTS[POSE_ROCK_PICKUP_2_1],
                 WAYPOINTS[POSE_ROCK_PICKUP_2_2],
@@ -365,7 +404,7 @@ esp_err_t rocks_sequence()
         WAYPOINTS[POSE_ROCK_SCAN_3],
     });
 
-    if (scan_if_not_found(false)) {
+    if (scan_if_not_found()) {
         follow_route({
             WAYPOINTS[POSE_ROCK_PICKUP_3_1],
             WAYPOINTS[POSE_ROCK_PICKUP_3_2],
@@ -381,7 +420,7 @@ esp_err_t rocks_sequence()
         WAYPOINTS[POSE_ROCK_SCAN_4],
     });
 
-    if (scan_if_not_found(false)) {
+    if (scan_if_not_found()) {
         follow_route({
             WAYPOINTS[POSE_ROCK_PICKUP_4_1],
             WAYPOINTS[POSE_ROCK_PICKUP_4_2],
@@ -399,7 +438,7 @@ esp_err_t rocks_sequence()
         WAYPOINTS[POSE_ROCK_SCAN_5],
     });
 
-    if (scan_if_not_found(true)) {
+    if (scan_if_not_found()) {
         follow_route({
             WAYPOINTS[POSE_ROCK_PICKUP_5_1],
             WAYPOINTS[POSE_ROCK_PICKUP_5_2],
@@ -615,25 +654,18 @@ void autonomous_task(void *arg)
     // test_course();
     // INITILIZATION:
 
-    if (elev_calibrated) elevator_claw.move_to_position(ELEV_TOP_FRONT);
-    if (worm_calibrated) {
-        worm_spear.set_spear(SPEAR_DOWN_DEG, 100UL);
-        worm_spear.move_to_position(SPEAR_LEFT);
-        worm_spear.set_spear(SPEAR_UP_DEG, 100UL);
-    }
-
     // // PHASE 1: ROCKS and TELETUBBY
 
     esp_err_t err = ESP_OK;
-    // if (metal_detector_available && elev_calibrated) {
-    //     err = rocks_sequence();
-    //     if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) halt_autonomous("rocks sequence", err);
-    // } else {
-    //     ESP_LOGW(TAG,
-    //              "skipping rocks: metal=%s elevator=%s",
-    //              metal_detector_available ? "ready" : "unavailable",
-    //              elev_calibrated ? "ready" : "uncalibrated");
-    // }
+    if (metal_detector_available && elev_calibrated) {
+        err = rocks_sequence();
+        if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) halt_autonomous("rocks sequence", err);
+    } else {
+        ESP_LOGW(TAG,
+                 "skipping rocks: metal=%s elevator=%s",
+                 metal_detector_available ? "ready" : "unavailable",
+                 elev_calibrated ? "ready" : "uncalibrated");
+    }
 
     // PHASE 2: TOWER
     //===============
@@ -641,8 +673,8 @@ void autonomous_task(void *arg)
     /* Tower tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors */
 
-    err = build_tower_sequence();
-    if (err != ESP_OK) halt_autonomous("tower build sequence", err);
+    // err = build_tower_sequence();
+    // if (err != ESP_OK) halt_autonomous("tower build sequence", err);
 
     // err = stack_tower_sequence();
     // if (err != ESP_OK) halt_autonomous("tower stack sequence", err);
@@ -699,6 +731,23 @@ esp_err_t reset_autonomous_task()
         return stop_err;
     }
 
+    if (elev_calibrated && worm_calibrated) {
+        ESP_RETURN_ON_FALSE(enable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to enable front chassis during autonomous reset");
+
+        worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
+        elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
+        worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+        worm_spear.set_spear(30.0f, 100.0f);
+
+        ESP_RETURN_ON_FALSE(disable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to disable front chassis after autonomous reset");
+    }
+
     return start_autonomous_task();
 }
 
@@ -717,8 +766,8 @@ esp_err_t setup_autonomous()
                         "guide and worm calibration switches cannot share GPIO %u",
                         static_cast<unsigned>(GUIDE_LIM_SWITCH_PIN));
 
-    pinMode(TRACK_SWITCH_PIN, INPUT_PULLDOWN);
-    is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
+    // pinMode(TRACK_SWITCH_PIN, INPUT_PULLDOWN);
+    // is_track_a = digitalRead(TRACK_SWITCH_PIN) == HIGH;
 
     is_track_a = true; // TEMPORARY OVERRIDE FOR TESTING
 
@@ -734,14 +783,6 @@ esp_err_t setup_autonomous()
                  "front chassis unavailable; pickup and tower phases will be skipped: %s",
                  esp_err_to_name(front_chassis_err));
 
-    // init metal detector task
-    const esp_err_t metal_detector_err = start_metal_detector_task();
-    metal_detector_available = metal_detector_err == ESP_OK;
-    if (!metal_detector_available)
-        ESP_LOGW(TAG,
-                 "metal detector unavailable; rock phase will be skipped: %s",
-                 esp_err_to_name(metal_detector_err));
-
     // init camera UART task
     const esp_err_t camera_uart_err = start_camera_uart_task();
     camera_available = camera_uart_err == ESP_OK;
@@ -750,32 +791,81 @@ esp_err_t setup_autonomous()
                  "camera UART unavailable; camera-dependent steps will be skipped: %s",
                  esp_err_to_name(camera_uart_err));
 
+    // init metal detector task
     delay(1000);
+
+    const esp_err_t metal_detector_err = start_metal_detector_task();
+    metal_detector_available = metal_detector_err == ESP_OK;
+    if (!metal_detector_available)
+        ESP_LOGW(TAG,
+                 "metal detector unavailable; rock phase will be skipped: %s",
+                 esp_err_to_name(metal_detector_err));
+
+    if (front_chassis_available) {
+        ESP_RETURN_ON_FALSE(disable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to quiet front chassis before metal calibration");
+    }
+    delay(1000);
+
+    // CALIBRATE
+    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+    xEventGroupWaitBits(supervisor::g_robot_status_flags,
+                        robot_flags::STATUS_METAL_1_CALIBRATED,
+                        pdTRUE,
+                        pdTRUE,
+                        portMAX_DELAY);
+    xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+
+    delay(300);
 
     constexpr bool CALIBRATE = true;
 
-    if (CALIBRATE) {
-        // calibrate elevator and worm spear if available
-        if (front_chassis_available) {
-            elevator_claw.set_claw(CLAW_OPEN_DEG);
-            worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
+    if (CALIBRATE && front_chassis_available) {
+        ESP_RETURN_ON_FALSE(enable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to enable front chassis for calibration");
 
-            const esp_err_t worm_err = worm_spear.calibrate();
-            worm_calibrated = worm_err == ESP_OK;
-            if (!worm_calibrated)
-                ESP_LOGW(TAG,
-                         "worm spear calibration failed; tower phase will be skipped: %s",
-                         esp_err_to_name(worm_err));
+        ESP_LOGI(TAG, "starting elevator and worm calibration");
 
-            const esp_err_t elev_err = elevator_claw.calibrate();
-            elev_calibrated = elev_err == ESP_OK;
-            if (!elev_calibrated)
-                ESP_LOGW(TAG,
-                         "elevator calibration failed; pickup and tower phases will be skipped: %s",
-                         esp_err_to_name(elev_err));
+        elevator_claw.set_claw(CLAW_OPEN_DEG);
+        worm_spear.set_spear(SPEAR_DOWN_DEG, 100.0f);
 
-            if (elev_calibrated) elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
+        // const esp_err_t worm_err =
+        // esp_err_t worm_err = ESP_OK;
+        worm_spear.move_to_position(-1000);
+        const esp_err_t worm_err = worm_spear.calibrate();
+        worm_calibrated = worm_err == ESP_OK;
+        if (!worm_calibrated) {
+            ESP_LOGW(TAG,
+                     "worm spear calibration failed; tower phase will be skipped: %s",
+                     esp_err_to_name(worm_err));
+        } else {
+            ESP_LOGI(TAG, "worm spear calibration successful");
         }
+
+        const esp_err_t elev_err = elevator_claw.calibrate();
+        elev_calibrated = elev_err == ESP_OK;
+        if (!elev_calibrated) {
+            ESP_LOGW(TAG,
+                     "elevator calibration failed; pickup and tower phases will be skipped: %s",
+                     esp_err_to_name(elev_err));
+        } else {
+            ESP_LOGI(TAG, "elevator calibration successful");
+        }
+
+        if (elev_calibrated && worm_calibrated) {
+            elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
+            worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+            worm_spear.set_spear(30.0f, 100.0f);
+        }
+
+        ESP_RETURN_ON_FALSE(disable_front_chassis_outputs(),
+                            ESP_ERR_INVALID_STATE,
+                            TAG,
+                            "failed to disable front chassis after calibration");
     }
 
     s_status_led_pulse_tx.init();
@@ -802,6 +892,7 @@ esp_err_t start_autonomous_task()
                         ESP_ERR_INVALID_STATE,
                         TAG,
                         "autonomous setup has not completed");
+
     ESP_RETURN_ON_FALSE(g_autonomous_task == nullptr,
                         ESP_ERR_INVALID_STATE,
                         TAG,
@@ -838,12 +929,25 @@ void setup()
         return;
     }
 
-    guide_switch_available = s_guide_limit_switch.begin("tower_guide_switch");
-    if (!guide_switch_available)
-        ESP_LOGW(TAG, "guide switch unavailable; tower phase will be skipped");
+    // guide_switch_available = s_guide_limit_switch.begin("tower_guide_switch");
+    // if (!guide_switch_available)
+    //     ESP_LOGW(TAG, "guide switch unavailable; tower phase will be skipped");
+
+    const esp_err_t setup_err = setup_autonomous();
+    if (setup_err != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "autonomous setup failed: %s; mission will remain stopped",
+                 esp_err_to_name(setup_err));
+    }
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
+
+    ESP_LOGI(TAG, "enable switch level=%d", s_enable_limit_switch.is_pressed());
 
     s_enable_limit_switch.register_pressed_callback(
         [](void *arg) {
+            ESP_LOGI(TAG, "enable pressed");
+
             (void)arg;
             if (g_autonomous_task == nullptr) {
                 start_autonomous_task();
@@ -853,22 +957,19 @@ void setup()
         },
         nullptr);
 
-    const esp_err_t setup_err = setup_autonomous();
-    if (setup_err != ESP_OK) {
-        ESP_LOGE(TAG,
-                 "autonomous setup failed: %s; mission will remain stopped",
-                 esp_err_to_name(setup_err));
-    }
+    // xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+
+    // start_autonomous_task();
+
 #else
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     setup_autonomous();
-    // start_autonomous_task();
+    start_autonomous_task();
 
     // test_course();
 #endif
-
     vTaskDelete(nullptr);
 }
 

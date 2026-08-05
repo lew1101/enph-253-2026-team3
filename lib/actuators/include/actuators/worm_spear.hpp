@@ -17,6 +17,8 @@ class WormSpear {
         gpio_num_t worm_step_pin = GPIO_NUM_NC;
         gpio_num_t worm_dir_pin = GPIO_NUM_NC;
         gpio_num_t worm_calibration_switch_pin = GPIO_NUM_NC;
+        gpio_num_t worm_en_pin = GPIO_NUM_NC;
+
         int32_t speed_hz = 500;
         int32_t acceleration_hz_per_s = 100;
 
@@ -51,10 +53,25 @@ class WormSpear {
         _stepper->moveTo(_config.reversed ? -step : step, blocking);
     }
 
-    inline void set_spear(float deg, uint32_t time = DEFAULT_SPEAR_SWEEP_TIME) { _spear_servo.sweep_to_deg(deg, time); };
+    inline void set_spear(float deg, uint32_t time = DEFAULT_SPEAR_SWEEP_TIME)
+    {
+        _spear_servo.sweep_to_deg(deg, time);
+    };
     inline void stop_worm() { _stepper->forceStop(); }
-    inline void disable_worm() { _stepper->disableOutputs(); }
-    inline void enable_worm() { _stepper->enableOutputs(); }
+    inline bool enable()
+    {
+        const bool servo_enabled = _spear_servo.attach();
+        const bool stepper_enabled = _stepper->enableOutputs();
+        return servo_enabled && stepper_enabled;
+    }
+    inline bool disable()
+    {
+        _stepper->forceStop();
+        vTaskDelay(pdMS_TO_TICKS(10));
+        const bool servo_disabled = _spear_servo.detach();
+        const bool stepper_disabled = _stepper->disableOutputs();
+        return servo_disabled && stepper_disabled;
+    }
     inline bool worm_done() const { return !_stepper->isRunning(); }
 
     // ONLY FOR TUNING PURPOSES

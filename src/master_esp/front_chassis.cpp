@@ -16,8 +16,14 @@ esp_err_t front_chassis_init()
 {
     stepper_engine.init();
 
-    ESP_RETURN_ON_ERROR(worm_spear.init(), TAG, "Failed to initialize WormSpear");
-    ESP_RETURN_ON_ERROR(elevator_claw.init(), TAG, "Failed to initialize ElevatorClaw");
+    const esp_err_t worm_err = worm_spear.init();
+    ESP_RETURN_ON_ERROR(worm_err, TAG, "Failed to initialize WormSpear");
+
+    const esp_err_t elevator_err = elevator_claw.init();
+    if (elevator_err != ESP_OK) {
+        worm_spear.disable();
+        ESP_RETURN_ON_ERROR(elevator_err, TAG, "Failed to initialize ElevatorClaw");
+    }
 
     ESP_LOGI(TAG, "WormSpear and ElevatorClaw initialized successfully");
     return ESP_OK;

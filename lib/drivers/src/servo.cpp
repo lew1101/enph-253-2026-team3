@@ -30,14 +30,10 @@ bool ServoDriver::init()
 
     if (_config.max_pulse_us > (1000000UL / _config.freq_hz)) return false;
 
-    const bool attached =
-        ledcAttachChannel(_config.gpio, _config.freq_hz, _config.duty_res_bits, _config.channel);
-
-    if (!attached) return false;
     _initialized = true;
+    _current_deg = 0.5f * (_config.min_clamp_deg + _config.max_clamp_deg);
 
-    // set to center position
-    if (!center()) {
+    if (!attach()) {
         _initialized = false;
         return false;
     }
@@ -45,10 +41,45 @@ bool ServoDriver::init()
     return true;
 }
 
-bool ServoDriver::set_deg(float deg)
+bool ServoDriver::attach()
 {
     if (!_initialized) return false;
-    
+    if (_attached) return true;
+
+    if (!ledcAttachChannel(
+            _config.gpio, _config.freq_hz, _config.duty_res_bits, _config.channel)) {
+        return false;
+    }
+
+    _attached = true;
+    if (!set_deg(_current_deg)) {
+        ledcDetach(_config.gpio);
+        _attached = false;
+        return false;
+    }
+
+    return true;
+}
+
+bool ServoDriver::detach()
+{
+    if (!_initialized) return false;
+
+    bool detached = true;
+    if (_attached) {
+        detached = ledcDetach(_config.gpio);
+    }
+
+    pinMode(_config.gpio, OUTPUT);
+    digitalWrite(_config.gpio, LOW);
+    _attached = false;
+    return detached;
+}
+
+bool ServoDriver::set_deg(float deg)
+{
+    if (!_initialized || !_attached) return false;
+
     _current_deg = clamp(deg, _config.min_clamp_deg, _config.max_clamp_deg);
 
     const uint32_t us = deg_to_us(deg);
@@ -57,8 +88,8 @@ bool ServoDriver::set_deg(float deg)
 
 bool ServoDriver::sweep_to_deg(float target_deg, uint32_t duration_ms)
 {
-    if (!_initialized) return false;
-    
+    if (!_initialized || !_attached) return false;
+
     float distance = target_deg - _current_deg;
     if (std::abs(distance) < 0.1f) return true; // Already there
 
@@ -81,7 +112,7 @@ bool ServoDriver::sweep_to_deg(float target_deg, uint32_t duration_ms)
 
 bool ServoDriver::set_us(uint32_t us)
 {
-    if (!_initialized) return false;
+    if (!_initialized || !_attached) return false;
 
     us = clamp(us, _config.min_pulse_us, _config.max_pulse_us);
     const uint32_t duty = us_to_duty(us);
