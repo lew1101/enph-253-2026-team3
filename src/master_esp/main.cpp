@@ -119,7 +119,7 @@ enum ElevatorPos : int32_t {
 };
 
 enum SpearPos : int32_t { //
-    SPEAR_LEFT = 55'500,
+    SPEAR_LEFT = 53'500,
     SPEAR_CENTRE = 24'000,
     SPEAR_RIGHT = 0,
     SPEAR_CENTERING = 0
@@ -485,13 +485,13 @@ esp_err_t build_tower_sequence()
     constexpr float Y_OFFSET = 0.1f; // m
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
-    constexpr float MOVEMENT_SPEED_MPS = 0.14f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14f;
     const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
 
     robot_DriveCommand forward =
-        make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_SPEED_MPS);
+        make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
     robot_DriveCommand backward =
-        make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true, MOVEMENT_SPEED_MPS);
+        make_pose_drive_command({0.0f, -Y_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
 
     xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_ACTUATORS);
     xEventGroupSetBits(supervisor::g_robot_control_flags,
@@ -503,7 +503,7 @@ esp_err_t build_tower_sequence()
             WAYPOINTS[POSE_INTER_ROCK_TOWER],
             WAYPOINTS[POSE_TOWER_BUILD],
         },
-        MOVEMENT_SPEED_MPS);
+        MOVEMENT_LOOKAHEAD_M);
 
     // realign with tower tape
     // stage robot to the left, so scan towards the right.
@@ -593,7 +593,7 @@ esp_err_t build_tower_sequence()
 
 esp_err_t stack_tower_sequence()
 {
-    constexpr float MOVEMENT_SPEED_MPS = 0.14f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14f;
     constexpr float FORWARD_SPEED = 0.05f;
 
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(700);
@@ -602,7 +602,7 @@ esp_err_t stack_tower_sequence()
 
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
     ESP_RETURN_ON_ERROR(
-        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_SPEED_MPS),
+        send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
         TAG,
         "failed to reach tower stack pose");
 

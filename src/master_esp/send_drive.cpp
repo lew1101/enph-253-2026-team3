@@ -54,9 +54,9 @@ void send_stop()
 esp_err_t send_pose(const Pose &waypoint,
                     bool is_relative,
                     uint32_t *out_sequence,
-                    float desired_speed_mps)
+                    float path_lookahead_m)
 {
-    robot_DriveCommand cmd = make_pose_drive_command(waypoint, is_relative, desired_speed_mps);
+    robot_DriveCommand cmd = make_pose_drive_command(waypoint, is_relative, path_lookahead_m);
     return send_drive_command(cmd, portMAX_DELAY, out_sequence);
 }
 
@@ -101,10 +101,10 @@ esp_err_t send_tape_alignment_and_wait(float staging_direction, TickType_t timeo
 esp_err_t send_pose_and_wait(const Pose &waypoint,
                              bool relative,
                              TickType_t timeout,
-                             float desired_speed_mps)
+                             float path_lookahead_m)
 {
     uint32_t sequence = 0;
-    const esp_err_t send_err = send_pose(waypoint, relative, &sequence, desired_speed_mps);
+    const esp_err_t send_err = send_pose(waypoint, relative, &sequence, path_lookahead_m);
     if (send_err != ESP_OK) return send_err;
     return wait_for_drive_sequence(sequence, timeout);
 }
@@ -112,12 +112,12 @@ esp_err_t send_pose_and_wait(const Pose &waypoint,
 esp_err_t send_pose_through(const Pose &waypoint,
                             float pass_radius_m,
                             TickType_t timeout,
-                            float desired_speed_mps)
+                            float path_lookahead_m)
 {
     if (!std::isfinite(pass_radius_m) || pass_radius_m <= 0.0f) return ESP_ERR_INVALID_ARG;
 
     uint32_t sequence = 0;
-    const esp_err_t send_err = send_pose(waypoint, false, &sequence, desired_speed_mps);
+    const esp_err_t send_err = send_pose(waypoint, false, &sequence, path_lookahead_m);
     if (send_err != ESP_OK) return send_err;
 
     const TickType_t start = xTaskGetTickCount();
@@ -157,14 +157,14 @@ esp_err_t send_pose_through(const Pose &waypoint,
     __builtin_unreachable();
 }
 
-void follow_route(std::initializer_list<Pose> route, float desired_speed_mps)
+void follow_route(std::initializer_list<Pose> route, float path_lookahead_m)
 {
     size_t index = 0;
     for (const Pose &pose : route) {
         const bool is_last = ++index == route.size();
         const esp_err_t err =
-            is_last ? send_pose_and_wait(pose, false, pdMS_TO_TICKS(5000), desired_speed_mps)
-                    : send_pose_through(pose, 0.15f, pdMS_TO_TICKS(5000), desired_speed_mps);
+            is_last ? send_pose_and_wait(pose, false, pdMS_TO_TICKS(5000), path_lookahead_m)
+                    : send_pose_through(pose, 0.15f, pdMS_TO_TICKS(5000), path_lookahead_m);
         if (err != ESP_OK) {
             ESP_LOGE("drive_pose",
                      "route failed at waypoint x=%.2fm, y=%.2fm, heading=%.2fdeg",

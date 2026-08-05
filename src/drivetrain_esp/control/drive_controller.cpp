@@ -299,9 +299,16 @@ void DriveController::_begin_pose_command(const robot_DriveCommand &cmd,
     _pose.path_distance_m = std::hypot(_pose.path_end.x_m - _pose.path_start.x_m,
                                        _pose.path_end.y_m - _pose.path_start.y_m);
     _pose.path_progress_m = 0.0f;
-    _pose.path_speed_mps = pose_command.desired_speed_mps > 0.0f
-                               ? pose_command.desired_speed_mps
-                               : DEFAULT_POSE_PATH_SPEED_MPS;
+    if (_pose.path_distance_m > 0.0f) {
+        _pose.path_unit_x = (_pose.path_end.x_m - _pose.path_start.x_m) / _pose.path_distance_m;
+        _pose.path_unit_y = (_pose.path_end.y_m - _pose.path_start.y_m) / _pose.path_distance_m;
+    } else {
+        _pose.path_unit_x = 0.0f;
+        _pose.path_unit_y = 0.0f;
+    }
+    _pose.path_lookahead_m = pose_command.path_lookahead_m > 0.0f
+                                 ? pose_command.path_lookahead_m
+                                 : DEFAULT_POSE_PATH_LOOKAHEAD_M;
 
     // A zero-length translation is a pure heading command, so it can use the
     // endpoint controller immediately.
@@ -372,22 +379,23 @@ void DriveController::_update_pose(Drivetrain &drivetrain,
         return;
     }
 
-    // Advance the reference at the requested physical speed. Hold it when the
-    // robot falls too far behind so the target cannot run away from the robot.
+    // Keep the reference the requested distance ahead of measured progress
+    // along the path. Never move it backward if pose data jitters.
     if (!_pose.path_endpoint_active) {
-        const float reference_error_m =
-            std::hypot(_pose.reference.pose.x_m - pose_snapshot.pose.x_m,
-                       _pose.reference.pose.y_m - pose_snapshot.pose.y_m);
+        const float measured_path_progress_m = std::clamp(
+            (pose_snapshot.pose.x_m - _pose.path_start.x_m) * _pose.path_unit_x +
+                (pose_snapshot.pose.y_m - _pose.path_start.y_m) * _pose.path_unit_y,
+            0.0f,
+            _pose.path_distance_m);
+        const float lookahead_progress_m =
+            std::min(measured_path_progress_m + _pose.path_lookahead_m, _pose.path_distance_m);
 
-        if (reference_error_m <= POSE_PATH_REFERENCE_ADVANCE_TOLERANCE_M) {
-            _pose.path_progress_m = std::min(
-                _pose.path_progress_m + _pose.path_speed_mps * dt_s, _pose.path_distance_m);
-            _pose.reference.pose = control::lerp_pose(
-                _pose.path_start, _pose.path_end, _pose.path_progress_m / _pose.path_distance_m);
-            _pose.path_endpoint_active = _pose.path_progress_m >= _pose.path_distance_m;
-            _pose.endpoint_motion_tracking = false;
-            _reached_pose.store(false, std::memory_order_relaxed);
-        }
+        _pose.path_progress_m = std::max(_pose.path_progress_m, lookahead_progress_m);
+        _pose.reference.pose = control::lerp_pose(
+            _pose.path_start, _pose.path_end, _pose.path_progress_m / _pose.path_distance_m);
+        _pose.path_endpoint_active = _pose.path_progress_m >= _pose.path_distance_m;
+        _pose.endpoint_motion_tracking = false;
+        _reached_pose.store(false, std::memory_order_relaxed);
     }
 
     const PoseReferenceError error =
