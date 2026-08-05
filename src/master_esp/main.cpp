@@ -281,25 +281,27 @@ esp_err_t rocks_sequence()
     constexpr TickType_t METAL_CALIBRATION_TIMEOUT = pdMS_TO_TICKS(15000);
     constexpr TickType_t MD_TIMEOUT = pdMS_TO_TICKS(3000);
 
-    struct ActuatorControlGuard {
-        ActuatorControlGuard() { disable_front_chassis_outputs(); }
-        ~ActuatorControlGuard() { enable_front_chassis_outputs(); }
-    } actuator_guard;
+    // ====================
 
-    // ensure control metal enabled bits are cleared when function out of scope
-    struct MetalControlGuard {
-        ~MetalControlGuard()
-        {
-            xEventGroupClearBits(supervisor::g_robot_control_flags,
-                                 robot_flags::CONTROL_METAL_ENABLED);
-        }
-    } metal_control_guard;
-
+    disable_front_chassis_outputs();
     delay(1000);
 
     xEventGroupClearBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
+    xEventGroupSetBits(supervisor::g_robot_control_flags,
+                       robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_CAMERA_ENABLE);
+
     xEventGroupClearBits(supervisor::g_robot_status_flags, robot_flags::STATUS_METAL_SEEN_MASK);
-    xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+
+    // ensure control metal and camera 3enabled bits are cleared when function out of scope
+    struct Guard {
+        ~Guard()
+        {
+            enable_front_chassis_outputs();
+            xEventGroupClearBits(supervisor::g_robot_control_flags,
+                                 robot_flags::CONTROL_METAL_ENABLED |
+                                     robot_flags::CONTROL_CAMERA_ENABLE);
+        }
+    } metal_control_guard;
 
     // // make sure metal calibration really was done
     // auto status_flags = xEventGroupWaitBits(supervisor::g_robot_status_flags,
@@ -344,10 +346,13 @@ esp_err_t rocks_sequence()
     const auto scan_if_not_found = [&]() -> bool {
         if (rock_was_found) return false;
 
+        send_stop();
+
         delay(500);
         xEventGroupClearBits(supervisor::g_robot_status_flags, robot_flags::STATUS_METAL_SEEN_MASK);
         xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
-        delay(1000);
+        delay(500);
+
         auto status_flags = xEventGroupWaitBits(supervisor::g_robot_status_flags,
                                                 robot_flags::STATUS_METAL_SEEN_MASK,
                                                 pdFALSE,

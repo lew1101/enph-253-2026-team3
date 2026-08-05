@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "esp_err.h"
+#include "freertos/idf_additions.h"
 #include "shared/robot_flags.hpp"
 
 #include "drivers/pulse_tx.hpp"
@@ -167,15 +168,23 @@ void _rx_task(void *)
 
         const TickType_t now = xTaskGetTickCount();
         if (!s_link_connected.load(std::memory_order_acquire) ||
-            (teletubby_seen && now - last_positive_detection >= TELETUBBY_LED_HOLD_TIME))
+            (teletubby_seen && now - last_positive_detection >= TELETUBBY_LED_HOLD_TIME)) {
             teletubby_seen = false;
+        }
 
-        if (!prev_teletubby_seen && teletubby_seen) {
-            log_i("%s: teletubby detected; flashing LED", TAG);
-            const esp_err_t flash_err = s_teletubby_led_pulse_tx.transmit(TELETUBBY_BLINK_MSG);
-            if (flash_err != ESP_OK)
-                log_w(
-                    "%s: failed to transmit teletubby flash: %s", TAG, esp_err_to_name(flash_err));
+        const auto should_flash_led =
+            robot_flags::has_flag(xEventGroupGetBits(supervisor::g_robot_control_flags),
+                                  robot_flags::CONTROL_CAMERA_ENABLE);
+
+        if (should_flash_led) {
+            if (!prev_teletubby_seen && teletubby_seen) {
+                log_i("%s: teletubby detected; flashing LED", TAG);
+                const esp_err_t flash_err = s_teletubby_led_pulse_tx.transmit(TELETUBBY_BLINK_MSG);
+                if (flash_err != ESP_OK)
+                    log_w("%s: failed to transmit teletubby flash: %s",
+                          TAG,
+                          esp_err_to_name(flash_err));
+            }
         }
 
         if (teletubby_seen) {
