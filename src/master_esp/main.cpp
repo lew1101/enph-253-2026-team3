@@ -33,7 +33,7 @@ using driver::PulseTx;
 static constexpr char TAG[]{"master_main"};
 
 esp_err_t setup_autonomous();
-esp_err_t start_autonomous_task(); 
+esp_err_t start_autonomous_task();
 
 namespace {
 
@@ -489,11 +489,10 @@ esp_err_t build_tower_sequence()
     align the robot with the boss) -> Elevator down -> Claw open */
     constexpr float Y_OFFSET = 0.12f; // m
     constexpr float Y_TAPE_OFFSET = 0.04f; // m
-    const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
     constexpr float MOVEMENT_LOOKAHEAD_M = 0.04f;
     const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
-    
+
 
     robot_DriveCommand forward =
         make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
@@ -505,6 +504,7 @@ esp_err_t build_tower_sequence()
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     // move to the tower
+    const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
     // follow_route(
     //     {
     //         WAYPOINTS[POSE_INTER_ROCK_TOWER],
@@ -573,7 +573,7 @@ esp_err_t build_tower_sequence()
     ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
                         TAG,
                         "failed to start tower piece 2 backward move");
-                        
+
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
     elevator_claw.set_claw(CLAW_OPEN_DEG);
 
@@ -625,9 +625,9 @@ esp_err_t stack_tower_sequence()
 
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(700);
 
-    const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
-
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_DRIVE_ENABLED);
+
+    const WaypointIndex POSE_TOWER_STACK = is_track_a ? POSE_TOWER_STACK_A : POSE_TOWER_STACK_B;
     ESP_RETURN_ON_ERROR(
         send_pose_and_wait(WAYPOINTS[POSE_TOWER_STACK], false, GUIDE_TIMEOUT, MOVEMENT_LOOKAHEAD_M),
         TAG,
@@ -637,13 +637,14 @@ esp_err_t stack_tower_sequence()
 
     // realign with tower tape
     // stage toward the right, so scan towards the left.
-    ESP_RETURN_ON_ERROR(send_tape_alignment_and_wait(1.0f), TAG, "failed to align with tower tape");
+    // ESP_RETURN_ON_ERROR(send_tape_alignment_and_wait(1.0f), TAG, "failed to align with tower tape");
 
     send_velocity(0, FORWARD_SPEED);
 
     if (s_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
 
+        delay(200);
         worm_spear.set_spear(SPEAR_UP_DEG);
         elevator_claw.move_to_position(ELEV_FLOOR);
         elevator_claw.set_claw(CLAW_OPEN_DEG);

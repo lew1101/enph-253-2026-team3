@@ -5,10 +5,12 @@
 #include "control/pose_estimator.hpp"
 
 #include "drive.pb.h"
+#include "projdefs.h"
 
 using control::Pose;
 
 constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.15f;
+constexpr TickType_t DEFAULT_POSE_TIMEOUT = pdMS_TO_TICKS(3000);
 
 constexpr robot_DriveCommand make_pose_drive_command(
     const Pose &pose, bool is_relative = false, float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M)
@@ -42,16 +44,16 @@ esp_err_t send_pose(const Pose &waypoint,
                     float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 esp_err_t wait_for_drive_sequence(uint32_t sequence, TickType_t timeout);
 esp_err_t send_drive_command_and_wait(const robot_DriveCommand &command,
-                                      TickType_t timeout = pdMS_TO_TICKS(5000));
+                                      TickType_t timeout = DEFAULT_POSE_TIMEOUT);
 esp_err_t send_tape_alignment_and_wait(float staging_direction = -1.0f,
-                                       TickType_t timeout = pdMS_TO_TICKS(6000));
+                                       TickType_t timeout = DEFAULT_POSE_TIMEOUT);
 esp_err_t send_pose_and_wait(const Pose &waypoint,
                              bool relative = false,
-                             TickType_t timeout = pdMS_TO_TICKS(5000),
+                             TickType_t timeout = DEFAULT_POSE_TIMEOUT,
                              float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 esp_err_t send_pose_through(const Pose &waypoint,
                             float pass_radius_m = 0.15f,
-                            TickType_t timeout = pdMS_TO_TICKS(5000),
+                            TickType_t timeout = DEFAULT_POSE_TIMEOUT,
                             float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M);
 [[noreturn]] void halt_autonomous(const char *phase, esp_err_t err);
 void follow_route(std::initializer_list<Pose> route,
