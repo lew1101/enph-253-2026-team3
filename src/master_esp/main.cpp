@@ -384,7 +384,7 @@ esp_err_t rocks_sequence()
             WAYPOINTS[POSE_ROCK_PICKUP_1_3],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_3]),
+        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_2]),
                             TAG,
                             "failed to leave rock pickup 1");
 
@@ -451,10 +451,12 @@ esp_err_t rocks_sequence()
             WAYPOINTS[POSE_ROCK_PICKUP_5_3],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_INTER_ROCK_TOWER]),
+        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_6]),
                             TAG,
                             "failed to leave rock pickup 5");
     }
+
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
 
     if (!rock_was_found) {
         follow_route({
