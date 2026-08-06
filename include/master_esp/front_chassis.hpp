@@ -31,8 +31,8 @@ constexpr control::WormSpear::Config worm_config{
     .worm_calibration_switch_pin = WORM_LIMIT_SWITCH_PIN,
     .worm_en_pin = WORM_EN_PIN,
 
-    .speed_hz = 18'000,
-    .acceleration_hz_per_s = 6'000,
+    .speed_hz = 10'000,
+    .acceleration_hz_per_s = 4'000,
     .calibration_max_delay = pdMS_TO_TICKS(10000),
     .reversed = true,
 
