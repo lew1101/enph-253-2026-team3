@@ -49,7 +49,7 @@ constexpr control::WormSpear::Config worm_config{
         .max_pulse_deg = 180.0f,
         .min_clamp_deg = 0.0f,
         .max_clamp_deg = 180.0f,
-        .bias_deg = 145.0f,
+        .bias_deg = 150.0f,
         .reversed = true,
     },
 };

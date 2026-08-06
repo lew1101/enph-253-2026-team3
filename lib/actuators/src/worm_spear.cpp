@@ -77,7 +77,7 @@ esp_err_t WormSpear::calibrate()
     _stepper->move(!_config.reversed ? 2000 : -2000, true);
 
     // move slowly to switch
-    _stepper->setSpeedInHz(500);
+    _stepper->setSpeedInHz(900);
     if (_config.reversed) {
         _stepper->runForward();
     } else {

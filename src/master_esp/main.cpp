@@ -125,6 +125,7 @@ enum SpearPos : int32_t { //
     SPEAR_CENTERING = 0
 };
 
+constexpr float SPEAR_UP_AWAY_DEG = 110.0f;
 constexpr float SPEAR_UP_DEG = 95.0f;
 constexpr float SPEAR_UP_TILTED_DEG = 90.0f;
 constexpr float SPEAR_UP_SLIGHTLY_DEG = 30.0f;
@@ -135,7 +136,7 @@ constexpr float CLAW_OPEN_DEG = 180.0f;
 constexpr float CLAW_CLOSE_TOWER_DEG = 35.0f;
 constexpr float CLAW_CLOSE_ROCK_DEG = 70.0f;
 
-constexpr float CLAW_TOWER_DELAY = 500.0f; // ms
+constexpr float CLAW_TOWER_DELAY = 200.0f; // ms
 
 #if RUN_WAYPOINT_TEST_ENABLED
 void test_course()
@@ -487,7 +488,7 @@ esp_err_t build_tower_sequence()
     -> Boss tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors -> Drive forward slowly (cresent moon will auto
     align the robot with the boss) -> Elevator down -> Claw open */
-    constexpr float Y_OFFSET = 0.12f; // m
+    constexpr float Y_OFFSET = 0.07f; // m
     constexpr float Y_TAPE_OFFSET = 0.04f; // m
 
     constexpr float MOVEMENT_LOOKAHEAD_M = 0.04f;
@@ -620,8 +621,8 @@ esp_err_t build_tower_sequence()
 
 esp_err_t stack_tower_sequence()
 {
-    constexpr float MOVEMENT_LOOKAHEAD_M = 0.08f;
-    constexpr float FORWARD_SPEED = 0.05f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.04f;
+    constexpr float FORWARD_SPEED = 2.2f;
 
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(700);
 
@@ -643,10 +644,10 @@ esp_err_t stack_tower_sequence()
 
     if (s_guide_limit_switch.wait_until_pressed(GUIDE_TIMEOUT)) {
         send_stop(); // immediately stop as soon as we hit the guide switch
+        worm_spear.set_spear(SPEAR_UP_AWAY_DEG);
 
         delay(200);
-        worm_spear.set_spear(SPEAR_UP_DEG);
-        elevator_claw.move_to_position(ELEV_FLOOR);
+        elevator_claw.move_to_position(ELEV_TOWER_1);
         elevator_claw.set_claw(CLAW_OPEN_DEG);
         ESP_LOGI(TAG, "guide limit switch hit and stopping on nub");
     } else {
@@ -835,7 +836,7 @@ esp_err_t setup_autonomous()
                             TAG,
                             "failed to quiet front chassis before metal calibration");
     }
-    delay(1000);
+    delay(500);
 
     // CALIBRATE
     xEventGroupSetBits(supervisor::g_robot_control_flags, robot_flags::CONTROL_METAL_ENABLED);
@@ -957,9 +958,9 @@ void setup()
         return;
     }
 
-    // guide_switch_available = s_guide_limit_switch.begin("tower_guide_switch");
-    // if (!guide_switch_available)
-    //     ESP_LOGW(TAG, "guide switch unavailable; tower phase will be skipped");
+    guide_switch_available = s_guide_limit_switch.begin("tower_guide_switch");
+    if (!guide_switch_available)
+        ESP_LOGW(TAG, "guide switch unavailable; tower phase will be skipped");
 
     const esp_err_t setup_err = setup_autonomous();
     if (setup_err != ESP_OK) {
