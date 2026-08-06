@@ -22,7 +22,7 @@
 #include "sensors/metal_detector.hpp"
 #include "drivers/pulse_tx.hpp"
 
-#define RUN_WAYPOINT_TEST_ENABLED 0
+#define RUN_WAYPOINT_TEST_ENABLED 1
 #define RUN_WAYPOINT_PICKUP_ENABLED 1
 #define RUN_WAYPOINT_ALIGN_ENABLED 1
 
@@ -33,7 +33,7 @@ using driver::PulseTx;
 static constexpr char TAG[]{"master_main"};
 
 esp_err_t setup_autonomous();
-esp_err_t start_autonomous_task();
+esp_err_t start_autonomous_task(); 
 
 namespace {
 
@@ -106,29 +106,29 @@ inline void status_double_flash()
 
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
-    ELEV_TOWER_1 = 500,
-    ELEV_TOWER_2_PLUS = 4000,
-    ELEV_TOWER_2_MINUS = 3400,
-    ELEV_TOWER_2 = 500,
-    ELEV_TOWER_3_PLUS = 4000,
-    ELEV_TOWER_3_MINUS = 3400,
-    ELEV_TOWER_3 = 500,
-    ELEV_TOP_FRONT = 4700,
-    ELEV_TIPPITY_TOP = 5000,
-    ELEV_BACK = 5400,
+    ELEV_TOWER_1 = 125,
+    ELEV_TOWER_2_PLUS = 1000,
+    ELEV_TOWER_2_MINUS = 800,
+    ELEV_TOWER_2 = 125,
+    ELEV_TOWER_3_PLUS = 1000,
+    ELEV_TOWER_3_MINUS = 800,
+    ELEV_TOWER_3 = 125,
+    ELEV_TOP_FRONT = 1175,
+    ELEV_TIPPITY_TOP = 1250,
+    ELEV_BACK = 1375,
 };
 
 enum SpearPos : int32_t { //
     SPEAR_LEFT = 53'500,
-    SPEAR_CENTRE = 24'000,
+    SPEAR_CENTRE = 28'000,
     SPEAR_RIGHT = 0,
     SPEAR_CENTERING = 0
 };
 
-constexpr float SPEAR_UP_DEG = 90.0f;
-constexpr float SPEAR_UP_TILTED = 75.0f;
-constexpr float SPEAR_UP_SLIGHTLY = 10.0f;
-constexpr float SPEAR_DOWN_DEG = 5.0f;
+constexpr float SPEAR_UP_DEG = 95.0f;
+constexpr float SPEAR_UP_TILTED_DEG = 90.0f;
+constexpr float SPEAR_UP_SLIGHTLY_DEG = 30.0f;
+constexpr float SPEAR_DOWN_DEG = 10.0f;
 constexpr float SPEAR_MOVE_DELAY = 600.0f; // ms
 
 constexpr float CLAW_OPEN_DEG = 180.0f;
@@ -487,11 +487,13 @@ esp_err_t build_tower_sequence()
     -> Boss tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors -> Drive forward slowly (cresent moon will auto
     align the robot with the boss) -> Elevator down -> Claw open */
-    constexpr float Y_OFFSET = 0.1f; // m
+    constexpr float Y_OFFSET = 0.12f; // m
+    constexpr float Y_TAPE_OFFSET = 0.04f; // m
     const WaypointIndex POSE_TOWER_BUILD = is_track_a ? POSE_TOWER_BUILD_A : POSE_TOWER_BUILD_B;
 
-    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.04f;
     const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
+    
 
     robot_DriveCommand forward =
         make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
@@ -503,36 +505,55 @@ esp_err_t build_tower_sequence()
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     // move to the tower
-    follow_route(
-        {
-            WAYPOINTS[POSE_INTER_ROCK_TOWER],
-            WAYPOINTS[POSE_TOWER_BUILD],
-        },
-        MOVEMENT_LOOKAHEAD_M);
+    // follow_route(
+    //     {
+    //         WAYPOINTS[POSE_INTER_ROCK_TOWER],
+    //         WAYPOINTS[POSE_TOWER_BUILD],
+    //     },
+    //     MOVEMENT_LOOKAHEAD_M);
+
+    robot_DriveCommand tape_forward =
+        make_pose_drive_command({0.0f, Y_TAPE_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
+    robot_DriveCommand tape_backward =
+        make_pose_drive_command({0.0f, -Y_TAPE_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
+
+    worm_spear.set_spear(SPEAR_DOWN_DEG);
+
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    elevator_claw.move_to_position(ELEV_TOWER_2_PLUS);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+
+    worm_spear.set_spear(SPEAR_UP_DEG);
+
+    send_drive_command_and_wait(tape_forward, DRIVE_TIMEOUT);
 
     // realign with tower tape
     // stage robot to the left, so scan towards the right.
     ESP_RETURN_ON_ERROR(
-        send_tape_alignment_and_wait(-1.0f), TAG, "failed to align with tower tape");
+            send_tape_alignment_and_wait(-1.0f), TAG, "failed to align with tower tape");
+
+    send_drive_command_and_wait(tape_backward, DRIVE_TIMEOUT);
 
     // PIECE 1
     // Starting with worm spear down, spear on the left, claw open, elevator at TOP_FRONT, and robot facing tower
+    elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
+    elevator_claw.move_to_position(ELEV_TOWER_2_PLUS);
+    elevator_claw.set_claw(CLAW_OPEN_DEG);
+
     worm_spear.set_spear(SPEAR_DOWN_DEG);
     ESP_RETURN_ON_ERROR(send_drive_command_and_wait(forward, DRIVE_TIMEOUT),
                         TAG,
                         "failed tower piece 1 forward move");
 
-    worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
+    worm_spear.set_spear(SPEAR_UP_TILTED_DEG);
     uint32_t movement_sequence = 0;
     ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
                         TAG,
                         "failed to start tower piece 1 backward move");
+
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
-    elevator_claw.set_claw(CLAW_OPEN_DEG);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
 
-    // Pick up tower piece tilted, stack them straight
-    worm_spear.set_spear(SPEAR_UP_TILTED);
     elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
     delay(CLAW_TOWER_DELAY);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_PLUS);
@@ -547,16 +568,18 @@ esp_err_t build_tower_sequence()
     ESP_RETURN_ON_ERROR(send_drive_command_and_wait(forward, DRIVE_TIMEOUT),
                         TAG,
                         "failed tower piece 2 forward move");
-    worm_spear.set_spear(SPEAR_UP_DEG);
+    worm_spear.set_spear(SPEAR_UP_DEG, 800UL);
 
     ESP_RETURN_ON_ERROR(send_drive_command(backward, DRIVE_TIMEOUT, &movement_sequence),
                         TAG,
                         "failed to start tower piece 2 backward move");
+                        
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
     elevator_claw.set_claw(CLAW_OPEN_DEG);
+
     delay(CLAW_TOWER_DELAY);
 
-    worm_spear.set_spear(SPEAR_UP_TILTED);
+    worm_spear.set_spear(SPEAR_UP_TILTED_DEG);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2);
     elevator_claw.set_claw(CLAW_CLOSE_TOWER_DEG);
     delay(CLAW_TOWER_DELAY);
@@ -575,10 +598,9 @@ esp_err_t build_tower_sequence()
                         TAG,
                         "failed tower piece 3 forward move");
 
-    worm_spear.set_spear(SPEAR_UP_SLIGHTLY);
+    worm_spear.set_spear(SPEAR_UP_DEG, 800UL);
     worm_spear.move_to_position(SpearPos::SPEAR_CENTRE);
 
-    worm_spear.set_spear(SPEAR_UP_DEG);
     elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_3_MINUS);
 
     elevator_claw.set_claw(CLAW_OPEN_DEG);
@@ -598,7 +620,7 @@ esp_err_t build_tower_sequence()
 
 esp_err_t stack_tower_sequence()
 {
-    constexpr float MOVEMENT_LOOKAHEAD_M = 0.14f;
+    constexpr float MOVEMENT_LOOKAHEAD_M = 0.08f;
     constexpr float FORWARD_SPEED = 0.05f;
 
     constexpr TickType_t GUIDE_TIMEOUT = pdMS_TO_TICKS(700);
@@ -864,7 +886,7 @@ esp_err_t setup_autonomous()
         if (elev_calibrated && worm_calibrated) {
             elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
             worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
-            worm_spear.set_spear(30.0f, 100.0f);
+            worm_spear.set_spear(SPEAR_UP_SLIGHTLY_DEG, 100.0f);
         }
 
         ESP_RETURN_ON_FALSE(disable_front_chassis_outputs(),
@@ -971,116 +993,106 @@ void setup()
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
     setup_autonomous();
-    start_autonomous_task();
+    // start_autonomous_task();
 
     // test_course();
 #endif
-    vTaskDelete(nullptr);
+    // vTaskDelete(nullptr);
+
+    enable_front_chassis_outputs();
 }
 
-void loop() {}
+// void loop() {}
 
-// void loop()
-// {
-//     static int elev_speed = 9000;
-//     static int elev_accel = 1600;
-//     static int worm_speed = 18000;
-//     static int worm_accel = 3200;
+void loop()
+{
+    static int elev_speed = 2250;
+    static int elev_accel = 200;
+    static int worm_speed = 18000;
+    static int worm_accel = 3200;
 
-//     if (Serial.available()) {
-//         String command = Serial.readStringUntil('\n');
-//         command.trim();
-//         if (command.length() == 0) return;
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        if (command.length() == 0) return;
 
-//         // ELEVATOR COMMANDS
-//         if (command.startsWith("es")) {
-//             elev_speed = command.substring(2).toInt();
-//             ESP_LOGI(TAG, "Setting Elevator Speed: %d Hz, Accel: %d", elev_speed, elev_accel);
-//             elevator_claw.set_speed(elev_speed, elev_accel);
-//         } else if (command.startsWith("ea")) {
-//             elev_accel = command.substring(2).toInt();
-//             ESP_LOGI(TAG, "Setting Elevator Speed: %d Hz, Accel: %d", elev_speed, elev_accel);
-//             elevator_claw.set_speed(elev_speed, elev_accel);
-//         } else if (command.startsWith("eh")) {
-//             elevator_claw.set_home_position();
-//             ESP_LOGI(TAG, "Elevator home position set.");
-//         } else if (command.startsWith("ep")) {
-//             int pos = elevator_claw.get_current_position();
-//             ESP_LOGI(TAG, "Current Elevator Position: %d", pos);
-//         } else if (command.startsWith("el")) {
-//             bool limit_pressed = elevator_claw.limit_is_pressed();
-//             ESP_LOGI(TAG, "Elevator limit switch pressed: %s", limit_pressed ? "true" : "false");
-//         } else if (command.startsWith("ecal")) {
-//             ESP_LOGI(TAG, "Calibrating Elevator Claw...");
-//             elevator_claw.calibrate();
-//         } else if (command.startsWith("e")) {
-//             int elevator_pos = command.substring(1).toInt();
-//             ESP_LOGI(TAG, "Moving Elevator to: %d", elevator_pos);
-//             elevator_claw.move_to_position(elevator_pos);
-//         }
+        // ELEVATOR COMMANDS
+        if (command.startsWith("es")) {
+            elev_speed = command.substring(2).toInt();
+            ESP_LOGI(TAG, "Setting Elevator Speed: %d Hz, Accel: %d", elev_speed, elev_accel);
+            elevator_claw.set_speed(elev_speed, elev_accel);
+        } else if (command.startsWith("ea")) {
+            elev_accel = command.substring(2).toInt();
+            ESP_LOGI(TAG, "Setting Elevator Speed: %d Hz, Accel: %d", elev_speed, elev_accel);
+            elevator_claw.set_speed(elev_speed, elev_accel);
+        } else if (command.startsWith("eh")) {
+            elevator_claw.set_home_position();
+            ESP_LOGI(TAG, "Elevator home position set.");
+        } else if (command.startsWith("ep")) {
+            int pos = elevator_claw.get_current_position();
+            ESP_LOGI(TAG, "Current Elevator Position: %d", pos);
+        } else if (command.startsWith("el")) {
+            bool limit_pressed = elevator_claw.limit_is_pressed();
+            ESP_LOGI(TAG, "Elevator limit switch pressed: %s", limit_pressed ? "true" : "false");
+        } else if (command.startsWith("ecal")) {
+            ESP_LOGI(TAG, "Calibrating Elevator Claw...");
+            elevator_claw.calibrate();
+        } else if (command.startsWith("e")) {
+            int elevator_pos = command.substring(1).toInt();
+            ESP_LOGI(TAG, "Moving Elevator to: %d", elevator_pos);
+            elevator_claw.move_to_position(elevator_pos);
+        }
 
-//         else if (command.startsWith("ws")) {
-//             worm_speed = command.substring(2).toInt();
-//             ESP_LOGI(TAG, "Setting Worm Speed: %d Hz, Accel: %d", worm_speed, worm_accel);
-//             worm_spear.set_speed(worm_speed, worm_accel);
-//         } else if (command.startsWith("wa")) {
-//             worm_accel = command.substring(2).toInt();
-//             ESP_LOGI(TAG, "Setting Worm Speed: %d Hz, Accel: %d", worm_speed, worm_accel);
-//             worm_spear.set_speed(worm_speed, worm_accel);
-//         } else if (command.startsWith("wh")) {
-//             worm_spear.set_home_position();
-//             ESP_LOGI(TAG, "Worm home position set.");
-//         } else if (command.startsWith("wp")) {
-//             int pos = worm_spear.get_current_position();
-//             ESP_LOGI(TAG, "Current Worm Position: %d", pos);
-//         } else if (command.startsWith("wl")) {
-//             bool limit_pressed = worm_spear.limit_is_pressed();
-//             ESP_LOGI(TAG, "Worm limit switch pressed: %s", limit_pressed ? "true" : "false");
-//         } else if (command.startsWith("wcal")) {
-//             ESP_LOGI(TAG, "Calibrating Worm Spear...");
-//             elevator_claw.enable_elevator();
-//             worm_spear.calibrate();
-//         } else if (command.startsWith("wx")) {
-//             worm_spear.disable_worm();
-//             ESP_LOGI(TAG, "Worm Spear disabled.");
-//         } else if (command.startsWith("we")) {
-//             worm_spear.enable_worm();
-//             ESP_LOGI(TAG, "Worm Spear enabled.");
-//         } else if (command.startsWith("w")) {
-//             int spear_pos = command.substring(1).toInt();
-//             ESP_LOGI(TAG, "Moving Spear to: %d", spear_pos);
-//             worm_spear.move_to_position(spear_pos);
-//         } else if (command == "pos") {
-//             Serial.printf("Elevator Pos: %d | Worm Pos: %d\n",
-//                           elevator_claw.get_current_position(),
-//                           worm_spear.get_current_position());
-//         } else if (command.startsWith("c")) {
-//             float claw_deg = command.substring(1).toFloat();
-//             ESP_LOGI(TAG, "Setting Claw to: %.2f degrees", claw_deg);
-//             elevator_claw.set_claw(claw_deg);
-//         } else if (command.startsWith("v")) {
-//             float spear_deg = command.substring(1).toFloat();
-//             worm_spear.set_spear(spear_deg, SPEAR_MOVE_DELAY);
-//             ESP_LOGI(TAG, "Setting Spear to: %.2f degrees", spear_deg);
-//         } else if (command.startsWith("assemble")) {
-//             ESP_LOGI(TAG, "Starting tower assembly sequence...");
-//             elevator_claw.set_claw(CLAW_OPEN_DEG);
-//             worm_spear.set_spear(SPEAR_DOWN_DEG, 100);
-//             ;
-//             worm_spear.calibrate();
-//             elevator_claw.calibrate();
-//             elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_2_MINUS);
-//             worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+        else if (command.startsWith("ws")) {
+            worm_speed = command.substring(2).toInt();
+            ESP_LOGI(TAG, "Setting Worm Speed: %d Hz, Accel: %d", worm_speed, worm_accel);
+            worm_spear.set_speed(worm_speed, worm_accel);
+        } else if (command.startsWith("wa")) {
+            worm_accel = command.substring(2).toInt();
+            ESP_LOGI(TAG, "Setting Worm Speed: %d Hz, Accel: %d", worm_speed, worm_accel);
+            worm_spear.set_speed(worm_speed, worm_accel);
+        } else if (command.startsWith("wh")) {
+            worm_spear.set_home_position();
+            ESP_LOGI(TAG, "Worm home position set.");
+        } else if (command.startsWith("wp")) {
+            int pos = worm_spear.get_current_position();
+            ESP_LOGI(TAG, "Current Worm Position: %d", pos);
+        } else if (command.startsWith("wl")) {
+            bool limit_pressed = worm_spear.limit_is_pressed();
+            ESP_LOGI(TAG, "Worm limit switch pressed: %s", limit_pressed ? "true" : "false");
+        } else if (command.startsWith("wcal")) {
+            ESP_LOGI(TAG, "Calibrating Worm Spear...");
 
-//             build_tower_sequence();
-//             ESP_LOGI(TAG, "Tower assembly sequence completed.");
-//         } else {
-//             ESP_LOGW(TAG, "Unknown command: %s", command.c_str());
-//         }
-//         // ==========================================
-//     }
-//     vTaskDelay(pdMS_TO_TICKS(10));
-// }
+            worm_spear.calibrate();
+        } else if (command.startsWith("w")) {
+            int spear_pos = command.substring(1).toInt();
+            ESP_LOGI(TAG, "Moving Spear to: %d", spear_pos);
+            worm_spear.move_to_position(spear_pos);
+        } else if (command == "pos") {
+            Serial.printf("Elevator Pos: %d | Worm Pos: %d\n",
+                          elevator_claw.get_current_position(),
+                          worm_spear.get_current_position());
+        } else if (command.startsWith("c")) {
+            float claw_deg = command.substring(1).toFloat();
+            ESP_LOGI(TAG, "Setting Claw to: %.2f degrees", claw_deg);
+            elevator_claw.set_claw(claw_deg);
+        } else if (command.startsWith("v")) {
+            float spear_deg = command.substring(1).toFloat();
+            worm_spear.set_spear(spear_deg, SPEAR_MOVE_DELAY);
+            ESP_LOGI(TAG, "Setting Spear to: %.2f degrees", spear_deg);
+        } else if (command.startsWith("assemble")) {
+            ESP_LOGI(TAG, "Starting tower assembly sequence...");
+            worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+
+            build_tower_sequence();
+            ESP_LOGI(TAG, "Tower assembly sequence completed.");
+        } else {
+            ESP_LOGW(TAG, "Unknown command: %s", command.c_str());
+        }
+        // ==========================================
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+}
 
 // void send_pose_setpoint(const String &command, bool relative)
 // {

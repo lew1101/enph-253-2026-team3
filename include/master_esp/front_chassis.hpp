@@ -32,7 +32,7 @@ constexpr control::WormSpear::Config worm_config{
     .worm_en_pin = WORM_EN_PIN,
 
     .speed_hz = 18'000,
-    .acceleration_hz_per_s = 3'200,
+    .acceleration_hz_per_s = 6'000,
     .calibration_max_delay = pdMS_TO_TICKS(10000),
     .reversed = true,
 
@@ -49,7 +49,7 @@ constexpr control::WormSpear::Config worm_config{
         .max_pulse_deg = 180.0f,
         .min_clamp_deg = 0.0f,
         .max_clamp_deg = 180.0f,
-        .bias_deg = 150.0f,
+        .bias_deg = 145.0f,
         .reversed = true,
     },
 };
@@ -62,8 +62,8 @@ constexpr control::ElevatorClaw::Config elevator_config{
     .elevator_calibration_switch_pin = ELEVATOR_LIMIT_SWITCH_PIN,
     .elevator_en_pin = ELEVATOR_EN_PIN,
 
-    .speed_hz = 6500,
-    .acceleration_hz_per_s = 1200,
+    .speed_hz = 2250,
+    .acceleration_hz_per_s = 200,
     .reversed = true,
 
     .claw_servo_config{

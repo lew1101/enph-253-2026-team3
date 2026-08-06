@@ -34,6 +34,7 @@ esp_err_t WormSpear::init()
 
     pinMode(_config.worm_calibration_switch_pin, INPUT_PULLUP);
     if (!_spear_servo.init()) return ESP_ERR_INVALID_STATE;
+    _spear_servo.set_deg(0.0f);
 
     _worm_limit_switch.register_pressed_callback(
         [](void *ctx) {
@@ -55,7 +56,7 @@ esp_err_t WormSpear::calibrate()
 {
     if (!_worm_limit_switch.is_pressed()) {
         // move quickly to switch
-        _stepper->setSpeedInHz(10000);
+        _stepper->setSpeedInHz(18000);
         if (_config.reversed) {
             _stepper->runForward();
         } else {

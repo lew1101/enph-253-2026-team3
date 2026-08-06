@@ -74,7 +74,7 @@ esp_err_t ElevatorClaw::calibrate()
     _stepper->forceStopAndNewPosition(0);
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    _stepper->move(!_config.reversed ? 500 : -500, true);
+    _stepper->move(!_config.reversed ? 125 : -125, true);
 
     // move slowly to switch
     _stepper->setSpeedInHz(500);
