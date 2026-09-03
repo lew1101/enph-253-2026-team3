@@ -43,7 +43,7 @@ constexpr gpio_num_t TRACK_SWITCH_PIN = GPIO_NUM_18;    // no debounce
 
 constexpr gpio_num_t STATUS_LED_PIN = GPIO_NUM_13;
 
-PulseTx s_status_led_pulse_tx{STATUS_LED_PIN};
+// PulseTx s_status_led_pulse_tx{STATUS_LED_PIN};
 
 DebouncedLimitSwitch s_guide_limit_switch{GUIDE_LIM_SWITCH_PIN, INPUT_PULLUP, HIGH};
 DebouncedLimitSwitch s_enable_limit_switch{ENABLE_SWITCH_PIN, INPUT, HIGH};
@@ -92,17 +92,17 @@ bool disable_front_chassis_outputs()
     return elevator_disabled && worm_disabled;
 }
 
-inline void status_double_flash()
-{
-    static constexpr PulseTx::Word DOUBLE_BLINK_MSG[]{
-        {1, 200'000},
-        {0, 180'000},
-        {1, 200'000},
-        {0, 0},
-    };
+// inline void status_double_flash()
+// {
+//     static constexpr PulseTx::Word DOUBLE_BLINK_MSG[]{
+//         {1, 200'000},
+//         {0, 180'000},
+//         {1, 200'000},
+//         {0, 0},
+//     };
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_pulse_tx.transmit(DOUBLE_BLINK_MSG));
-}
+//     ESP_ERROR_CHECK_WITHOUT_ABORT(s_status_led_pulse_tx.transmit(DOUBLE_BLINK_MSG));
+// }
 
 enum ElevatorPos : int32_t {
     ELEV_FLOOR = 0,
@@ -333,12 +333,7 @@ esp_err_t rocks_sequence()
         delay(500);
         ESP_RETURN_ON_ERROR(send_pose(waypoint), TAG, "failed to send pose to next waypoint");
 
-        elevator_claw.move_to_position(ElevatorPos::ELEV_TOP_FRONT);
-        elevator_claw.move_to_position(ElevatorPos::ELEV_TIPPITY_TOP);
-        elevator_claw.move_to_position(ElevatorPos::ELEV_BACK);
-        elevator_claw.set_claw(CLAW_OPEN_DEG);
-        elevator_claw.move_to_position(ElevatorPos::ELEV_TIPPITY_TOP);
-        elevator_claw.move_to_position(ElevatorPos::ELEV_TOP_FRONT);
+        elevator_claw.move_to_position(ElevatorPos::ELEV_TOWER_1);
 
         return ESP_OK;
     };
@@ -366,7 +361,7 @@ esp_err_t rocks_sequence()
         if (metal_detected) {
             ESP_LOGI(TAG, "metal detected");
 
-            status_double_flash();
+            // status_double_flash();
             return true;
         }
 
@@ -374,8 +369,7 @@ esp_err_t rocks_sequence()
         return false;
     };
 
-    ESP_RETURN_ON_ERROR(
-        send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]), TAG, "failed to reach rock scan 1");
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_1]);
 
     if (scan_if_not_found()) {
         follow_route({
@@ -384,29 +378,27 @@ esp_err_t rocks_sequence()
             WAYPOINTS[POSE_ROCK_PICKUP_1_3],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_2]),
-                            TAG,
-                            "failed to leave rock pickup 1");
+        pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_2]);
 
     } else {
-        ESP_RETURN_ON_ERROR(
-            send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_2]), TAG, "failed to reach rock scan 2");
+        follow_route({
+            WAYPOINTS[POSE_ROCK_INTER_12],
+            WAYPOINTS[POSE_ROCK_SCAN_2],
+        });
 
         if (scan_if_not_found()) {
             follow_route({
                 WAYPOINTS[POSE_ROCK_PICKUP_2_1],
                 WAYPOINTS[POSE_ROCK_PICKUP_2_2],
-                WAYPOINTS[POSE_ROCK_PICKUP_2_3],
             });
 
-            ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_23]),
-                                TAG,
-                                "failed to leave rock pickup 2");
+            pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_23_1]);
         }
     }
 
     follow_route({
-        WAYPOINTS[POSE_ROCK_INTER_23],
+        WAYPOINTS[POSE_ROCK_INTER_23_1],
+        WAYPOINTS[POSE_ROCK_INTER_23_2],
         WAYPOINTS[POSE_ROCK_SCAN_3],
     });
 
@@ -416,9 +408,9 @@ esp_err_t rocks_sequence()
             WAYPOINTS[POSE_ROCK_PICKUP_3_2],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_34_1]),
-                            TAG,
-                            "failed to leave rock pickup 3");
+        pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_34_1]);
+    } else {
+        delay(1000);
     }
 
     follow_route({
@@ -433,42 +425,43 @@ esp_err_t rocks_sequence()
             WAYPOINTS[POSE_ROCK_PICKUP_4_3],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_45_1]),
-                            TAG,
-                            "failed to leave rock pickup 4");
+        pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_INTER_45_1]);
+    } else {
+        delay(1000);
     }
 
-    follow_route({
-        WAYPOINTS[POSE_ROCK_INTER_45_1],
-        WAYPOINTS[POSE_ROCK_INTER_45_2],
-        WAYPOINTS[POSE_ROCK_SCAN_5],
-    });
+    follow_route({WAYPOINTS[POSE_ROCK_INTER_45_1],
+                  WAYPOINTS[POSE_ROCK_INTER_45_2],
+                  WAYPOINTS[POSE_ROCK_SCAN_5],
+                  WAYPOINTS[POSE_ROCK_SCAN_6]});
 
     if (scan_if_not_found()) {
-        follow_route({
-            WAYPOINTS[POSE_ROCK_PICKUP_5_1],
-            WAYPOINTS[POSE_ROCK_PICKUP_5_2],
-            WAYPOINTS[POSE_ROCK_PICKUP_5_3],
-        });
-
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_6]),
-                            TAG,
-                            "failed to leave rock pickup 5");
-    }
-
-    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_6]);
-
-    if (!rock_was_found) {
         follow_route({
             WAYPOINTS[POSE_ROCK_PICKUP_6_1],
             WAYPOINTS[POSE_ROCK_PICKUP_6_2],
             WAYPOINTS[POSE_ROCK_PICKUP_6_3],
         });
 
-        ESP_RETURN_ON_ERROR(pick_up_and_go_to_next(WAYPOINTS[POSE_INTER_ROCK_TOWER]),
-                            TAG,
-                            "failed to leave fallback rock pickup");
+        pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_5_TELETUBBY]);
+    } else {
+        delay(1000);
     }
+
+    send_pose_and_wait(WAYPOINTS[POSE_ROCK_SCAN_5_TELETUBBY]);
+
+    if (!rock_was_found) {
+        follow_route({
+            WAYPOINTS[POSE_ROCK_PICKUP_5_1],
+            WAYPOINTS[POSE_ROCK_PICKUP_5_2],
+            WAYPOINTS[POSE_ROCK_PICKUP_5_3],
+        });
+
+        pick_up_and_go_to_next(WAYPOINTS[POSE_ROCK_SCAN_6]);
+    } else {
+        delay(1000);
+    }
+
+    follow_route({WAYPOINTS[POSE_INTER_ROCK_TOWER], WAYPOINTS[POSE_TOWER_BUILD_B]});
 
     return ESP_OK;
 }
@@ -490,12 +483,11 @@ esp_err_t build_tower_sequence()
     -> Boss tape detected -> forward and back until tape aligned with side sensors -> rotate CCW
     until side tape aligned with front sensors -> Drive forward slowly (cresent moon will auto
     align the robot with the boss) -> Elevator down -> Claw open */
-    constexpr float Y_OFFSET = 0.07f; // m
+    constexpr float Y_OFFSET = 0.07f;      // m
     constexpr float Y_TAPE_OFFSET = 0.04f; // m
 
     constexpr float MOVEMENT_LOOKAHEAD_M = 0.04f;
     const TickType_t DRIVE_TIMEOUT = pdMS_TO_TICKS(3000);
-
 
     robot_DriveCommand forward =
         make_pose_drive_command({0.0f, Y_OFFSET, 0.0f}, true, MOVEMENT_LOOKAHEAD_M);
@@ -533,7 +525,7 @@ esp_err_t build_tower_sequence()
     // realign with tower tape
     // stage robot to the left, so scan towards the right.
     ESP_RETURN_ON_ERROR(
-            send_tape_alignment_and_wait(-1.0f), TAG, "failed to align with tower tape");
+        send_tape_alignment_and_wait(-1.0f), TAG, "failed to align with tower tape");
 
     send_drive_command_and_wait(tape_backward, DRIVE_TIMEOUT);
 
@@ -725,8 +717,8 @@ void autonomous_task(void *arg)
     // }
 
     // PHASE 3: SOLAR PANEL
-    // err = solar();
-    // if (err != ESP_OK) halt_autonomous("solar sequence", err);
+    err = solar();
+    if (err != ESP_OK) halt_autonomous("solar sequence", err);
 
     celebration_sequence(); // yahoo
 
@@ -866,16 +858,16 @@ esp_err_t setup_autonomous()
 
         // const esp_err_t worm_err =
         // esp_err_t worm_err = ESP_OK;
-        worm_spear.move_to_position(-1000);
-        const esp_err_t worm_err = worm_spear.calibrate();
-        worm_calibrated = worm_err == ESP_OK;
-        if (!worm_calibrated) {
-            ESP_LOGW(TAG,
-                     "worm spear calibration failed; tower phase will be skipped: %s",
-                     esp_err_to_name(worm_err));
-        } else {
-            ESP_LOGI(TAG, "worm spear calibration successful");
-        }
+        // worm_spear.move_to_position(-1000);
+        // const esp_err_t worm_err = worm_spear.calibrate();
+        // worm_calibrated = worm_err == ESP_OK;
+        // if (!worm_calibrated) {
+        //     ESP_LOGW(TAG,
+        //              "worm spear calibration failed; tower phase will be skipped: %s",
+        //              esp_err_to_name(worm_err));
+        // } else {
+        //     ESP_LOGI(TAG, "worm spear calibration successful");
+        // }
 
         const esp_err_t elev_err = elevator_claw.calibrate();
         elev_calibrated = elev_err == ESP_OK;
@@ -887,11 +879,12 @@ esp_err_t setup_autonomous()
             ESP_LOGI(TAG, "elevator calibration successful");
         }
 
-        if (elev_calibrated && worm_calibrated) {
-            elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
-            worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
-            worm_spear.set_spear(SPEAR_UP_SLIGHTLY_DEG, 100.0f);
-        }
+        elevator_claw.move_to_position(ElevatorPos::ELEV_FLOOR);
+        worm_spear.set_spear(SPEAR_UP_SLIGHTLY_DEG, 100.0f);
+
+        // if (elev_calibrated && worm_calibrated) {
+        //     worm_spear.move_to_position(SpearPos::SPEAR_LEFT);
+        // }
 
         ESP_RETURN_ON_FALSE(disable_front_chassis_outputs(),
                             ESP_ERR_INVALID_STATE,
@@ -899,7 +892,7 @@ esp_err_t setup_autonomous()
                             "failed to disable front chassis after calibration");
     }
 
-    s_status_led_pulse_tx.init();
+    // s_status_led_pulse_tx.init();
 
     setup_completed.store(true, std::memory_order_release);
 
@@ -996,9 +989,10 @@ void setup()
     xEventGroupSetBits(supervisor::g_robot_control_flags,
                        robot_flags::CONTROL_DRIVE_ENABLED | robot_flags::CONTROL_TAPE_ENABLED);
 
-    setup_autonomous();
+    // setup_autonomous();
     // start_autonomous_task();
 
+    // start_master_uart_tasks();
     // test_course();
 #endif
     vTaskDelete(nullptr);

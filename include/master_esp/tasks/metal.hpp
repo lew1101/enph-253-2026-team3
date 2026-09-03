@@ -32,8 +32,8 @@ constexpr metal_detector::MetalDetector::Config METAL_1_CFG{
     .detect_count_required = 4,
     .clear_count_required = 8,
 
-    .detect_threshold = -7.5f,
-    .clear_threshold = -4.0f,
+    .detect_threshold = -10.5f,
+    .clear_threshold = -6.0f,
 
     .baseline_samples = 200,
     .baseline_discard = 70,

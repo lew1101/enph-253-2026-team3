@@ -9,8 +9,8 @@
 
 using control::Pose;
 
-constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.15f;
-constexpr TickType_t DEFAULT_POSE_TIMEOUT = pdMS_TO_TICKS(3000);
+constexpr float DEFAULT_PATH_LOOKAHEAD_M = 0.19f;
+constexpr TickType_t DEFAULT_POSE_TIMEOUT = pdMS_TO_TICKS(5000);
 
 constexpr robot_DriveCommand make_pose_drive_command(
     const Pose &pose, bool is_relative = false, float path_lookahead_m = DEFAULT_PATH_LOOKAHEAD_M)
